@@ -1131,3 +1131,146 @@
     backdrop-filter: none;
   }
 }
+
+/* ── Product marquee ────────────────────────────────────────────────────── */
+
+/*
+ * The opening screen's answer to "what does this shop sell".
+ *
+ * It bleeds past the reading column to the viewport edges, because a row that
+ * stops inside the column reads as a finished list rather than a shelf
+ * continuing out of frame.
+ */
+.marquee {
+  margin-top: var(--space-6);
+  margin-inline: calc(50% - 50vw);
+  padding-inline: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* Faded at both ends so cards enter and leave rather than being cut off. */
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  animation: rise var(--dur-enter) var(--ease-out) 200ms both;
+}
+
+.marquee-row {
+  overflow: hidden;
+}
+
+.marquee-track {
+  display: flex;
+  gap: var(--space-3);
+  width: max-content;
+  animation-name: marquee-left;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.marquee-row[data-direction='right'] .marquee-track {
+  animation-name: marquee-right;
+}
+
+/* The list is duplicated, so -50% is exactly one full copy and the loop has
+   no seam. */
+@keyframes marquee-left {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marquee-right {
+  from {
+    transform: translateX(-50%);
+  }
+}
+
+/* Hovering is someone trying to read one; stop moving it out from under them. */
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track,
+.marquee[data-paused='true'] .marquee-track {
+  animation-play-state: paused;
+}
+
+.marquee-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  text-align: left;
+  box-shadow: var(--shadow-lift);
+  transition:
+    transform var(--dur-enter) var(--ease-out),
+    border-color var(--dur-quick) ease,
+    box-shadow var(--dur-enter) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .marquee-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--brand) 38%, transparent);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--brand) 18%, transparent);
+  }
+}
+
+.marquee-card:active {
+  transform: scale(0.98);
+}
+
+.marquee-art {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+  border-radius: 999px;
+  overflow: hidden;
+  background: linear-gradient(150deg, var(--surface-sunken), color-mix(in srgb, var(--brand) 10%, var(--surface-sunken)));
+}
+
+.marquee-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.marquee-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+}
+
+.marquee-name {
+  font-size: var(--text-sm);
+  line-height: 1.25;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.marquee-price {
+  font-size: var(--text-xs);
+  color: var(--ink-secondary);
+}
+
+/* Reduced motion: the products are the content, so they stay — only the
+   drifting goes. */
+.marquee-still {
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-inline: 0;
+  mask-image: none;
+  -webkit-mask-image: none;
+  gap: var(--space-2);
+}
+
+@media (max-width: 34rem) {
+  .marquee-name {
+    max-width: 8.5rem;
+  }
+}

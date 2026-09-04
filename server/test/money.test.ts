@@ -38,7 +38,7 @@ before(() => {
     credentialsEnc: null,
     credentialsHint: null,
   })
-  connections.activate(tenantId, 'manual')
+  connections.activate(tenantId, 'manual', ['catalog', 'payment'])
 })
 
 after(() => {

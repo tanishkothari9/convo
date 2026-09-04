@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { contrastOn, hexToRgb, shade } from '../lib/format'
 import { IconCart, IconSpark } from '../components/icons'
 import { Thinking } from './Thinking'
+import { ProductMarquee, type MarqueeProduct } from './ProductMarquee'
 import { Composer } from './Composer'
 import { CartSheet } from './CartSheet'
 import { ProductCards } from './cards/ProductCards'
@@ -24,6 +25,7 @@ interface BrandResponse {
   catalogSize: number
   categories: string[]
   openers: string[]
+  showcase: MarqueeProduct[]
 }
 
 interface HistoryResponse {
@@ -347,6 +349,13 @@ export function ChatPage() {
                   ))}
                 </div>
               )}
+
+              {/* The shop's own goods, before a word is typed. Tapping one
+                  starts the conversation about that product. */}
+              <ProductMarquee
+                products={brand.showcase ?? []}
+                onPick={(product) => send(`Tell me about the ${product.name}`)}
+              />
             </section>
           ) : (
             <ol className="chat-log">

@@ -21,7 +21,7 @@ import { gatedConfirmPayment } from '../agent/gates.js'
 import { mockRazorpay } from '../commerce/razorpay/mock.js'
 import { signManualPayment } from '../commerce/manual.js'
 import { resolveProvider } from '../commerce/registry.js'
-import type { Tenant } from '../domain/types.js'
+import type { Product, Tenant } from '../domain/types.js'
 
 export const chatRoutes = Router()
 
@@ -66,6 +66,7 @@ chatRoutes.get(
       catalogSize: catalog.length,
       categories: [...new Set(catalog.map((p) => p.category).filter(Boolean))].slice(0, 8),
       openers: openers(catalog.length),
+      showcase: showcase(catalog, tenant.currency),
     })
   }),
 )
@@ -306,4 +307,43 @@ chatRoutes.get(
 function openers(catalogSize: number): string[] {
   if (catalogSize === 0) return ['What do you sell?']
   return ['Show me what you have', 'Something under ₹5,000', 'What is popular right now']
+}
+
+/**
+ * The products the storefront drifts across its opening screen.
+ *
+ * Photographed and in stock only — an empty tile or a sold-out item is a worse
+ * first impression than a shorter row. Spread across categories so the marquee
+ * shows the range rather than twelve variations of one thing.
+ */
+function showcase(catalog: Product[], currency: string) {
+  const eligible = catalog.filter((p) => p.images.length > 0 && p.stock > 0)
+
+  const byCategory = new Map<string, Product[]>()
+  for (const product of eligible) {
+    const key = product.category ?? ''
+    byCategory.set(key, [...(byCategory.get(key) ?? []), product])
+  }
+
+  const spread: Product[] = []
+  const buckets = [...byCategory.values()]
+  for (let round = 0; spread.length < 12; round += 1) {
+    let added = false
+    for (const bucket of buckets) {
+      const product = bucket[round]
+      if (!product) continue
+      spread.push(product)
+      added = true
+      if (spread.length === 12) break
+    }
+    if (!added) break
+  }
+
+  return spread.map((product) => ({
+    id: product.id,
+    name: product.name,
+    price_display: formatMoney(product.priceMinor, currency),
+    image_url: product.images[0] ?? null,
+    in_stock: product.stock > 0,
+  }))
 }

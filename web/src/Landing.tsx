@@ -3,15 +3,15 @@ import { Mark } from './components/Mark'
 import { LiveDemo } from './components/LiveDemo'
 import { ShaderField } from './components/ShaderField'
 import {
+  IconAgent,
   IconArrow,
   IconAudit,
   IconBolt,
   IconCatalogue,
+  IconGate,
   IconLink,
   IconProvider,
   IconRupee,
-  IconShield,
-  IconSpark,
 } from './components/icons'
 import { useDarkSurface } from './lib/useDarkSurface'
 import { useAuth } from './dashboard/auth'
@@ -23,7 +23,7 @@ const CAPABILITIES = [
     body: 'The agent searches your products and nothing else. Every price, image, and stock level on screen is joined from your records after the model has spoken, so it can choose what to show but never what it costs.',
   },
   {
-    icon: IconShield,
+    icon: IconGate,
     title: 'Gates, not good intentions',
     body: 'A cart write only accepts a product the agent actually looked up this conversation. Quantities are capped in the schema. An item that sells out between the cart and the till stops the charge.',
   },
@@ -51,7 +51,7 @@ const STEPS = [
     body: 'Your own address, in your own voice. The page that opens carries your name and your colour, not ours.',
   },
   {
-    icon: IconSpark,
+    icon: IconAgent,
     label: 'It sells',
     body: 'Search, cart, checkout, payment — inside the conversation, with the ledger writing itself behind it.',
   },
@@ -165,7 +165,7 @@ export function Landing() {
         <div className="section-inner">
           <header className="section-head">
             <span className="eyebrow">
-              <IconShield size={14} />
+              <IconGate size={14} />
               What holds when the model is wrong
             </span>
             <h2 className="section-title">
@@ -214,6 +214,7 @@ export function Landing() {
           </div>
 
           <div className="swap-visual">
+            <p className="swap-caption swap-caption-top">Swap the model</p>
             <div className="swap-rail">
               {['Claude', 'GPT', 'Built-in'].map((name, i) => (
                 <div key={name} className="swap-chip" style={{ animationDelay: `${i * 90}ms` }}>
@@ -222,11 +223,21 @@ export function Landing() {
                 </div>
               ))}
             </div>
+            <p className="swap-caption">Everything under it stays put</p>
+
             <div className="swap-stack">
-              {['Skills', 'Gates', 'Tool contracts', 'Audit trail'].map((layer, i) => (
-                <div key={layer} className="swap-layer" style={{ animationDelay: `${i * 70}ms` }}>
-                  <IconProvider size={15} />
-                  {layer}
+              <span className="swap-bracket" aria-hidden="true" />
+              {[
+                { label: 'Skills', icon: IconAgent },
+                { label: 'Gates', icon: IconGate },
+                { label: 'Tool contracts', icon: IconProvider },
+                { label: 'Audit trail', icon: IconAudit },
+              ].map((layer, i) => (
+                <div key={layer.label} className="swap-layer" style={{ animationDelay: `${i * 70}ms` }}>
+                  <span className="swap-layer-icon">
+                    <layer.icon size={16} />
+                  </span>
+                  {layer.label}
                   <span className="swap-layer-tag">unchanged</span>
                 </div>
               ))}

@@ -779,22 +779,43 @@
   box-shadow: 0 0 0 3px rgba(55, 208, 196, 0.22);
 }
 
+.swap-caption {
+  font-size: var(--text-xs);
+  letter-spacing: var(--text-xs-ls);
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: var(--space-2);
+}
+
+.swap-caption-top {
+  margin-bottom: var(--space-3);
+}
+
 .swap-stack {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  position: relative;
+  padding-left: var(--space-4);
 }
 
-/* The rule tying the swappable models to the layers that do not move. */
-.swap-stack::before {
-  content: '';
+/*
+ * A bracket, not a line through the rows.
+ *
+ * The earlier connector ran from the model chips down past every layer, which
+ * read as "the model feeds into these" — the opposite of the claim. A bracket
+ * beside the stack groups the four as one thing that the choice above does not
+ * reach into.
+ */
+.swap-bracket {
   position: absolute;
-  left: 1.0625rem;
-  top: -0.75rem;
-  bottom: 1.25rem;
-  width: 1px;
-  background: linear-gradient(180deg, var(--cyan-400), transparent);
+  left: 0;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 0.5rem;
+  border-left: 1.5px solid rgba(55, 208, 196, 0.55);
+  border-top: 1.5px solid rgba(55, 208, 196, 0.55);
+  border-bottom: 1.5px solid rgba(55, 208, 196, 0.55);
+  border-radius: 0.375rem 0 0 0.375rem;
 }
 
 .swap-layer {
@@ -807,20 +828,34 @@
   border: 1px solid rgba(255, 255, 255, 0.09);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  color: var(--ink);
+  color: #fff;
   animation: hero-in 520ms var(--ease-out) both;
 }
 
-.swap-layer svg {
-  color: var(--cyan-400);
+/* Each layer gets its own mark. Four rows of the same icon is noise that
+   looks like a rendering fault. */
+.swap-layer-icon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
   flex: none;
+  border-radius: 0.5rem;
+  color: var(--cyan-400);
+  background: rgba(47, 176, 138, 0.14);
 }
 
 .swap-layer-tag {
   margin-left: auto;
+  padding: 0.0625rem var(--space-2);
+  border-radius: var(--radius-chip);
+  background: rgba(47, 176, 138, 0.14);
+  border: 1px solid rgba(47, 176, 138, 0.26);
   font-size: var(--text-xs);
-  font-weight: var(--weight-regular);
-  color: var(--ink-muted);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--text-xs-ls);
+  color: var(--cyan-400);
+  white-space: nowrap;
 }
 
 /* ── Closing call to action ─────────────────────────────────────────────── */
