@@ -931,6 +931,15 @@ export const orders = {
     return orders.byId(tenantId, orderId)
   },
 
+  setProviderOrderId(tenantId: string, orderId: string, providerOrderId: string): void {
+    run('UPDATE orders SET provider_order_id = ?, updated_at = ? WHERE tenant_id = ? AND id = ?', [
+      providerOrderId,
+      nowIso(),
+      tenantId,
+      orderId,
+    ])
+  },
+
   revenueMinor(tenantId: string): number {
     const r = get<{ total: number | null }>(
       "SELECT SUM(total_amount_minor) AS total FROM orders WHERE tenant_id = ? AND status = 'paid'",
