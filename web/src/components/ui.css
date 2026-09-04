@@ -1,0 +1,421 @@
+/*
+ * The shared component layer. Both surfaces use these; nothing here is
+ * dashboard-only or chat-only.
+ */
+
+/* ── Button ─────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  height: 2.375rem;
+  border-radius: var(--radius-input);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.002em;
+  white-space: nowrap;
+  /* Named properties, never `all`: `all` animates layout too. */
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-quick) ease,
+    border-color var(--dur-quick) ease,
+    color var(--dur-quick) ease,
+    opacity var(--dur-quick) ease;
+}
+
+/* Instant feedback on press: the interface heard you. */
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover:not(:disabled) {
+    background: var(--brand-hover);
+  }
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--surface-hover);
+    border-color: var(--ink-muted);
+  }
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-secondary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--ink);
+  }
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-danger:hover:not(:disabled) {
+    background: var(--danger-tint);
+  }
+}
+
+.btn-sm {
+  height: 1.875rem;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.btn-lg {
+  height: 2.75rem;
+  padding: 0 var(--space-5);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ── Field ──────────────────────────────────────────────────────────────── */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field-label {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+
+.field-hint {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--ink-secondary);
+}
+
+.field-error {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--danger);
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  padding: 0 var(--space-3);
+  height: 2.375rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-input);
+  color: var(--ink);
+  transition:
+    border-color var(--dur-quick) ease,
+    box-shadow var(--dur-quick) ease;
+}
+
+.textarea {
+  height: auto;
+  min-height: 5rem;
+  padding: var(--space-3);
+  resize: vertical;
+  line-height: var(--text-base-lh);
+}
+
+.select {
+  appearance: none;
+  padding-right: var(--space-6);
+  /* The chevron is drawn, not a font glyph, so it stays crisp at any size. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838a99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--ink-muted);
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+.input[aria-invalid='true'],
+.textarea[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.input[aria-invalid='true']:focus,
+.textarea[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+/* Money inputs sit behind their symbol rather than repeating it in the label. */
+.input-prefixed {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-prefix {
+  position: absolute;
+  left: var(--space-3);
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.input-prefixed .input {
+  padding-left: 1.75rem;
+}
+
+/* ── Chip ───────────────────────────────────────────────────────────────── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  height: 2rem;
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  letter-spacing: var(--text-sm-ls);
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-quick) ease,
+    border-color var(--dur-quick) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover:not(:disabled) {
+    background: var(--brand-tint);
+    border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+  }
+}
+
+.chip:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Badge ──────────────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.0625rem var(--space-2);
+  border-radius: var(--radius-chip);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  letter-spacing: var(--text-xs-ls);
+  font-weight: var(--weight-medium);
+  background: var(--surface-sunken);
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+.badge-ok {
+  background: var(--accent-tint);
+  color: var(--accent-active);
+}
+
+.badge-warn {
+  background: var(--warning-tint);
+  color: var(--warning);
+}
+
+.badge-danger {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+/* A dot carries state where a word would be noise. */
+.badge-dot::before {
+  content: '';
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+/* ── Card ───────────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.card-pad {
+  padding: var(--space-5);
+}
+
+/* ── Table ──────────────────────────────────────────────────────────────── */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+.table th {
+  text-align: left;
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+  padding: 0 var(--space-4) var(--space-2);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  color: var(--ink-secondary);
+}
+
+.table td:first-child,
+.table th:first-child {
+  padding-left: 0;
+}
+
+.table td:last-child,
+.table th:last-child {
+  padding-right: 0;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.table .cell-strong {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+
+.table .cell-right {
+  text-align: right;
+}
+
+/* Wide tables scroll inside themselves; the page never scrolls sideways. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+
+/* An empty screen is an invitation to act, not an apology. */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-7) 0;
+  max-width: 34rem;
+}
+
+.empty-title {
+  font-size: var(--text-heading);
+  line-height: var(--text-heading-lh);
+  letter-spacing: var(--text-heading-ls);
+  font-weight: var(--weight-semibold);
+}
+
+.empty-body {
+  color: var(--ink-secondary);
+}
+
+/* ── Notice ─────────────────────────────────────────────────────────────── */
+
+.notice {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-input);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  background: var(--surface-sunken);
+  color: var(--ink-secondary);
+}
+
+.notice-danger {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.notice-ok {
+  background: var(--accent-tint);
+  color: var(--accent-active);
+}
+
+.notice-warn {
+  background: var(--warning-tint);
+  color: var(--warning);
+}
+
+/* ── Spinner ────────────────────────────────────────────────────────────── */
+
+/* Fast: a quicker spinner makes the same wait feel shorter. */
+.spinner {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 620ms linear infinite;
+  flex: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.6s;
+  }
+}

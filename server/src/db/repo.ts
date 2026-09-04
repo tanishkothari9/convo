@@ -401,8 +401,11 @@ export const connections = {
 export const products = {
   list(tenantId: string, opts: { includeInactive?: boolean } = {}): Product[] {
     const clause = opts.includeInactive ? '' : ' AND is_active = 1'
+    // rowid breaks the tie: several products added in the same millisecond
+    // would otherwise come back in an arbitrary order, and reversing this list
+    // is how the agent recovers the merchant's own catalogue order.
     return all(
-      `SELECT * FROM products WHERE tenant_id = ?${clause} ORDER BY created_at DESC`,
+      `SELECT * FROM products WHERE tenant_id = ?${clause} ORDER BY created_at DESC, rowid DESC`,
       [tenantId],
     ).map(toProduct)
   },

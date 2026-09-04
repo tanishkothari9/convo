@@ -1,0 +1,155 @@
+/*
+ * Convo design tokens.
+ *
+ * One source for both surfaces — the brand dashboard and the public chat page.
+ * They share every neutral, the type scale, the spacing rhythm, and the shapes;
+ * they differ only in density and in which accent is in force.
+ *
+ * On accent: Convo white-labels. Every tenant carries its own accent colour and
+ * the chat page runs on it, so Convo's own chrome has to recede rather than
+ * compete. The neutrals are very slightly cool so that a warm brand accent
+ * (Smart Choice's rust, say) sits on them without muddying.
+ */
+
+:root {
+  /* ── Neutrals ────────────────────────────────────────────────────────────
+     Cool-shifted, not warm: a warm ground fights half the brand accents that
+     will be dropped onto it. */
+  --canvas: #fbfbfd;
+  --surface: #ffffff;
+  --surface-sunken: #f4f5f8;
+  --surface-hover: #f0f1f5;
+
+  --ink: #1a1c22;          /* primary text */
+  --ink-secondary: #575d6b; /* supporting text, 5.8:1 on canvas */
+  --ink-muted: #838a99;     /* labels, timestamps, 3.4:1 — never body copy */
+  --ink-inverse: #ffffff;
+
+  --line: #e4e6ed;          /* hairlines and input borders */
+  --line-strong: #d2d6e0;   /* a boundary that carries weight */
+
+  /* ── Accent ──────────────────────────────────────────────────────────────
+     Convo's own: a deep bottle green. It belongs to the ledger side of this
+     product — totals, confirmations, the audit trail — and it recedes behind
+     whatever colour a brand brings. 4.9:1 on canvas. */
+  --accent: #1b6b54;
+  --accent-hover: #155943;
+  --accent-active: #114736;
+  --accent-tint: #eaf3f0;
+  --accent-tint-strong: #d4e7e0;
+  --accent-ring: rgba(27, 107, 84, 0.32);
+
+  /* The tenant's colour. Set on the chat page from the brand record; falls
+     back to Convo's own so nothing is ever unstyled. */
+  --brand: var(--accent);
+  --brand-hover: var(--accent-hover);
+  --brand-tint: var(--accent-tint);
+  --brand-ring: var(--accent-ring);
+  --brand-contrast: #ffffff;
+
+  /* ── Status ──────────────────────────────────────────────────────────────
+     Same muted family as the accent, so a warning never shouts. */
+  --danger: #b4342a;
+  --danger-tint: #fbeceb;
+  --warning: #8a5d0f;
+  --warning-tint: #fbf2e0;
+  --success: var(--accent);
+  --success-tint: var(--accent-tint);
+
+  /* ── Type ────────────────────────────────────────────────────────────────
+     One family. Inter sits behind Instrument Sans in the stack so any glyph
+     Instrument Sans lacks — the rupee sign above all — still renders.
+     Monospace is reserved for identifiers people compare character by
+     character; it is not a label style. */
+  --font: 'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  /* Tracking is size-specific: large text reads too loose as it grows, small
+     text too tight. A single letter-spacing would be wrong somewhere. */
+  --text-display: 2.125rem;   /* 34px */
+  --text-display-lh: 1.08;
+  --text-display-ls: -0.022em;
+
+  --text-title: 1.5rem;       /* 24px */
+  --text-title-lh: 1.2;
+  --text-title-ls: -0.016em;
+
+  --text-heading: 1.1875rem;  /* 19px */
+  --text-heading-lh: 1.32;
+  --text-heading-ls: -0.011em;
+
+  --text-lg: 1.0625rem;       /* 17px — chat messages */
+  --text-lg-lh: 1.55;
+  --text-lg-ls: -0.004em;
+
+  --text-base: 0.9375rem;     /* 15px */
+  --text-base-lh: 1.55;
+  --text-base-ls: 0;
+
+  --text-sm: 0.84375rem;      /* 13.5px */
+  --text-sm-lh: 1.45;
+  --text-sm-ls: 0.004em;
+
+  --text-xs: 0.75rem;         /* 12px */
+  --text-xs-lh: 1.4;
+  --text-xs-ls: 0.012em;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* ── Space ───────────────────────────────────────────────────────────────
+     A 4px rhythm. Everything in rem so a larger browser text size scales the
+     layout with the type instead of breaking it. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* ── Shape ───────────────────────────────────────────────────────────────
+     Different radii for different roles, rather than one radius on everything:
+     the shape is part of what tells you what a thing is. */
+  --radius-chip: 999px;
+  --radius-input: 0.5625rem;
+  --radius-card: 0.75rem;
+  --radius-sheet: 1.125rem;
+
+  /* Elevation is used sparingly: things that genuinely float. Two levels, not
+     one shadow reused at every depth. */
+  --shadow-raised: 0 1px 2px rgba(26, 28, 34, 0.05), 0 2px 8px rgba(26, 28, 34, 0.04);
+  --shadow-float: 0 4px 12px rgba(26, 28, 34, 0.07), 0 16px 40px rgba(26, 28, 34, 0.09);
+
+  /* ── Motion ──────────────────────────────────────────────────────────────
+     The built-in easings are too weak to read as intentional. ease-in is
+     absent on purpose: it delays the first frame, which is exactly the moment
+     the eye is on. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --dur-press: 110ms;   /* button feedback */
+  --dur-quick: 160ms;   /* hover, colour */
+  --dur-enter: 220ms;   /* cards, chips, popovers */
+  --dur-sheet: 320ms;   /* sheets and drawers */
+
+  --header-height: 3.5rem;
+  --chat-column: 43rem;   /* ~688px: under 80 characters at 17px */
+  --page-column: 68rem;
+}
+
+/*
+ * Reduced motion means gentler, not absent. Opacity and colour still carry
+ * meaning — what goes is travel.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-press: 1ms;
+    --dur-quick: 1ms;
+    --dur-enter: 120ms;
+    --dur-sheet: 120ms;
+  }
+}

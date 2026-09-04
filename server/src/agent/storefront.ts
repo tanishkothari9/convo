@@ -93,7 +93,23 @@ export class ConvoStorefront implements StorefrontBackend {
       )
     }
 
-    return scored.slice(0, limit).map(({ product }) => product)
+    const ranked = scored.map(({ product }) => product)
+
+    // An open browse — no terms, no sort asked for — should show the range the
+    // brand carries, not the cheapest few. Taking one product per category in
+    // turn puts a saree, a kurta, and a dupatta in the first row rather than
+    // whatever happens to sit at the bottom of the price list. It starts from
+    // the filtered list rather than the ranked one, because with no terms the
+    // ranking is only the price tiebreak and the merchant's own catalogue
+    // order is the better signal.
+    if (terms.length === 0 && !filters.sort) {
+      const inStockFirst = [...withinFilters]
+        .reverse() // the repository returns newest first; the merchant added oldest first
+        .sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0))
+      return spreadAcrossCategories(inStockFirst, limit)
+    }
+
+    return ranked.slice(0, limit)
   }
 
   async getProductDetails(session: StorefrontSession, productId: string): Promise<Product | null> {
@@ -224,6 +240,38 @@ export function ensureSession(
 ): StorefrontSession {
   const conversation = conversations.ensure(tenantId, customerSessionId)
   return { tenantId, conversationId: conversation.id, customerSessionId, currency }
+}
+
+/**
+ * One from each category in turn, until `limit` is reached.
+ *
+ * `products` arrives in the merchant's own catalogue order, which is kept
+ * within each category: they decided what comes first, and an open "what do
+ * you have" is exactly the moment to respect that rather than lead with
+ * whatever happens to be cheapest.
+ */
+function spreadAcrossCategories(products: Product[], limit: number): Product[] {
+  const byCategory = new Map<string, Product[]>()
+  for (const product of products) {
+    const key = product.category ?? ''
+    const bucket = byCategory.get(key)
+    if (bucket) bucket.push(product)
+    else byCategory.set(key, [product])
+  }
+  const buckets = [...byCategory.values()]
+  const out: Product[] = []
+  for (let round = 0; out.length < limit; round += 1) {
+    let added = false
+    for (const bucket of buckets) {
+      const product = bucket[round]
+      if (!product) continue
+      out.push(product)
+      added = true
+      if (out.length === limit) return out
+    }
+    if (!added) break
+  }
+  return out
 }
 
 // ── relevance ───────────────────────────────────────────────────────────────

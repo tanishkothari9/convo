@@ -27,7 +27,14 @@ const callId = () => `call_scripted_${(counter += 1)}`
 
 type Intent =
   | { kind: 'greeting' }
-  | { kind: 'search'; query: string; maxPriceMinor?: number; minPriceMinor?: number; category?: string }
+  | {
+      kind: 'search'
+      query: string
+      maxPriceMinor?: number
+      minPriceMinor?: number
+      category?: string
+      sort?: 'price_asc' | 'price_desc'
+    }
   | { kind: 'add'; reference: Reference; quantity: number }
   | { kind: 'remove'; reference: Reference }
   | { kind: 'view_cart' }
@@ -127,12 +134,16 @@ function plan_(request: AgentTurnRequest): Plan {
           call('search_catalog', {
             status: 'looking through the catalogue',
             query: intent.query,
-            ...(intent.maxPriceMinor !== undefined || intent.minPriceMinor !== undefined || intent.category
+            ...(intent.maxPriceMinor !== undefined ||
+            intent.minPriceMinor !== undefined ||
+            intent.category ||
+            intent.sort
               ? {
                   filters: {
                     ...(intent.maxPriceMinor !== undefined ? { max_price: intent.maxPriceMinor / 100 } : {}),
                     ...(intent.minPriceMinor !== undefined ? { min_price: intent.minPriceMinor / 100 } : {}),
                     ...(intent.category ? { category: intent.category } : {}),
+                    ...(intent.sort ? { sort: intent.sort } : {}),
                   },
                 }
               : {}),
@@ -249,6 +260,18 @@ function present(
   if (search) {
     const ids = productIdsIn(search.content)
     if (ids.length === 0) {
+      // The two-search rule from the search-discovery skill: one empty result
+      // says what that query matched, nothing about what the brand carries.
+      // Widen once before saying anything is missing.
+      if (searchCount(messages) < 2) {
+        return {
+          text: '',
+          toolCalls: [
+            call('search_catalog', { status: 'looking more broadly', query: '', limit: 6 }),
+          ],
+          stopReason: 'tool_use',
+        }
+      }
       return {
         text: "I couldn't find anything matching that in the catalogue. Try a different colour, fabric, or budget and I'll look again.",
         toolCalls: has('present_suggestions')
@@ -276,14 +299,31 @@ function present(
         stopReason: 'tool_use',
       }
     }
+    // A reason is a judgment about a stated need. With nothing stated — an
+    // open "show me what you have" — there is no judgment to make, so none is
+    // sent rather than a filler line.
+    const described = intent.kind === 'search' && intent.query !== 'featured'
+    // These results came from a widened second search: nothing matched what
+    // was actually asked for, and saying they "fit" would not be true.
+    const widened = searchCount(messages) > 1
     const picks = ids.slice(0, 6).map((product_id, index) => ({
       product_id,
-      ...(index === 0 ? { reason: 'Closest match to what you described' } : {}),
+      ...(index === 0 && described && !widened
+        ? { reason: 'Closest match to what you asked for' }
+        : {}),
     }))
     return {
-      text: ids.length === 1 ? "Here's what fits." : `Here are ${picks.length} that fit.`,
+      text: widened
+        ? 'Nothing matched that exactly. Here is what we do carry.'
+        : described
+          ? ids.length === 1
+            ? "Here's what fits."
+            : `Here are ${picks.length} that fit.`
+          : ids.length === 1
+            ? "Here's what we have."
+            : 'Here is a spread of what we carry.',
       toolCalls: [
-        call('present_products', { title: 'For you', layout: 'carousel', picks }),
+        call('present_products', { layout: 'carousel', picks }),
         ...(has('present_suggestions')
           ? [
               call('present_suggestions', {
@@ -337,7 +377,17 @@ function present(
       : [],
     stopReason: 'end_turn',
   }
-  void messages
+}
+
+/** How many catalogue searches this turn has already run. */
+function searchCount(messages: ModelMessage[]): number {
+  let count = 0
+  for (const message of messages) {
+    if (message.role === 'user') count = 0
+    if (message.role !== 'assistant') continue
+    count += message.toolCalls.filter((call) => call.name === 'search_catalog').length
+  }
+  return count
 }
 
 // ── intent reading ──────────────────────────────────────────────────────────
@@ -376,7 +426,23 @@ function readIntent(messages: ModelMessage[]): Intent {
     return { kind: 'view_cart' }
   }
 
-  return { kind: 'search', query: cleanQuery(text), ...readPriceBounds(text) }
+  return {
+    kind: 'search',
+    query: cleanQuery(text),
+    ...readPriceBounds(text),
+    ...readSort(text),
+  }
+}
+
+/** "cheapest kurta" is a sort the customer stated, not a word to match on. */
+function readSort(text: string): { sort?: 'price_asc' | 'price_desc' } {
+  if (/\b(cheap|cheapest|cheaper|budget|affordable|lowest|least expensive|inexpensive)\b/.test(text)) {
+    return { sort: 'price_asc' }
+  }
+  if (/\b(expensive|premium|finest|luxury|dearest|priciest|most expensive|high end)\b/.test(text)) {
+    return { sort: 'price_desc' }
+  }
+  return {}
 }
 
 function readReference(text: string): Reference {
@@ -425,7 +491,7 @@ function readPriceBounds(text: string): { maxPriceMinor?: number; minPriceMinor?
 }
 
 const FILLER =
-  /\b(show|me|please|can|you|i|want|need|looking|for|some|something|a|an|the|do|have|got|any|find|search|get|add|buy|to|my|cart|and|is|are|there|would|like|of|in|with|under|below|over|above|less|than|more|at|least|upto|up|within|max|maximum|min|minimum|thousand|rs|inr|rupees)\b/g
+  /\b(show|me|please|can|could|you|your|i|want|need|needed|looking|look|for|some|something|anything|everything|all|stuff|things?|options?|available|a|an|the|do|does|have|having|got|any|find|search|see|browse|get|give|add|buy|to|my|cart|and|is|are|was|there|would|will|like|of|in|on|with|what|whats|which|who|how|about|got|carry|sell|stock|new|latest|best|popular|featured|nice|good|rs|inr|rupees|under|below|over|above|less|than|more|at|least|upto|up|within|max|maximum|min|minimum|thousand)\b/g
 
 function cleanQuery(text: string): string {
   const stripped = text
