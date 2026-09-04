@@ -88,8 +88,10 @@ export interface Product {
 
 export interface ProviderConnection {
   id: string
-  providerType: 'manual' | 'razorpay'
+  providerType: 'manual' | 'razorpay' | 'shopify'
   capabilities: string
+  isCatalogSource: boolean
+  isPaymentProcessor: boolean
   credentialsHint: string | null
   syncStatus: 'never' | 'syncing' | 'ok' | 'error'
   syncError: string | null

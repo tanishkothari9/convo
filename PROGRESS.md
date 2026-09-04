@@ -17,7 +17,8 @@ build order is done, and the last thing done was the polish pass.
 | Per-brand persona, accent colour, and model choice | Driven in a browser |
 | Layout at laptop, tablet, and 375px phone widths | Measured and screenshotted |
 
-`npm test` → 29 passing. `npm run typecheck` → clean, both workspaces.
+`npm test` → 49 passing. `npm run typecheck` → clean, both workspaces. Production
+build → clean. Every page loads with no failed requests and no console errors.
 
 ## The graceful failure cases
 
@@ -55,6 +56,16 @@ Neither blocked the build; both were worked around rather than skipped.
 
 See `DECISIONS.md` for what each of those means in detail.
 
+## Added since the first build
+
+| | |
+|---|---|
+| **Public REST API** | `/v1` — bulk upsert by your own id, products CRUD, orders, audit, `/me`. Keys minted in Dashboard → Developers. |
+| **API reference** | `/docs` — fills in your own key and host when signed in, so the first example is a live request. |
+| **Shopify** | Catalogue source. Brands can now take products from one provider and payments from another. |
+| **Storefront marquee** | The brand's real catalogue drifting on the opening screen, tappable to start a conversation. |
+| **Security** | Rate limiting, no account enumeration, no SVG image XSS, no SSRF through a shop name, security headers, tenant isolation under test. |
+
 ## Known limits
 
 Not bugs — things deliberately out of scope, listed so you are not surprised:
@@ -63,7 +74,8 @@ Not bugs — things deliberately out of scope, listed so you are not surprised:
 - No customer accounts; order history is per-conversation.
 - No webhooks. Payment confirmation is synchronous from the browser, so a
   customer who closes the tab mid-payment leaves an order awaiting payment.
-- No rate limiting on the chat routes.
+- Rate limiting is per instance, not shared across a cluster.
+- The Shopify sync reads four pages of 250 products; beyond that, push by API.
 - Currency is INR for every tenant; there is no UI to change it.
 - Dark mode is not built.
 

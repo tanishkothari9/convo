@@ -171,12 +171,75 @@ appears only on identifiers people compare character by character.
   checked against its product by eye. They are placeholders; a real brand
   replaces them in the dashboard.
 
+## Added in the ship-ready pass
+
+### The public API is addressed by *your* id, not ours
+
+`POST /v1/products/bulk` takes an `external_id` — the merchant's own — and
+upserts on it. That one choice is what makes an integration safe to leave
+running: a cron job that fires twice, or a retry after a timeout, updates the
+same rows instead of doubling the catalogue. Convo's own ids are still returned
+and still work, so no mapping table is needed on either side.
+
+The batch is one transaction. A 400-row payload with one bad price writes
+nothing, which is the behaviour you want when the failure happens at 3am and
+nobody reads the log until morning.
+
+### Shopify is catalogue-only, and that forced a better model
+
+Shopify's checkout belongs to Shopify, and a customer buying inside a Convo
+conversation is not in it. Rather than fake it, the adapter declares
+`payment: false` — which meant `provider_connections` had to stop assuming one
+active provider per brand. It now has two roles: where the catalogue comes from,
+and who takes the money. Shopify for products and Razorpay for payment is a
+supported combination, and a provider is only offered a role its adapter can
+fill.
+
+WooCommerce is the same shape when you want it; nothing else changes.
+
+### API keys are digests, not secrets
+
+Stored as SHA-256, not scrypt — unlike a password this is 256 bits of random,
+there is nothing to brute-force, and the lookup happens on every request. The
+consequence to know about: **a lost key cannot be recovered, only replaced.**
+The `cvo_` prefix is deliberate, so a key pasted into a repository is findable
+by secret scanners.
+
+### Rate limiting is in-process
+
+Per instance, so running several behind a load balancer multiplies the
+effective limit by the instance count. That is the right trade today — no Redis,
+cannot fail open on a network blip — and the numbers are low enough that a few
+multiples is still far from a problem. Moving to a shared store is
+`lib/ratelimit.ts` and nothing else.
+
+The chat limiter is keyed by **customer session, not IP**, on purpose: a shop's
+customers share addresses behind carrier NAT, and throttling them as one caller
+would break the storefront for a whole city.
+
+### The landing and sign-in are dark; the working surfaces are light
+
+Not indecision. Convo's own pages carry the brand and an animated field; the
+dashboard and the storefront are full of figures and photographs, where paper
+beats atmosphere. The dashboard's dark navigation rail puts that seam inside one
+screen so the change of register is a deliberate edge rather than a jolt between
+pages.
+
+### Icons are drawn on one rule
+
+Every icon is built from the three horizontal registers of a ledger, bent into
+its subject — because the rupee sign is already two rules over a stem, so the
+currency this product counts in seeds the set. Settings is the one exception,
+turned vertical, because it sits under Provider in the rail and two icons of
+horizontal lines and beads are not distinguishable at 17px.
+
 ## What a deployment still owns
 
 Convo is complete as a working system, not as a production deployment. Before
 real money moves:
 
-- **Rate limiting** in front of the chat routes. There is none.
+- **A shared rate-limit store** once more than one instance runs. The limiter
+  is in-process today; see above.
 - **Webhooks.** Payment confirmation is synchronous, from the browser. Razorpay
   can also confirm out-of-band, and a real deployment needs that path so a
   customer who closes the tab mid-payment is not lost.
@@ -185,5 +248,8 @@ real money moves:
 - **Postgres**, and a connection pool.
 - **A retry and timeout policy** around provider calls. There is a 20-second
   timeout and no retry.
-- **Log hygiene review.** Credentials, session ids, and cookies are never
-  logged today; keep it that way.
+- **Log hygiene review.** Credentials, session ids, API keys and cookies are
+  never logged today; keep it that way.
+- **A CSP report endpoint.** The policy is set but nothing collects violations.
+- **Cursor pagination for the Shopify sync.** It reads four pages of 250; past
+  a thousand products a merchant should push to `/v1/products` instead.
