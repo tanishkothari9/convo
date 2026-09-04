@@ -722,6 +722,13 @@
   margin-top: var(--space-3);
 }
 
+.order-checking {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.375rem;
+}
+
 /* ── Confirmation ───────────────────────────────────────────────────────── */
 
 .confirm-card {

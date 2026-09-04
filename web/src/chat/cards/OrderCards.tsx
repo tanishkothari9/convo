@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import type { OrderConfirmationPayload, OrderSummaryPayload } from '../types'
 import { PaymentPanel } from './PaymentPanel'
@@ -22,8 +22,38 @@ export function OrderSummaryCard({
   disabled: boolean
 }) {
   const [paying, setPaying] = useState(false)
-  const [state, setState] = useState<'open' | 'paid' | 'failed' | 'cancelled'>('open')
+  const [state, setState] = useState<'open' | 'paid' | 'failed' | 'cancelled' | 'superseded' | 'checking'>(
+    'checking',
+  )
   const [reason, setReason] = useState<string | null>(null)
+
+  /*
+   * A card stays in the transcript, so scrolling back reaches an order that may
+   * have been paid, cancelled, or replaced since. The server is the authority on
+   * that, so the card asks it before offering to pay anything.
+   */
+  useEffect(() => {
+    let live = true
+    api
+      .get<{ order: { status: string; failureReason: string | null } }>(
+        `/chat/${slug}/orders/${payload.order_id}`,
+      )
+      .then(({ order }) => {
+        if (!live) return
+        if (order.status === 'paid') setState('paid')
+        else if (order.status === 'cancelled') {
+          setState('superseded')
+          setReason(order.failureReason)
+        } else if (order.status === 'failed') {
+          setState('failed')
+          setReason(order.failureReason ?? 'The payment did not go through.')
+        } else setState('open')
+      })
+      .catch(() => live && setState('open'))
+    return () => {
+      live = false
+    }
+  }, [slug, payload.order_id])
 
   async function cancel() {
     setPaying(false)
@@ -103,7 +133,19 @@ export function OrderSummaryCard({
         </>
       )}
 
+      {state === 'checking' && (
+        <p className="order-checking t-sm t-muted">
+          <span className="spinner" /> Checking this order
+        </p>
+      )}
+
       {state === 'paid' && <p className="notice notice-ok">Paid. Your confirmation is below.</p>}
+
+      {state === 'superseded' && (
+        <p className="notice">
+          {reason ?? 'This order was replaced by a newer one.'} Nothing was charged for it.
+        </p>
+      )}
 
       {state === 'cancelled' && (
         <div className="order-retry">

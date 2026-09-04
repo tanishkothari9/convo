@@ -80,6 +80,50 @@ async function withCartLock<T>(conversationId: string, fn: () => Promise<T>): Pr
   }
 }
 
+/**
+ * Changing the cart after a checkout was staged.
+ *
+ * `checkout` locks the cart so nothing moves while a payment is in flight. If
+ * the customer goes back to shopping instead of paying, that lock would
+ * otherwise strand their items in a cart they can no longer reach and start
+ * them a fresh empty one. So a cart write reopens the locked cart and cancels
+ * the order that locked it — they are telling us they are not done.
+ */
+function reopenAfterCheckout(session: StorefrontSession, reasoning: string | null): void {
+  const open = carts.ensureOpen(session.tenantId, session.conversationId)
+  if (open.items.length > 0) return
+
+  const locked = carts.latestLocked(session.tenantId, session.conversationId)
+  if (!locked || locked.items.length === 0) return
+
+  const pending = orders
+    .pendingForConversation(session.tenantId, session.conversationId)
+    .filter((order) => order.cartId === locked.id)
+
+  transaction(() => {
+    for (const order of pending) {
+      orders.setStatus(session.tenantId, order.id, 'cancelled', {
+        failureReason: 'The customer went back to shopping before paying.',
+      })
+      audit.record({
+        tenantId: session.tenantId,
+        conversationId: session.conversationId,
+        cartId: locked.id,
+        orderId: order.id,
+        actionType: 'payment.failed',
+        amountMinor: order.totalAmountMinor,
+        currency: order.currency,
+        outcome: 'blocked',
+        reasoning,
+        detail: { reason: 'cart reopened before payment' },
+      })
+    }
+    // The empty cart opened above is discarded; the locked one becomes current.
+    if (open.id !== locked.id) carts.setStatus(session.tenantId, open.id, 'abandoned')
+    carts.setStatus(session.tenantId, locked.id, 'open')
+  })
+}
+
 function cartSummary(cart: PricedCart): string {
   if (cart.lines.length === 0) return 'the cart is empty'
   const items = `${cart.itemCount} item${cart.itemCount === 1 ? '' : 's'}`
@@ -136,6 +180,7 @@ export async function gatedAddToCart(args: {
   const requested = Math.max(1, args.quantity)
 
   return withCartLock(session.conversationId, async () => {
+    reopenAfterCheckout(session, 'customer added another item after staging a checkout')
     const current = await backend.getCart(session)
     const existing = current.lines.find((line) => line.productId === productId)
     if (!existing && current.lines.length >= config.maxCartLines) {
@@ -173,6 +218,7 @@ export async function gatedUpdateCartItem(args: {
   const applied = Math.min(requested, config.maxQuantityPerItem)
 
   return withCartLock(session.conversationId, async () => {
+    reopenAfterCheckout(session, 'customer changed a quantity after staging a checkout')
     const blocked = provenanceOrCart(session, productId)
     if (blocked) return blocked
     try {
@@ -194,6 +240,7 @@ export async function gatedRemoveFromCart(args: {
 }): Promise<ToolOutcome> {
   const { backend, session, productId } = args
   return withCartLock(session.conversationId, async () => {
+    reopenAfterCheckout(session, 'customer removed an item after staging a checkout')
     const blocked = provenanceOrCart(session, productId)
     if (blocked) return blocked
     const cart = await backend.removeFromCart(session, productId)
@@ -321,9 +368,32 @@ export async function gatedCheckout(args: {
       return failed(`${adapter.displayName} is not set up to take payments for this brand.`)
     }
 
+    // Staging a new order supersedes any earlier one for this conversation that
+    // could still be paid. Without this an order summary further up the
+    // transcript keeps a live pay button against a cart that has since changed,
+    // which is a second charge waiting to happen.
+    const superseded = orders.pendingForConversation(session.tenantId, session.conversationId)
+
     // The cart is locked and the order recorded before the provider is called,
     // so a provider that answers slowly cannot be charged for twice.
     const order = transaction(() => {
+      for (const stale of superseded) {
+        orders.setStatus(session.tenantId, stale.id, 'cancelled', {
+          failureReason: 'Replaced by a newer order in the same conversation.',
+        })
+        audit.record({
+          tenantId: session.tenantId,
+          conversationId: session.conversationId,
+          cartId: stale.cartId,
+          orderId: stale.id,
+          actionType: 'payment.failed',
+          amountMinor: stale.totalAmountMinor,
+          currency: stale.currency,
+          outcome: 'blocked',
+          reasoning: 'superseded by a newer checkout',
+          detail: { reason: 'superseded' },
+        })
+      }
       carts.setStatus(session.tenantId, cart.id, 'locked')
       audit.record({
         tenantId: session.tenantId,
@@ -487,6 +557,23 @@ export async function gatedConfirmPayment(args: {
   }
   if (order.status === 'paid') {
     return ok(`Order ${order.id} is already paid.`, [orderConfirmationComponent(order.id, order)])
+  }
+  if (order.status === 'cancelled') {
+    return ok(
+      `Order ${order.id} was cancelled or replaced by a newer one, so it cannot be paid. ` +
+        'Tell the customer nothing was charged and offer to check out again.',
+      [
+        {
+          component: 'payment_failed',
+          payload: {
+            order_id: order.id,
+            reason:
+              order.failureReason ?? 'This order was replaced by a newer one and cannot be paid.',
+            total_display: formatMoney(order.totalAmountMinor, order.currency),
+          },
+        },
+      ],
+    )
   }
 
   const { adapter, credentials, providerType } = resolveProvider(session.tenantId)

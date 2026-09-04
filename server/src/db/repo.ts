@@ -837,6 +837,16 @@ export const carts = {
     return carts.byId(tenantId, cartId)!
   },
 
+  /** The most recent cart locked by a checkout that was never paid. */
+  latestLocked(tenantId: string, conversationId: string): Cart | undefined {
+    const row = get<{ id: string }>(
+      `SELECT id FROM carts WHERE tenant_id = ? AND conversation_id = ? AND status = 'locked'
+       ORDER BY updated_at DESC LIMIT 1`,
+      [tenantId, conversationId],
+    )
+    return row ? carts.byId(tenantId, String(row.id)) : undefined
+  },
+
   setStatus(tenantId: string, cartId: string, status: CartStatus): void {
     run('UPDATE carts SET status = ?, updated_at = ? WHERE tenant_id = ? AND id = ?', [
       status,
@@ -932,6 +942,16 @@ export const orders = {
     params.push(tenantId, orderId)
     run(`UPDATE orders SET ${sets.join(', ')} WHERE tenant_id = ? AND id = ?`, params)
     return orders.byId(tenantId, orderId)
+  },
+
+  /** Orders for this conversation that could still be paid. */
+  pendingForConversation(tenantId: string, conversationId: string): Order[] {
+    return all(
+      `SELECT * FROM orders
+       WHERE tenant_id = ? AND conversation_id = ? AND status IN ('created', 'awaiting_payment')
+       ORDER BY created_at`,
+      [tenantId, conversationId],
+    ).map(toOrder)
   },
 
   setProviderOrderId(tenantId: string, orderId: string, providerOrderId: string): void {
