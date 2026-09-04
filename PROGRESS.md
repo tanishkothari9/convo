@@ -67,6 +67,22 @@ Not bugs — things deliberately out of scope, listed so you are not surprised:
 - Currency is INR for every tenant; there is no UI to change it.
 - Dark mode is not built.
 
+## Two brands are seeded, on purpose
+
+**Smart Choice** is the one to look at: sixteen products, each matched to its
+own photograph, a rust accent, and a full audit trail from the runs I did while
+building.
+
+**Kalaa Studio** (`owner@kalaa.demo` / `kalaa-demo-2026`, `/chat/kalaa-studio`)
+is an empty brand created through the real sign-up form. It is there so the
+empty states are visible without you having to make one: an empty catalogue, an
+empty audit trail, and a storefront that says the shop is not open yet and
+closes its own composer rather than inviting a message nothing can answer. It
+also shows tenant isolation is real — different accent, different slug,
+separate catalogue, separate everything.
+
+Delete it if you would rather have one brand.
+
 ## Where to look first
 
 1. `http://localhost:5173/chat/smart-choice` — the product.

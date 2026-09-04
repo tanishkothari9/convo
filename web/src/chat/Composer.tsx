@@ -11,11 +11,14 @@ export function Composer({
   brandName,
   chips,
   busy,
+  closed,
   onSend,
 }: {
   brandName: string
   chips: string[]
   busy: boolean
+  /** The brand has no catalogue, so there is nothing to answer with. */
+  closed?: boolean
   onSend(text: string): void
 }) {
   const [value, setValue] = useState('')
@@ -31,7 +34,7 @@ export function Composer({
 
   function submit() {
     const text = value.trim()
-    if (text === '' || busy) return
+    if (text === '' || busy || closed) return
     setValue('')
     onSend(text)
     field.current?.focus()
@@ -39,7 +42,7 @@ export function Composer({
 
   return (
     <div className="composer-layer">
-      {chips.length > 0 && (
+      {chips.length > 0 && !closed && (
         <div className="chip-rail">
           {chips.map((chip, index) => (
             <button
@@ -67,8 +70,9 @@ export function Composer({
           className="composer-field"
           rows={1}
           value={value}
-          placeholder={`Message ${brandName}`}
-          aria-label={`Message ${brandName}`}
+          disabled={closed}
+          placeholder={closed ? 'This shop is not open for messages yet' : `Message ${brandName}`}
+          aria-label={closed ? 'Messaging is closed' : `Message ${brandName}`}
           maxLength={2000}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => {
@@ -82,7 +86,7 @@ export function Composer({
         <button
           className="composer-send"
           type="submit"
-          disabled={busy || value.trim() === ''}
+          disabled={busy || closed || value.trim() === ''}
           aria-label="Send"
         >
           <SendIcon />

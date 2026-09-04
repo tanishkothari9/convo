@@ -250,12 +250,13 @@
 }
 
 /* A caret while the reply is still arriving. */
+/* A caret, not a block: it should sit in the text, not shout over it. */
 .reply[data-streaming='true']::after {
   content: '';
   display: inline-block;
-  width: 0.5rem;
+  width: 0.125rem;
   height: 1.05em;
-  margin-left: 0.125rem;
+  margin-left: 0.1875rem;
   vertical-align: -0.16em;
   border-radius: 1px;
   background: var(--brand);
@@ -323,6 +324,16 @@
  * becomes the thing being read, and the dot is only there to say it is still
  * running. Width and opacity, so the collapse is a movement rather than a cut.
  */
+.thinking-dots {
+  transition: gap 200ms var(--ease-out);
+}
+
+.thinking-dots[data-compact='true'] {
+  /* The gaps have to close too, or the collapsed dots leave a hole where the
+     other two used to be. */
+  gap: 0;
+}
+
 .thinking-dots[data-compact='true'] span:nth-child(2),
 .thinking-dots[data-compact='true'] span:nth-child(3) {
   width: 0;
@@ -734,8 +745,8 @@
 .confirm-card {
   display: flex;
   gap: var(--space-3);
-  border-color: color-mix(in srgb, var(--accent) 26%, transparent);
-  background: var(--accent-tint);
+  border-color: var(--success-line);
+  background: var(--success-tint);
 }
 
 .confirm-tick {
@@ -744,7 +755,7 @@
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--success);
   color: #fff;
   flex: none;
   animation: tick-in 320ms var(--ease-out) both;
@@ -759,7 +770,7 @@
 
 .confirm-title {
   font-weight: var(--weight-semibold);
-  color: var(--accent-active);
+  color: var(--success-strong);
   margin-bottom: 0.0625rem;
 }
 
@@ -906,6 +917,11 @@
 
 .composer-field::placeholder {
   color: var(--ink-muted);
+}
+
+.composer-field:disabled {
+  background: var(--surface-sunken);
+  cursor: not-allowed;
 }
 
 .composer-field:focus {

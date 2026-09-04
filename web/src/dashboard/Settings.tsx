@@ -21,7 +21,7 @@ export function Settings() {
     description: '',
     assistantName: '',
     brandVoice: '',
-    accentColor: '#1B6B54',
+    accentColor: '#1A1C22',
     llmProvider: '',
   })
   const [busy, setBusy] = useState(false)

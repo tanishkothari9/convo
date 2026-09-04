@@ -120,7 +120,7 @@
 
 .landing-steps {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
   gap: var(--space-6);
   padding-top: var(--space-7);
   border-top: 1px solid var(--line);

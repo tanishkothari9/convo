@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import type { OrderConfirmationPayload, OrderSummaryPayload } from '../types'
+import type { Component, OrderConfirmationPayload, OrderSummaryPayload } from '../types'
 import { PaymentPanel } from './PaymentPanel'
 
 /**
@@ -18,7 +18,7 @@ export function OrderSummaryCard({
 }: {
   payload: OrderSummaryPayload
   slug: string
-  onSettled(result: { paid: boolean; reason?: string }): void
+  onSettled(result: { paid: boolean; reason?: string; components?: Component[] }): void
   disabled: boolean
 }) {
   const [paying, setPaying] = useState(false)
@@ -68,18 +68,25 @@ export function OrderSummaryCard({
 
   async function confirm(result: Record<string, unknown>) {
     try {
-      const response = await api.post<{ status: string; failureReason: string | null }>(
-        `/chat/${slug}/orders/${payload.order_id}/confirm`,
-        result,
-      )
+      const response = await api.post<{
+        status: string
+        failureReason: string | null
+        components: Component[]
+      }>(`/chat/${slug}/orders/${payload.order_id}/confirm`, result)
       setPaying(false)
       if (response.status === 'paid') {
         setState('paid')
-        onSettled({ paid: true })
+        // The server authored the confirmation, down to the payment reference.
+        // The page posts it into the transcript rather than composing its own.
+        onSettled({ paid: true, components: response.components })
       } else {
         setState('failed')
         setReason(response.failureReason ?? 'The payment did not go through.')
-        onSettled({ paid: false, reason: response.failureReason ?? undefined })
+        onSettled({
+          paid: false,
+          reason: response.failureReason ?? undefined,
+          components: response.components,
+        })
       }
     } catch (error) {
       setPaying(false)
@@ -127,8 +134,10 @@ export function OrderSummaryCard({
             Pay {payload.total_display}
           </button>
           <p className="order-fineprint t-xs t-muted">
-            Payment happens in {payload.payment.provider_label}&rsquo;s panel. Never type a card
-            number, UPI PIN, or OTP into this chat.
+            {payload.payment.provider === 'razorpay'
+              ? `Payment happens in ${payload.payment.provider_label}'s own panel.`
+              : 'Payment happens in a separate panel.'}{' '}
+            Never type a card number, UPI PIN, or OTP into this chat.
           </p>
         </>
       )}

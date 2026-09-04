@@ -119,7 +119,7 @@ export const tenants = {
         input.assistantName ?? `${input.name} Assistant`,
         input.brandVoice ?? 'warm, precise, and unhurried',
         input.currency ?? 'INR',
-        input.accentColor ?? '#6D4AFF',
+        input.accentColor ?? '#1A1C22',
         now,
         now,
       ],

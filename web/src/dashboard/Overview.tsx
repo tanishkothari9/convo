@@ -66,7 +66,17 @@ export function Overview() {
       </section>
 
       <section className="stat-row">
-        <Stat label="Products" value={String(stats.products)} note={stats.outOfStock > 0 ? `${stats.outOfStock} out of stock` : 'all in stock'} />
+        <Stat
+          label="Products"
+          value={String(stats.products)}
+          note={
+            stats.products === 0
+              ? undefined
+              : stats.outOfStock > 0
+                ? `${stats.outOfStock} out of stock`
+                : 'all in stock'
+          }
+        />
         <Stat label="Conversations" value={String(stats.conversations)} />
         <Stat label="Paid orders" value={String(stats.orders)} />
         <Stat label="Taken" value={money(stats.revenueMinor, tenant.currency)} />

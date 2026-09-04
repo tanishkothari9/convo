@@ -233,6 +233,28 @@ export function ChatPage() {
       .catch(() => undefined)
   }, [slug])
 
+  /**
+   * A payment finished in the panel. The server authored the confirmation —
+   * including the payment reference — so it goes into the transcript as it
+   * came back, rather than the page writing its own version of what happened.
+   */
+  const settlePayment = useCallback(
+    (result: { paid: boolean; reason?: string; components?: Component[] }) => {
+      refreshCart()
+      const components = (result.components ?? []).filter(
+        (component) =>
+          component.component === 'order_confirmation' || component.component === 'payment_failed',
+      )
+      if (components.length === 0) return
+      setMessages((current) => [
+        ...current,
+        { id: `settled-${Date.now()}`, role: 'assistant', content: '', components },
+      ])
+      pinned.current = true
+    },
+    [refreshCart],
+  )
+
   // ── theme ─────────────────────────────────────────────────────────────────
   const theme = useMemo(() => {
     const accent = brand?.brand.accentColor ?? '#1B6B54'
@@ -298,7 +320,7 @@ export function ChatPage() {
               <p className="chat-open-hint t-sm t-muted">
                 {brand.catalogSize > 0
                   ? `${brand.brand.assistantName} can search the catalogue, keep a cart, and take you through checkout.`
-                  : `${brand.brand.name} has not published a catalogue yet.`}
+                  : `${brand.brand.name} has not put anything up for sale yet. Come back once they have.`}
               </p>
               {brand.catalogSize > 0 && (
                 <div className="chat-openers">
@@ -327,7 +349,7 @@ export function ChatPage() {
                       slug={slug}
                       disabled={thinking}
                       onAsk={send}
-                      onPaymentSettled={refreshCart}
+                      onPaymentSettled={settlePayment}
                     />
                   )}
                 </li>
@@ -343,6 +365,7 @@ export function ChatPage() {
         brandName={brand.brand.name}
         chips={thinking ? [] : lastChips}
         busy={thinking}
+        closed={brand.catalogSize === 0 && messages.length === 0}
         onSend={send}
       />
 
@@ -373,7 +396,7 @@ function Reply({
   slug: string
   disabled: boolean
   onAsk(text: string): void
-  onPaymentSettled(): void
+  onPaymentSettled(result: { paid: boolean; reason?: string; components?: Component[] }): void
 }) {
   if (message.error) {
     return <p className="reply-error">{message.error}</p>
@@ -403,7 +426,11 @@ function renderComponent(
   slug: string,
   disabled: boolean,
   onAsk: (text: string) => void,
-  onPaymentSettled: () => void,
+  onPaymentSettled: (result: {
+    paid: boolean
+    reason?: string
+    components?: Component[]
+  }) => void,
 ) {
   switch (component.component) {
     case 'products':
@@ -430,10 +457,7 @@ function renderComponent(
           payload={component.payload as unknown as OrderSummaryPayload}
           slug={slug}
           disabled={disabled}
-          onSettled={(result) => {
-            onPaymentSettled()
-            if (result.paid) onAsk('Thanks — is my order confirmed?')
-          }}
+          onSettled={onPaymentSettled}
         />
       )
     case 'order_confirmation':

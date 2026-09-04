@@ -17,6 +17,8 @@
   font-weight: var(--weight-medium);
   letter-spacing: -0.002em;
   white-space: nowrap;
+  /* A link styled as a button is a button: it does not carry a link's underline. */
+  text-decoration: none;
   /* Named properties, never `all`: `all` animates layout too. */
   transition:
     transform var(--dur-press) var(--ease-out),
@@ -254,8 +256,8 @@
 }
 
 .badge-ok {
-  background: var(--accent-tint);
-  color: var(--accent-active);
+  background: var(--success-tint);
+  color: var(--success-strong);
 }
 
 .badge-warn {
@@ -386,8 +388,8 @@
 }
 
 .notice-ok {
-  background: var(--accent-tint);
-  color: var(--accent-active);
+  background: var(--success-tint);
+  color: var(--success-strong);
 }
 
 .notice-warn {

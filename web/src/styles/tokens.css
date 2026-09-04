@@ -53,8 +53,16 @@
   --danger-tint: #fbeceb;
   --warning: #8a5d0f;
   --warning-tint: #fbf2e0;
-  --success: var(--accent);
-  --success-tint: var(--accent-tint);
+  /*
+   * Success is semantic, not brand. It stays green on a storefront whose accent
+   * is red, where a brand-coloured "paid" card would read as an error — and it
+   * is defined independently so changing Convo's own accent never changes what
+   * a confirmed payment looks like.
+   */
+  --success: #1b6b54;
+  --success-tint: #eaf3f0;
+  --success-strong: #114736;
+  --success-line: #c3ded5;
 
   /* ── Type ────────────────────────────────────────────────────────────────
      One family. Inter sits behind Instrument Sans in the stack so any glyph

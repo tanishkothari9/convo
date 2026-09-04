@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   assistant_name    TEXT NOT NULL DEFAULT 'Assistant',
   brand_voice       TEXT NOT NULL DEFAULT 'warm, precise, and unhurried',
   currency          TEXT NOT NULL DEFAULT 'INR',
-  accent_color      TEXT NOT NULL DEFAULT '#6D4AFF',
+  accent_color      TEXT NOT NULL DEFAULT '#1A1C22',
   -- Per-tenant model override; NULL falls back to the platform LLM_PROVIDER.
   llm_provider      TEXT,
   created_at        TEXT NOT NULL,

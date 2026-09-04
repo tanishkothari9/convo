@@ -26,7 +26,7 @@ import { env } from '../env.js'
  */
 export class ManualAdapter implements CommerceProviderAdapter {
   readonly type = 'manual'
-  readonly displayName = 'Convo catalog'
+  readonly displayName = 'Convo catalogue'
   readonly capabilities = { catalog: true, payment: true }
 
   async verifyCredentials(): Promise<{ ok: true; detail: string }> {
