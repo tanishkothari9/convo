@@ -207,3 +207,37 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at        TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_log(tenant_id, created_at);
+
+-- ── Public API keys ─────────────────────────────────────────────────────────
+
+-- A key is stored only as a SHA-256 digest: Convo cannot recover one, and a
+-- copy of this table is not a set of credentials. `prefix` is the first
+-- characters of the key, kept in clear so a merchant can tell two keys apart
+-- and so a leaked key can be matched to its row without holding the secret.
+CREATE TABLE IF NOT EXISTS api_keys (
+  id                TEXT PRIMARY KEY,
+  tenant_id         TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  key_hash          TEXT NOT NULL UNIQUE,
+  prefix            TEXT NOT NULL,
+  -- 'read' | 'write'. A write key can also read.
+  scope             TEXT NOT NULL DEFAULT 'write',
+  created_at        TEXT NOT NULL,
+  last_used_at      TEXT,
+  revoked_at        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+
+-- The merchant's own id for a product, so a re-sync updates instead of
+-- duplicating. Distinct from provider_native_id, which belongs to a connected
+-- provider rather than to the merchant's own system.
+ALTER TABLE products ADD COLUMN external_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_products_external
+  ON products(tenant_id, external_id) WHERE external_id IS NOT NULL;
+
+-- A brand can take its catalogue from one provider and its payments from
+-- another — Shopify for products, Razorpay for money — so the two roles are
+-- separate flags rather than one `is_active`.
+ALTER TABLE provider_connections ADD COLUMN is_catalog_source INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE provider_connections ADD COLUMN is_payment_processor INTEGER NOT NULL DEFAULT 0;

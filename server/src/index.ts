@@ -8,11 +8,18 @@ import { authRoutes } from './routes/auth.js'
 import { catalogRoutes } from './routes/catalog.js'
 import { providerRoutes } from './routes/providers.js'
 import { chatRoutes } from './routes/chat.js'
+import { apiRoutes } from './routes/api.js'
 import { modelProvider } from './models/index.js'
+import { limiters } from './lib/ratelimit.js'
+import { clientIp, rateLimit, securityHeaders } from './lib/security.js'
 
 const app = express()
 
 app.disable('x-powered-by')
+// One proxy hop is trusted for the client address; beyond that, X-Forwarded-For
+// is attacker-controlled and rate limiting by it would be trivially evaded.
+app.set('trust proxy', 1)
+app.use(securityHeaders)
 // Product images can be data URLs, so the JSON limit is generous but bounded.
 app.use(express.json({ limit: '2mb' }))
 app.use(cookieParser())
@@ -29,12 +36,17 @@ app.get('/api/health', (_req, res) => {
 // Public first, then the dashboard behind its own prefix: the dashboard
 // routers apply requireAuth at the router level, so they must not sit on a
 // path that public requests also travel through.
-app.use('/api/auth', authRoutes)
-app.use('/api', chatRoutes)
-app.use('/api/dashboard', catalogRoutes)
-app.use('/api/dashboard', providerRoutes)
+// The public REST API is versioned and authenticated by key, so it sits
+// outside /api where the cookie-authenticated surfaces live.
+app.use('/v1', apiRoutes)
 
-app.use('/api', (_req, res) => {
+app.use('/api/auth', authRoutes)
+app.use('/api', rateLimit(limiters.publicRead, clientIp), chatRoutes)
+const dashboardLimit = rateLimit(limiters.dashboard, clientIp)
+app.use('/api/dashboard', dashboardLimit, catalogRoutes)
+app.use('/api/dashboard', dashboardLimit, providerRoutes)
+
+app.use(['/api', '/v1'], (_req, res) => {
   res.status(404).json({ error: 'No such endpoint.' })
 })
 

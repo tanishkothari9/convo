@@ -2,8 +2,20 @@ import { Router } from 'express'
 import { tenants, users } from '../db/repo.js'
 import { badRequest, conflict, requireString, optionalString, route, unauthorized } from '../lib/http.js'
 import { slugify } from '../lib/ids.js'
-import { clearSession, issueSession, passwordFields, passwordMatches, requireAuth, type AuthedRequest } from '../auth/index.js'
+import {
+  burnPasswordWork,
+  clearSession,
+  issueSession,
+  passwordFields,
+  passwordMatches,
+  requireAuth,
+  type AuthedRequest,
+} from '../auth/index.js'
 import { transaction } from '../db/index.js'
+import { limiters } from '../lib/ratelimit.js'
+import { clientIp, rateLimit } from '../lib/security.js'
+
+const byIp = rateLimit(limiters.auth, clientIp)
 
 export const authRoutes = Router()
 
@@ -12,6 +24,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 /** Sign up: creates the brand and its first user together. */
 authRoutes.post(
   '/signup',
+  byIp,
   route(async (req, res) => {
     const email = requireString(req.body, 'email', 200).toLowerCase()
     const password = requireString(req.body, 'password', 200)
@@ -43,13 +56,19 @@ authRoutes.post(
 
 authRoutes.post(
   '/login',
+  byIp,
   route(async (req, res) => {
     const email = requireString(req.body, 'email', 200).toLowerCase()
     const password = requireString(req.body, 'password', 200)
 
     const credentials = users.credentialsByEmail(email)
-    // The same message either way, so this cannot enumerate accounts.
-    if (!credentials || !passwordMatches(password, credentials.hash, credentials.salt)) {
+    // The same message either way, and the same amount of work either way, so
+    // neither the wording nor the timing says whether the account exists.
+    if (!credentials) {
+      burnPasswordWork(password)
+      throw unauthorized('That email and password do not match.')
+    }
+    if (!passwordMatches(password, credentials.hash, credentials.salt)) {
       throw unauthorized('That email and password do not match.')
     }
 

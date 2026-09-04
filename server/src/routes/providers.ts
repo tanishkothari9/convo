@@ -13,14 +13,23 @@ import { credentialHint, encryptJson } from '../lib/crypto.js'
 import { log } from '../lib/logger.js'
 import { adapterFor, credentialsFor, listAdapters } from '../commerce/registry.js'
 import { ProviderApiError, ProviderConfigError } from '../commerce/types.js'
-import type { ProviderType } from '../domain/types.js'
+import type { ProviderRole, ProviderType } from '../domain/types.js'
 
 export const providerRoutes = Router()
 providerRoutes.use(requireAuth)
 
 const tenantOf = (req: unknown) => (req as AuthedRequest).auth.tenant
 
-const KNOWN: ProviderType[] = ['manual', 'razorpay']
+const KNOWN: ProviderType[] = ['manual', 'razorpay', 'shopify']
+
+/** The roles a provider can hold, from what its adapter actually supports. */
+function rolesFor(providerType: ProviderType): ProviderRole[] {
+  const { capabilities } = adapterFor(providerType)
+  return [
+    ...(capabilities.catalog ? (['catalog'] as const) : []),
+    ...(capabilities.payment ? (['payment'] as const) : []),
+  ]
+}
 
 function readProviderType(value: unknown): ProviderType {
   if (typeof value !== 'string' || !KNOWN.includes(value as ProviderType)) {
@@ -76,7 +85,7 @@ providerRoutes.post(
       throw badRequest(providerMessage(error), 'provider_rejected')
     }
 
-    const secretish = credentials.keyId ?? ''
+    const secretish = credentials.keyId ?? credentials.shop ?? ''
     connections.upsert({
       tenantId: tenant.id,
       providerType,
@@ -86,7 +95,9 @@ providerRoutes.post(
       credentialsEnc: Object.keys(credentials).length > 0 ? encryptJson(credentials) : null,
       credentialsHint: secretish ? credentialHint(secretish) : null,
     })
-    connections.activate(tenant.id, providerType)
+    // A provider takes only the roles its adapter can actually fill, so
+    // connecting Shopify does not quietly make it the payment processor.
+    connections.activate(tenant.id, providerType, rolesFor(providerType))
 
     log.info('provider connected', { tenantId: tenant.id, providerType })
     res.status(201).json({
@@ -102,7 +113,7 @@ providerRoutes.post(
     const tenant = tenantOf(req)
     const providerType = readProviderType(req.params.providerType)
     if (!connections.byType(tenant.id, providerType)) throw notFound('That provider is not connected.')
-    connections.activate(tenant.id, providerType)
+    connections.activate(tenant.id, providerType, rolesFor(providerType))
     res.json({ active: connections.active(tenant.id) })
   }),
 )
@@ -122,7 +133,7 @@ providerRoutes.delete(
         credentialsEnc: null,
         credentialsHint: null,
       })
-      connections.activate(tenant.id, 'manual')
+      connections.activate(tenant.id, 'manual', ['catalog', 'payment'])
     }
     res.json({ active: connections.active(tenant.id) })
   }),
@@ -174,13 +185,24 @@ providerRoutes.post(
 )
 
 function readCredentials(providerType: ProviderType, body: unknown): Record<string, string> {
-  if (providerType !== 'razorpay') return {}
-  const keyId = optionalString(body, 'keyId', 120)
-  const keySecret = optionalString(body, 'keySecret', 200)
-  // Both blank is valid: it selects Convo's built-in Razorpay test sandbox.
-  if (keyId && !keySecret) throw badRequest('A key id needs its key secret too.', 'missing_secret')
-  if (keySecret && !keyId) throw badRequest('A key secret needs its key id too.', 'missing_key_id')
-  return { ...(keyId ? { keyId } : {}), ...(keySecret ? { keySecret } : {}) }
+  if (providerType === 'razorpay') {
+    const keyId = optionalString(body, 'keyId', 120)
+    const keySecret = optionalString(body, 'keySecret', 200)
+    // Both blank is valid: it selects Convo's built-in Razorpay test sandbox.
+    if (keyId && !keySecret) throw badRequest('A key id needs its key secret too.', 'missing_secret')
+    if (keySecret && !keyId) throw badRequest('A key secret needs its key id too.', 'missing_key_id')
+    return { ...(keyId ? { keyId } : {}), ...(keySecret ? { keySecret } : {}) }
+  }
+
+  if (providerType === 'shopify') {
+    const shop = optionalString(body, 'shop', 120)
+    const accessToken = optionalString(body, 'accessToken', 200)
+    if (!shop) throw badRequest('Enter your Shopify store name.', 'missing_shop')
+    if (!accessToken) throw badRequest('Enter a Shopify Admin API access token.', 'missing_token')
+    return { shop, accessToken }
+  }
+
+  return {}
 }
 
 function providerMessage(error: unknown): string {

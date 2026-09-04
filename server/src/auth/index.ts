@@ -67,3 +67,17 @@ export function passwordFields(password: string): { hash: string; salt: string }
 export function passwordMatches(password: string, hash: string, salt: string): boolean {
   return verifyPassword(password, hash, salt)
 }
+
+/**
+ * Burns the same work as a real password check.
+ *
+ * Without this, "no such email" answers measurably faster than "wrong
+ * password", which turns the sign-in form into an account-enumeration oracle.
+ * The salt is fixed and the result discarded; only the elapsed time matters.
+ */
+export function burnPasswordWork(password: string): void {
+  verifyPassword(password, DUMMY_HASH, DUMMY_SALT)
+}
+
+const DUMMY_SALT = 'convo-timing-equalisation-salt'
+const DUMMY_HASH = hashPassword('convo-timing-equalisation').hash

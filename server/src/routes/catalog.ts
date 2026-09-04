@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { audit, connections, conversations, orders, products, tenants } from '../db/repo.js'
+import { apiKeys, audit, connections, conversations, orders, products, tenants } from '../db/repo.js'
 import { requireAuth, type AuthedRequest } from '../auth/index.js'
 import {
   badRequest,
@@ -13,6 +13,8 @@ import {
 import { slugify } from '../lib/ids.js'
 import { toMinor } from '../lib/money.js'
 import { env } from '../env.js'
+import { mintApiKey } from '../lib/apikeys.js'
+import { log } from '../lib/logger.js'
 import { AVAILABLE_PROVIDERS, providerStatus } from '../models/index.js'
 import type { Product } from '../domain/types.js'
 
@@ -149,6 +151,52 @@ catalogRoutes.delete(
   }),
 )
 
+// ── API keys ────────────────────────────────────────────────────────────────
+
+catalogRoutes.get(
+  '/api-keys',
+  route(async (req, res) => {
+    res.json({ keys: apiKeys.list(tenantOf(req).id) })
+  }),
+)
+
+catalogRoutes.post(
+  '/api-keys',
+  route(async (req, res) => {
+    const tenant = tenantOf(req)
+    const name = optionalString(req.body, 'name', 60) ?? 'API key'
+    const scope = req.body?.scope === 'read' ? 'read' : 'write'
+
+    const live = apiKeys.list(tenant.id).filter((k) => k.revokedAt === null)
+    if (live.length >= 10) {
+      throw badRequest('You already have 10 active keys. Revoke one first.', 'too_many_keys')
+    }
+
+    const minted = mintApiKey()
+    const record = apiKeys.create({
+      tenantId: tenant.id,
+      name,
+      keyHash: minted.hash,
+      prefix: minted.prefix,
+      scope,
+    })
+    log.info('api key created', { tenantId: tenant.id, keyId: record.id, scope })
+
+    // The only time the secret exists outside the caller's hands.
+    res.status(201).json({ key: record, secret: minted.secret })
+  }),
+)
+
+catalogRoutes.delete(
+  '/api-keys/:keyId',
+  route(async (req, res) => {
+    if (!apiKeys.revoke(tenantOf(req).id, req.params.keyId!)) {
+      throw notFound('No such key, or it is already revoked.')
+    }
+    res.status(204).end()
+  }),
+)
+
 // ── orders and audit ────────────────────────────────────────────────────────
 
 catalogRoutes.get(
@@ -180,13 +228,32 @@ function readProduct(body: unknown, currency: string) {
   }
 }
 
-/** Only http(s) and data-image URLs; anything else is dropped rather than rejected. */
-function readImages(value: unknown): string[] {
+/**
+ * Image URLs, filtered rather than rejected so one bad row does not fail a save.
+ *
+ * SVG is excluded in both forms. An `<svg>` can carry script, and these URLs
+ * are rendered in a customer's browser on a page the merchant controls the
+ * content of — which is exactly the shape of a stored XSS. Raster data URLs and
+ * https are allowed; plain http only outside production.
+ */
+export function readImages(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value
-    .filter((url): url is string => typeof url === 'string' && url.length < 2000)
-    .filter((url) => /^https?:\/\//i.test(url) || /^data:image\//i.test(url))
+    .filter((url): url is string => typeof url === 'string' && url.length < 4000)
+    .map((url) => url.trim())
+    .filter(isSafeImageUrl)
     .slice(0, 6)
+}
+
+const RASTER_DATA_URL = /^data:image\/(png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=\s]+$/i
+
+export function isSafeImageUrl(url: string): boolean {
+  if (/^data:/i.test(url)) return RASTER_DATA_URL.test(url)
+  if (/^https:\/\//i.test(url)) return !/\.svgz?($|[?#])/i.test(url)
+  // Plain http is for local development only; it would be a mixed-content
+  // warning in a customer's browser anyway.
+  if (/^http:\/\//i.test(url)) return !env.isProduction && !/\.svgz?($|[?#])/i.test(url)
+  return false
 }
 
 function readAttributes(value: unknown): Record<string, string> {

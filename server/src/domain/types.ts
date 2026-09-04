@@ -26,7 +26,8 @@ export interface TenantUser {
   createdAt: string
 }
 
-export type ProviderType = 'manual' | 'razorpay'
+export type ProviderType = 'manual' | 'razorpay' | 'shopify'
+export type ProviderRole = 'catalog' | 'payment'
 export type SyncStatus = 'never' | 'syncing' | 'ok' | 'error'
 
 export interface ProviderConnection {
@@ -34,6 +35,10 @@ export interface ProviderConnection {
   tenantId: string
   providerType: ProviderType
   capabilities: string
+  /** Where this brand's catalogue is synced from. */
+  isCatalogSource: boolean
+  /** Who takes the money at checkout. */
+  isPaymentProcessor: boolean
   credentialsHint: string | null
   syncStatus: SyncStatus
   syncError: string | null
@@ -49,6 +54,8 @@ export interface Product {
   tenantId: string
   source: ProviderType
   providerNativeId: string | null
+  /** The merchant's own id for this product, set through the public API. */
+  externalId: string | null
   name: string
   description: string | null
   priceMinor: number

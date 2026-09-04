@@ -9,6 +9,8 @@
 import { Router, type Request, type Response } from 'express'
 import { carts, conversations, messages as messageStore, orders, products, tenants } from '../db/repo.js'
 import { badRequest, notFound, requireString, route } from '../lib/http.js'
+import { limiters } from '../lib/ratelimit.js'
+import { RateLimitError } from '../lib/security.js'
 import { token } from '../lib/ids.js'
 import { formatMoney } from '../lib/money.js'
 import { env } from '../env.js'
@@ -101,6 +103,18 @@ chatRoutes.post(
     const tenant = tenantBySlug(req.params.slug!)
     const message = requireString(req.body, 'message', 2000)
     const customerSessionId = customerSession(req, res)
+
+    /*
+     * Every request here runs a model turn, so this is the endpoint that costs
+     * real money. It is limited per customer session rather than per IP: a
+     * shop's customers can share an address behind carrier NAT, and throttling
+     * them as one would break the product for a whole city.
+     */
+    const budget = limiters.chat.take(`${tenant.id}:${customerSessionId}`)
+    if (!budget.allowed) {
+      res.setHeader('Retry-After', String(budget.retryAfter))
+      throw new RateLimitError(budget.retryAfter)
+    }
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',

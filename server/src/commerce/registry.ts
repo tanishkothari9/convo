@@ -6,6 +6,7 @@
 import type { CommerceProviderAdapter } from './adapter.js'
 import { ManualAdapter } from './manual.js'
 import { RazorpayAdapter } from './razorpay/adapter.js'
+import { ShopifyAdapter } from './shopify.js'
 import type { ProviderCredentials } from './types.js'
 import type { ProviderType } from '../domain/types.js'
 import { connections } from '../db/repo.js'
@@ -15,6 +16,7 @@ import { log } from '../lib/logger.js'
 const ADAPTERS: Record<ProviderType, CommerceProviderAdapter> = {
   manual: new ManualAdapter(),
   razorpay: new RazorpayAdapter(),
+  shopify: new ShopifyAdapter(),
 }
 
 export function adapterFor(providerType: ProviderType): CommerceProviderAdapter {
@@ -33,9 +35,29 @@ export interface ResolvedProvider {
   credentials: ProviderCredentials
 }
 
-/** The tenant's active provider, defaulting to the manual catalog. */
+/**
+ * Who takes the money.
+ *
+ * This is what the money gate calls, so it must never resolve to a provider
+ * that cannot process a payment — a brand on Shopify falls back to the
+ * built-in processor rather than to an adapter that would throw at checkout.
+ */
 export function resolveProvider(tenantId: string): ResolvedProvider {
-  const connection = connections.active(tenantId)
+  const connection = connections.activePayment(tenantId)
+  const providerType: ProviderType =
+    connection && adapterFor(connection.providerType).capabilities.payment
+      ? connection.providerType
+      : 'manual'
+  return {
+    providerType,
+    adapter: adapterFor(providerType),
+    credentials: credentialsFor(tenantId, providerType),
+  }
+}
+
+/** Where the catalogue is synced from. */
+export function resolveCatalogProvider(tenantId: string): ResolvedProvider {
+  const connection = connections.activeCatalog(tenantId)
   const providerType: ProviderType = connection?.providerType ?? 'manual'
   return {
     providerType,

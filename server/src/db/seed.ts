@@ -253,7 +253,7 @@ function seed(): void {
         credentialsEnc: null,
         credentialsHint: null,
       })
-      connections.activate(tenant.id, 'manual')
+      connections.activate(tenant.id, 'manual', ['catalog', 'payment'])
     }
 
     log.info('seed complete', {

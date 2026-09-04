@@ -24,8 +24,59 @@ export function db(): DatabaseSync {
   handle.exec('PRAGMA journal_mode = WAL')
   handle.exec('PRAGMA foreign_keys = ON')
   handle.exec('PRAGMA busy_timeout = 5000')
+  // The schema is idempotent apart from ALTER TABLE, which SQLite has no
+  // IF NOT EXISTS for. Those statements are split out and allowed to fail on
+  // an already-migrated database; anything else failing is a real error.
   const schema = readFileSync(resolve(import.meta.dirname, 'schema.sql'), 'utf8')
-  handle.exec(schema)
+  const statements = schema.split(/;\s*$/m)
+  let batch = ''
+  for (const statement of statements) {
+    if (/^\s*ALTER TABLE/im.test(statement)) {
+      if (batch.trim()) handle.exec(batch)
+
+  // Backfill the split roles from the flag they replaced. Idempotent: it only
+  // touches rows where neither role has been set yet. Guarded because a
+  // process that started mid-write can reach here before its own ALTER landed.
+  try {
+    handle.exec(`
+      UPDATE provider_connections
+         SET is_catalog_source = is_active,
+             is_payment_processor = is_active
+       WHERE is_catalog_source = 0 AND is_payment_processor = 0 AND is_active = 1
+    `)
+  } catch (error) {
+    log.warn('role backfill skipped', {
+      reason: error instanceof Error ? error.message : 'unknown',
+    })
+  }
+      batch = ''
+      try {
+        handle.exec(statement)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : ''
+        if (!/duplicate column name/i.test(message)) throw error
+      }
+      continue
+    }
+    batch += statement + ';\n'
+  }
+  if (batch.trim()) handle.exec(batch)
+
+  // Backfill the split roles from the flag they replaced. Idempotent: it only
+  // touches rows where neither role has been set yet. Guarded because a
+  // process that started mid-write can reach here before its own ALTER landed.
+  try {
+    handle.exec(`
+      UPDATE provider_connections
+         SET is_catalog_source = is_active,
+             is_payment_processor = is_active
+       WHERE is_catalog_source = 0 AND is_payment_processor = 0 AND is_active = 1
+    `)
+  } catch (error) {
+    log.warn('role backfill skipped', {
+      reason: error instanceof Error ? error.message : 'unknown',
+    })
+  }
   log.info('database ready', { path: env.databasePath })
   return handle
 }

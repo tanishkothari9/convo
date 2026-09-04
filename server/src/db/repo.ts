@@ -21,6 +21,7 @@ import type {
   ProviderConnection,
   ProviderType,
   StoredMessage,
+  ProviderRole,
   SyncStatus,
   Tenant,
   TenantUser,
@@ -61,6 +62,7 @@ function toProduct(r: Record<string, unknown>): Product {
     tenantId: String(r.tenant_id),
     source: String(r.source) as ProviderType,
     providerNativeId: (r.provider_native_id as string) ?? null,
+    externalId: (r.external_id as string) ?? null,
     name: String(r.name),
     description: (r.description as string) ?? null,
     priceMinor: Number(r.price_minor),
@@ -274,6 +276,8 @@ function toConnection(r: Record<string, unknown>): ProviderConnection {
     tenantId: String(r.tenant_id),
     providerType: String(r.provider_type) as ProviderType,
     capabilities: String(r.capabilities),
+    isCatalogSource: bool(r.is_catalog_source),
+    isPaymentProcessor: bool(r.is_payment_processor),
     credentialsHint: (r.credentials_hint as string) ?? null,
     syncStatus: String(r.sync_status) as SyncStatus,
     syncError: (r.sync_error as string) ?? null,
@@ -291,9 +295,25 @@ export const connections = {
     ]).map(toConnection)
   },
 
+  /** Kept for the overview, which shows "who are we selling through". */
   active(tenantId: string): ProviderConnection | undefined {
+    return connections.activePayment(tenantId) ?? connections.activeCatalog(tenantId)
+  },
+
+  /** Where the catalogue is synced from. Null means Convo's own products. */
+  activeCatalog(tenantId: string): ProviderConnection | undefined {
     const r = get(
-      `SELECT * FROM provider_connections WHERE tenant_id = ? AND is_active = 1
+      `SELECT * FROM provider_connections WHERE tenant_id = ? AND is_catalog_source = 1
+       ORDER BY CASE provider_type WHEN 'manual' THEN 1 ELSE 0 END LIMIT 1`,
+      [tenantId],
+    )
+    return r ? toConnection(r) : undefined
+  },
+
+  /** Who takes the money. Falls back to the built-in test processor. */
+  activePayment(tenantId: string): ProviderConnection | undefined {
+    const r = get(
+      `SELECT * FROM provider_connections WHERE tenant_id = ? AND is_payment_processor = 1
        ORDER BY CASE provider_type WHEN 'manual' THEN 1 ELSE 0 END LIMIT 1`,
       [tenantId],
     )
@@ -375,17 +395,28 @@ export const connections = {
     )
   },
 
-  /** Exactly one connection is active per tenant; activating one deactivates the rest. */
-  activate(tenantId: string, providerType: ProviderType): void {
+  /**
+   * Makes one connection the tenant's source for a role.
+   *
+   * Roles are exclusive within themselves but independent of each other, so
+   * Shopify can be the catalogue while Razorpay takes the money. A provider is
+   * only offered a role its adapter actually supports.
+   */
+  activate(tenantId: string, providerType: ProviderType, roles: ProviderRole[]): void {
     transaction(() => {
-      run('UPDATE provider_connections SET is_active = 0, updated_at = ? WHERE tenant_id = ?', [
-        nowIso(),
-        tenantId,
-      ])
-      run(
-        'UPDATE provider_connections SET is_active = 1, updated_at = ? WHERE tenant_id = ? AND provider_type = ?',
-        [nowIso(), tenantId, providerType],
-      )
+      const now = nowIso()
+      for (const role of roles) {
+        const column = role === 'catalog' ? 'is_catalog_source' : 'is_payment_processor'
+        run(`UPDATE provider_connections SET ${column} = 0, updated_at = ? WHERE tenant_id = ?`, [
+          now,
+          tenantId,
+        ])
+        run(
+          `UPDATE provider_connections SET ${column} = 1, is_active = 1, updated_at = ?
+           WHERE tenant_id = ? AND provider_type = ?`,
+          [now, tenantId, providerType],
+        )
+      }
     })
   },
 
@@ -425,6 +456,57 @@ export const products = {
     ]).map(toProduct)
   },
 
+  byExternalId(tenantId: string, externalId: string): Product | undefined {
+    const r = get('SELECT * FROM products WHERE tenant_id = ? AND external_id = ?', [
+      tenantId,
+      externalId,
+    ])
+    return r ? toProduct(r) : undefined
+  },
+
+  /**
+   * Upserts by the merchant's own id.
+   *
+   * This is what makes a nightly sync safe to re-run: the same `external_id`
+   * updates the same row rather than growing a duplicate catalogue. A field the
+   * caller omits is left alone, so a partial payload is a partial update.
+   */
+  upsertByExternalId(
+    tenantId: string,
+    externalId: string,
+    input: {
+      name?: string
+      description?: string | null
+      priceMinor?: number
+      currency?: string
+      images?: string[]
+      stock?: number
+      category?: string | null
+      attributes?: Record<string, string>
+      isActive?: boolean
+    },
+  ): { product: Product; created: boolean } {
+    const existing = products.byExternalId(tenantId, externalId)
+    if (existing) {
+      const updated = products.update(tenantId, existing.id, input)!
+      return { product: updated, created: false }
+    }
+    const product = products.create({
+      tenantId,
+      externalId,
+      name: input.name ?? 'Untitled product',
+      description: input.description ?? null,
+      priceMinor: input.priceMinor ?? 0,
+      currency: input.currency ?? 'INR',
+      images: input.images ?? [],
+      stock: input.stock ?? 0,
+      category: input.category ?? null,
+      attributes: input.attributes ?? {},
+      source: 'manual',
+    })
+    return { product, created: true }
+  },
+
   create(input: {
     tenantId: string
     name: string
@@ -437,19 +519,21 @@ export const products = {
     attributes?: Record<string, string>
     source?: ProviderType
     providerNativeId?: string | null
+    externalId?: string | null
   }): Product {
     const now = nowIso()
     const productId = id('prd')
     run(
       `INSERT INTO products
-         (id, tenant_id, source, provider_native_id, name, description, price_minor, currency,
+         (id, tenant_id, source, provider_native_id, external_id, name, description, price_minor, currency,
           images, stock, category, attributes, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       [
         productId,
         input.tenantId,
         input.source ?? 'manual',
         input.providerNativeId ?? null,
+        input.externalId ?? null,
         input.name,
         input.description ?? null,
         input.priceMinor,
@@ -977,6 +1061,76 @@ export const orders = {
       [tenantId],
     )
     return Number(r?.total ?? 0)
+  },
+}
+
+// ── API keys ────────────────────────────────────────────────────────────────
+
+export interface ApiKeyRecord {
+  id: string
+  tenantId: string
+  name: string
+  prefix: string
+  scope: 'read' | 'write'
+  createdAt: string
+  lastUsedAt: string | null
+  revokedAt: string | null
+}
+
+function toApiKey(r: Record<string, unknown>): ApiKeyRecord {
+  return {
+    id: String(r.id),
+    tenantId: String(r.tenant_id),
+    name: String(r.name),
+    prefix: String(r.prefix),
+    scope: String(r.scope) as 'read' | 'write',
+    createdAt: String(r.created_at),
+    lastUsedAt: (r.last_used_at as string) ?? null,
+    revokedAt: (r.revoked_at as string) ?? null,
+  }
+}
+
+export const apiKeys = {
+  list(tenantId: string): ApiKeyRecord[] {
+    return all('SELECT * FROM api_keys WHERE tenant_id = ? ORDER BY created_at DESC', [
+      tenantId,
+    ]).map(toApiKey)
+  },
+
+  create(input: {
+    tenantId: string
+    name: string
+    keyHash: string
+    prefix: string
+    scope: 'read' | 'write'
+  }): ApiKeyRecord {
+    const keyId = id('key')
+    run(
+      `INSERT INTO api_keys (id, tenant_id, name, key_hash, prefix, scope, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [keyId, input.tenantId, input.name, input.keyHash, input.prefix, input.scope, nowIso()],
+    )
+    return apiKeys.list(input.tenantId).find((k) => k.id === keyId)!
+  },
+
+  /** Resolves a presented key. Revoked keys resolve to nothing. */
+  byHash(keyHash: string): (ApiKeyRecord & { keyHash: string }) | undefined {
+    const r = get('SELECT * FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL', [keyHash])
+    return r ? { ...toApiKey(r), keyHash: String(r.key_hash) } : undefined
+  },
+
+  touch(keyId: string): void {
+    run('UPDATE api_keys SET last_used_at = ? WHERE id = ?', [nowIso(), keyId])
+  },
+
+  revoke(tenantId: string, keyId: string): boolean {
+    return (
+      run('UPDATE api_keys SET revoked_at = ? WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL', [
+        nowIso(),
+        tenantId,
+        keyId,
+      ]).changes > 0
+    )
   },
 }
 
