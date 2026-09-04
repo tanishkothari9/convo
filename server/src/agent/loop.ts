@@ -92,6 +92,9 @@ export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> 
       })
 
       let roundText = ''
+      // A status line goes out once: from the stream if the backend surfaced it
+      // mid-call, otherwise after the call is parsed.
+      const statusSent = new Set<string>()
       let next = await stream.next()
       while (!next.done) {
         const event = next.value
@@ -101,6 +104,7 @@ export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> 
         } else if (event.type === 'tool_call_start') {
           yield { type: 'tool_started', name: event.name }
         } else if (event.type === 'tool_call_status') {
+          statusSent.add(event.id)
           yield { type: 'status', text: event.status }
         }
         next = await stream.next()
@@ -129,7 +133,7 @@ export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> 
         turnToolCalls.push({ id: call.id, name: call.name, input: call.input })
         const executed = await execute(context, call.name, call.input)
 
-        if (executed.status && !isPresentationTool(call.name)) {
+        if (executed.status && !statusSent.has(call.id) && !isPresentationTool(call.name)) {
           yield { type: 'status', text: executed.status }
         }
         for (const component of pruneComponents(executed.components)) {

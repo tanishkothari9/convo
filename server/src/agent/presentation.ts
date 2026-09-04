@@ -105,7 +105,7 @@ export function presentCart(session: StorefrontSession, cartId: string): ToolOut
   const priced = priceCart(session, cartId)
   return ok(
     priced.lines.length === 0 ? 'Showed the cart; it is empty.' : `Showed the cart (${priced.itemCount} items).`,
-    [cartComponent(priced)],
+    [cartComponent(priced, 'cart')],
   )
 }
 
@@ -125,6 +125,9 @@ export function presentSuggestions(input: Record<string, unknown>): ToolOutcome 
 /** Strips components that carry nothing renderable. */
 export function pruneComponents(components: UiComponent[]): UiComponent[] {
   return components.filter((component) => {
+    if (component.component === 'cart' || component.component === 'cart_state') {
+      return Array.isArray(component.payload.lines)
+    }
     if (component.component === 'products') {
       return Array.isArray(component.payload.items) && component.payload.items.length > 0
     }

@@ -86,9 +86,17 @@ function cartSummary(cart: PricedCart): string {
   return `${items}, subtotal ${formatMoney(cart.subtotalMinor, cart.currency)}`
 }
 
-function cartComponent(cart: PricedCart) {
+/**
+ * The cart, as a component.
+ *
+ * `kind` splits the two ways it reaches the page: `cart_state` is the running
+ * cart panel keeping itself in sync after a write, and `cart` is an inline
+ * card the agent chose to post with `present_cart`. Same payload, different
+ * placement — which is why a write no longer leaves a duplicate card behind.
+ */
+function cartComponent(cart: PricedCart, kind: 'cart' | 'cart_state' = 'cart_state') {
   return {
-    component: 'cart',
+    component: kind,
     payload: {
       cart_id: cart.cartId,
       currency: cart.currency,

@@ -232,14 +232,16 @@ function present(
     }
   }
 
-  const held = results.find((r) => /^\[held:/.test(r.content))
-  if (held) {
+  // A held call is a gate reporting why it refused, with what to do instead.
+  // It ends the turn: retrying the same call is exactly what the gate stopped.
+  const heldResult = results.find((r) => /^\[held:/.test(r.content))
+  if (heldResult) {
     return {
-      text: "I couldn't complete that just now. Let me show you what's available instead.",
-      toolCalls: [
-        call('search_catalog', { status: 'looking through the catalogue', query: 'featured', limit: 4 }),
-      ],
-      stopReason: 'tool_use',
+      text: heldExplanation(heldResult.content),
+      toolCalls: has('present_suggestions')
+        ? [call('present_suggestions', { suggestions: heldChips(heldResult.content) })]
+        : [],
+      stopReason: 'end_turn',
     }
   }
 
@@ -296,11 +298,13 @@ function present(
 
   const cart = results.find((r) => r.name === 'manage_cart')
   if (cart) {
-    const empty = /cart is empty|0 items/i.test(cart.content)
+    const empty = /cart is empty/i.test(cart.content)
+    const wasWrite = /^(Added|Removed|Updated)/.test(cart.content)
     return {
       text: empty ? 'Your cart is empty right now.' : summarise(cart.content),
       toolCalls: [
-        ...(empty ? [] : [call('present_cart', {})]),
+        // A write already refreshed the cart panel; only a read posts a card.
+        ...(empty || wasWrite ? [] : [call('present_cart', {})]),
         ...(has('present_suggestions')
           ? [
               call('present_suggestions', {
@@ -363,11 +367,13 @@ function readIntent(messages: ModelMessage[]): Intent {
   if (/\b(remove|delete|take (it |that )?out|drop)\b/.test(text)) {
     return { kind: 'remove', reference: readReference(text) }
   }
-  if (/\b(my cart|the cart|show cart|open cart|what'?s in (my |the )?cart|view cart|basket)\b/.test(text)) {
-    return { kind: 'view_cart' }
-  }
+  // Checked before the cart intent: "add the first one to my cart" is an add,
+  // and it names the cart too.
   if (/\b(add|buy|i'?ll take|take the|get me|i want the|put .* in (my |the )?cart|order the)\b/.test(text)) {
     return { kind: 'add', reference: readReference(text), quantity: readQuantity(text) }
+  }
+  if (/\b(my cart|the cart|show cart|open cart|what'?s in (my |the )?cart|view cart|basket)\b/.test(text)) {
+    return { kind: 'view_cart' }
   }
 
   return { kind: 'search', query: cleanQuery(text), ...readPriceBounds(text) }
@@ -442,47 +448,59 @@ function lastUserText(messages: ModelMessage[]): string {
   return ''
 }
 
-/** Tool results that arrived after the last user message — this turn's results. */
+/**
+ * The results of the most recent round only.
+ *
+ * Not every result since the user's message: an earlier round's held call
+ * would then keep steering later rounds, which is how a retry loop starts.
+ */
 function trailingToolResults(
   messages: ModelMessage[],
 ): Array<{ name: string; content: string; isError: boolean }> {
-  const out: Array<{ name: string; content: string; isError: boolean }> = []
+  const last = messages.at(-1)
+  if (!last || last.role !== 'tool') return []
+
   const names = new Map<string, string>()
-  let seenUser = false
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i]!
-    if (message.role === 'user') {
-      seenUser = true
-      break
-    }
-    if (message.role === 'assistant') {
-      for (const c of message.toolCalls) names.set(c.id, c.name)
-    }
-  }
-  if (!seenUser) return out
-  let afterUser = false
   for (const message of messages) {
-    if (message.role === 'user') {
-      afterUser = true
-      out.length = 0
-      continue
-    }
-    if (!afterUser) continue
     if (message.role === 'assistant') {
       for (const c of message.toolCalls) names.set(c.id, c.name)
     }
-    if (message.role === 'tool') {
-      for (const result of message.results) {
-        out.push({
-          name: names.get(result.toolCallId) ?? '',
-          content: result.content,
-          isError: result.isError,
-        })
-      }
-    }
   }
-  // Presentation calls resolve without a meaningful result; ignore them.
-  return out.filter((r) => !r.name.startsWith('present_'))
+
+  return last.results
+    .map((result) => ({
+      name: names.get(result.toolCallId) ?? '',
+      content: result.content,
+      isError: result.isError,
+    }))
+    // Presentation calls resolve without a meaningful result; ignore them.
+    .filter((r) => !r.name.startsWith('present_'))
+}
+
+/** Turns a gate's held message into something a customer can act on. */
+function heldExplanation(content: string): string {
+  if (content.includes('[held: empty_cart]')) {
+    return 'There is nothing in your cart yet, so there is nothing to check out. Tell me what you would like and I will add it.'
+  }
+  if (content.includes('[held: stock]')) {
+    const ids = content.match(/prd_[a-z0-9]+/g) ?? []
+    return ids.length > 0
+      ? 'One of the items in your cart went out of stock while you were shopping, so I stopped the checkout — nothing has been charged. I can take it out and check out with the rest, or find you something close.'
+      : 'That item is not available in the quantity you asked for right now.'
+  }
+  if (content.includes('[held: provenance]')) {
+    return "I don't have that item in front of me yet. Tell me what you are after and I will look it up."
+  }
+  if (content.includes('[held: amount]')) {
+    return 'That order is larger than this brand takes over chat. Get in touch with them directly and they will sort it out.'
+  }
+  return "I couldn't complete that just now."
+}
+
+function heldChips(content: string): string[] {
+  if (content.includes('[held: empty_cart]')) return ['Show me what you have', 'What is popular']
+  if (content.includes('[held: stock]')) return ['Remove it and check out', 'Find something similar']
+  return ['Show me what you have', 'Open my cart']
 }
 
 /** Product ids in a fenced tool result, in the order they appear. */
@@ -540,11 +558,32 @@ function forcedCall(name: string, intent: Intent, messages: ModelMessage[]): Mod
   return call(name, {})
 }
 
-/** Turns a tool result line into a sentence, without inventing a figure. */
+/**
+ * Turns a tool result into a sentence for the customer.
+ *
+ * Tool results name products by id on purpose — catalogue text stays inside
+ * the fence — so the id is dropped here rather than read out. The figure comes
+ * from the result verbatim; none is invented.
+ */
 function summarise(content: string): string {
-  const first = content.split('\n').find((line) => line.trim() !== '') ?? ''
-  const cleaned = first.replace(/<[^>]*>/g, '').trim()
-  return cleaned === '' ? 'Your cart is updated.' : cleaned
+  const first = (content.split('\n').find((line) => line.trim() !== '') ?? '')
+    .replace(/<[^>]*>/g, '')
+    .trim()
+  if (first === '') return 'Your cart is updated.'
+  const tail = /Cart now has (.+?)\.?$/.exec(first)?.[1]
+  const lead = /^Added\b/.test(first)
+    ? 'Added to your cart'
+    : /^Removed\b/.test(first)
+      ? 'Taken out of your cart'
+      : /^Updated\b/.test(first)
+        ? 'Quantity updated'
+        : /^The cart has\b/.test(first)
+          ? 'Your cart has'
+          : null
+  if (lead === 'Your cart has' && tail) return `Your cart has ${tail}.`
+  if (lead && tail) return `${lead}. Your cart now has ${tail}.`
+  // Anything unrecognised: strip ids rather than read them out.
+  return first.replace(/\bprd_[a-z0-9]+\s*/g, '').replace(/\s+/g, ' ').trim()
 }
 
 function plainFailure(content: string): string {
