@@ -1,3 +1,4 @@
+import { IconPlus } from '../../components/icons'
 import type { ProductCard } from '../types'
 
 /**
@@ -39,6 +40,9 @@ export function ProductCards({
                 <span className="pcard-image-empty" aria-hidden="true" />
               )}
               {!item.in_stock && <span className="pcard-sold">Sold out</span>}
+              {item.in_stock && item.stock <= 3 && (
+                <span className="pcard-scarce">{item.stock} left</span>
+              )}
             </div>
 
             <div className="pcard-body">
@@ -55,6 +59,7 @@ export function ProductCards({
               disabled={disabled || !item.in_stock}
               onClick={() => onAsk(`Add "${item.name}" to my cart`)}
             >
+              {item.in_stock && <IconPlus size={14} />}
               {item.in_stock ? 'Add to cart' : 'Sold out'}
             </button>
           </article>

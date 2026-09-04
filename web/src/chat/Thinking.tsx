@@ -39,12 +39,15 @@ export function Thinking({ status }: { status: string | null }) {
 
   return (
     <div className="thinking" role="status" aria-live="polite">
-      <span className="thinking-dots" data-compact={shown !== null} aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </span>
-      {shown !== null && (
+      {/* A small sphere lit from within, turning. It is the brand's colour, so
+          the wait belongs to the shop rather than to the software. */}
+      <span className="thinking-orb" aria-hidden="true" />
+      {shown === null ? (
+        <span className="thinking-shimmer" aria-hidden="true">
+          <span />
+          <span />
+        </span>
+      ) : (
         <span className="thinking-status" data-fading={fading}>
           {shown}
         </span>

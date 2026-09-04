@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from 'react'
  * next, so they live next to the place you act, and they stay reachable
  * without scrolling back up.
  */
+import { IconSend } from '../components/icons'
+
 export function Composer({
   brandName,
   chips,
@@ -89,23 +91,10 @@ export function Composer({
           disabled={busy || closed || value.trim() === ''}
           aria-label="Send"
         >
-          <SendIcon />
+          <IconSend size={16} />
         </button>
       </form>
     </div>
   )
 }
 
-function SendIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}

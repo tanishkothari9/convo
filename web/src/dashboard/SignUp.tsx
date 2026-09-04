@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ApiError } from '../lib/api'
 import { Mark } from '../components/Mark'
+import { ShaderField } from '../components/ShaderField'
+import { useDarkSurface } from '../lib/useDarkSurface'
 import { useAuth } from './auth'
 
 function slugPreview(name: string): string {
@@ -15,6 +17,7 @@ function slugPreview(name: string): string {
 
 export function SignUp() {
   const { session, signUp, loading } = useAuth()
+  useDarkSurface()
   const navigate = useNavigate()
   const [brandName, setBrandName] = useState('')
   const [email, setEmail] = useState('')
@@ -42,7 +45,8 @@ export function SignUp() {
 
   return (
     <main className="auth">
-      <div className="auth-panel">
+      <ShaderField speed={0.09} swirl={0.4} distortion={0.55} />
+      <div className="auth-panel glass-dark">
         <Link to="/" className="auth-mark" aria-label="Convo home">
           <Mark size={26} />
         </Link>

@@ -173,24 +173,50 @@ what they filled in.
 
 Both surfaces run on one set of tokens
 ([`web/src/styles/tokens.css`](web/src/styles/tokens.css)): one type scale with
-size-specific tracking, one spacing rhythm, one set of shapes.
+size-specific tracking, one spacing rhythm, one set of shapes, and one gradient
+ramp built out of the accent rather than beside it.
 
-Convo white-labels, so its own chrome recedes. The neutrals are shifted
-slightly cool — a warm ground fights half the brand accents that will be
-dropped onto it — and Convo's own accent, a deep bottle green, is used only in
-the dashboard. The chat page runs entirely on the tenant's colour.
+**Where the light changes.** Convo's own pages — the landing and sign-in — are
+dark, lit by an animated WebGL field
+([`ShaderField.tsx`](web/src/components/ShaderField.tsx), a Paper Design mesh
+gradient with grain over it). The working surfaces are light, because a
+merchant reading a ledger and a customer judging a fabric are both better
+served by paper than by atmosphere. The dashboard puts that seam inside one
+screen: a dark navigation rail against a light content area, so the change of
+register is a deliberate edge rather than something you fall through between
+pages.
 
-The storefront sets the agent's replies as **text in a reading column rather
-than in bubbles**; only the customer's messages get a bubble. Product cards
-then read as part of what the shop is saying.
+The shader's palette is weighted toward green on purpose. An animated field
+gives every colour the frame eventually, and a brand that reads violet for a
+few seconds of each cycle is not a brand — so the indigo is one stop out of
+eight, present as depth at the far end of the travel. It degrades honestly: the
+CSS gradient underneath stands in when WebGL is missing, and
+`prefers-reduced-motion` freezes the field rather than removing it.
+
+**Icons** ([`icons.tsx`](web/src/components/icons.tsx)) are drawn for this
+product on one rule: every icon is built from the three horizontal registers of
+a ledger, bent, broken or beaded into its subject. The rule has an origin — the
+rupee sign is already two horizontal rules over a stem, so the currency the
+product mostly counts in is the set's seed glyph. The gate is three registers
+stopped dead by a barred seal, which is the claim the whole product makes;
+settings is the one deliberate exception, turned on its side because it sits
+directly under provider in the rail and two icons of horizontal lines and beads
+are not distinguishable at 17px.
+
+**The storefront** is the tenant's, so it defers: it takes the brand's colour
+for its ambient field, its bubbles, its buttons and its thinking indicator, and
+Convo's own green appears nowhere on it. The agent's replies are set as text in
+a reading column rather than in bubbles — only the customer's messages get one
+— so product cards read as part of what the shop is saying.
 
 The thinking state is the one place motion is the point, because it is the only
-thing a customer has to look at while they wait: dots appear on the same frame
-the message is sent, collapse to a single dot as the agent's own status line
-arrives ("looking through the catalogue"), and successive statuses cross-fade
-through a blur so it reads as one line changing rather than two swapping. That
-status is a real field on every tool call, streamed out of the model's
-arguments before the rest of them have arrived.
+thing a customer has to look at while they wait. A small sphere lit from within
+turns the instant the message is sent; a shimmering placeholder shows where the
+reply will land; the agent's own status line replaces it ("looking through the
+catalogue"), and successive statuses cross-fade through a blur so it reads as
+one line changing rather than two swapping. That status is a real field on
+every tool call, streamed out of the model's arguments before the rest of them
+have arrived.
 
 ## Tests
 

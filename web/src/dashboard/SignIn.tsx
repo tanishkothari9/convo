@@ -2,10 +2,13 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ApiError } from '../lib/api'
 import { Mark } from '../components/Mark'
+import { ShaderField } from '../components/ShaderField'
+import { useDarkSurface } from '../lib/useDarkSurface'
 import { useAuth } from './auth'
 
 export function SignIn() {
   const { session, signIn, loading } = useAuth()
+  useDarkSurface()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -30,7 +33,8 @@ export function SignIn() {
 
   return (
     <main className="auth">
-      <div className="auth-panel">
+      <ShaderField speed={0.09} swirl={0.4} distortion={0.55} />
+      <div className="auth-panel glass-dark">
         <Link to="/" className="auth-mark" aria-label="Convo home">
           <Mark size={26} />
         </Link>

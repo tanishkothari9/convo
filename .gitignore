@@ -11,3 +11,6 @@ data/*.db-wal
 data/*.db-shm
 coverage/
 .vite/
+
+# TypeScript incremental build state
+*.tsbuildinfo

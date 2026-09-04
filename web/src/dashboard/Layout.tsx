@@ -1,14 +1,23 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Mark } from '../components/Mark'
+import {
+  IconAudit,
+  IconCatalogue,
+  IconClose,
+  IconMenu,
+  IconOverview,
+  IconProvider,
+  IconSettings,
+} from '../components/icons'
 import { useAuth } from './auth'
 
 const NAV = [
-  { to: '/dashboard', label: 'Overview', end: true },
-  { to: '/dashboard/catalog', label: 'Catalogue' },
-  { to: '/dashboard/provider', label: 'Provider' },
-  { to: '/dashboard/audit', label: 'Audit trail' },
-  { to: '/dashboard/settings', label: 'Settings' },
+  { to: '/dashboard', label: 'Overview', icon: IconOverview, end: true },
+  { to: '/dashboard/catalog', label: 'Catalogue', icon: IconCatalogue },
+  { to: '/dashboard/provider', label: 'Provider', icon: IconProvider },
+  { to: '/dashboard/audit', label: 'Audit trail', icon: IconAudit },
+  { to: '/dashboard/settings', label: 'Settings', icon: IconSettings },
 ]
 
 export function DashboardLayout() {
@@ -30,7 +39,7 @@ export function DashboardLayout() {
           aria-expanded={navOpen}
           aria-controls="dashboard-nav"
         >
-          <MenuIcon />
+          {navOpen ? <IconClose size={16} /> : <IconMenu size={16} />}
           Menu
         </button>
         <span className="wordmark wordmark-sm">
@@ -41,10 +50,10 @@ export function DashboardLayout() {
 
       <aside className="shell-side" id="dashboard-nav" data-open={navOpen}>
         <div className="shell-side-top">
-          <span className="wordmark">
+          <Link to="/" className="wordmark" aria-label="Convo home">
             <Mark />
             <span>Convo</span>
-          </span>
+          </Link>
         </div>
 
         <nav className="shell-nav">
@@ -56,6 +65,7 @@ export function DashboardLayout() {
               className={({ isActive }) => `shell-link${isActive ? ' is-active' : ''}`}
               onClick={() => setNavOpen(false)}
             >
+              <item.icon size={17} />
               {item.label}
             </NavLink>
           ))}
@@ -81,33 +91,23 @@ export function DashboardLayout() {
   )
 }
 
-function MenuIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M2 4h12M2 8h12M2 12h12"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
 /** A page header, shared by every dashboard screen so the rhythm is identical. */
 export function PageHead({
   title,
   lede,
+  eyebrow,
   actions,
 }: {
   title: string
   lede?: string
+  eyebrow?: React.ReactNode
   actions?: React.ReactNode
 }) {
   return (
     <header className="page-head">
       <div className="page-head-text">
-        <h1 className="t-title">{title}</h1>
+        {eyebrow && <span className="page-eyebrow">{eyebrow}</span>}
+        <h1 className="page-title">{title}</h1>
         {lede && <p className="page-lede t-secondary">{lede}</p>}
       </div>
       {actions && <div className="page-head-actions">{actions}</div>}

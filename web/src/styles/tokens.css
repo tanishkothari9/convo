@@ -144,6 +144,56 @@
   --dur-enter: 220ms;   /* cards, chips, popovers */
   --dur-sheet: 320ms;   /* sheets and drawers */
 
+  /* ── Gradients ────────────────────────────────────────────────────────────
+     Built out of the accent rather than beside it: forest through bottle green
+     into teal, then a cool lift. It reads as one light source moving across a
+     surface, which is what keeps it from looking like a swatch strip. The
+     violet only ever appears at the far end of the hero field, where it gives
+     the green somewhere to travel to. */
+  --green-950: #04160f;
+  --green-900: #072a1f;
+  --green-800: #0b3d2e;
+  --green-700: #14563f;
+  --green-600: #1b6b54;
+  --green-500: #23886a;
+  --green-400: #2fb08a;
+  --teal-400: #14b8a6;
+  --cyan-400: #37d0c4;
+  --violet-600: #4b39c8;
+
+  /* Primary action. Two stops only — a button is a small surface. */
+  --grad-brand: linear-gradient(135deg, var(--green-600) 0%, var(--green-500) 55%, var(--teal-400) 130%);
+  --grad-brand-hover: linear-gradient(135deg, var(--green-700) 0%, var(--green-600) 55%, var(--green-500) 130%);
+
+  /* Large fields: panels, hero backdrops, the shader fallback. */
+  --grad-field: linear-gradient(150deg, var(--green-950) 0%, var(--green-800) 38%, var(--green-600) 68%, var(--teal-400) 105%);
+  --grad-aurora: radial-gradient(120% 90% at 12% 0%, rgba(47, 176, 138, 0.5) 0%, transparent 55%),
+    radial-gradient(100% 80% at 88% 8%, rgba(75, 57, 200, 0.42) 0%, transparent 58%),
+    radial-gradient(90% 70% at 50% 100%, rgba(20, 184, 166, 0.34) 0%, transparent 60%);
+
+  /* A hairline that catches light along its length. */
+  --grad-hairline: linear-gradient(90deg, transparent, var(--line-strong) 18%, var(--line-strong) 82%, transparent);
+  --grad-edge: linear-gradient(140deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.08) 42%, rgba(255, 255, 255, 0) 70%);
+
+  /* A tint wash for panels that should feel lit rather than filled. */
+  --grad-wash: linear-gradient(160deg, rgba(35, 136, 106, 0.09) 0%, rgba(20, 184, 166, 0.045) 45%, transparent 80%);
+
+  /* ── Glass ────────────────────────────────────────────────────────────────
+     A translucent surface is a material, so it gets a bright top edge where
+     the light would catch it, not just a border. */
+  --glass-light: rgba(255, 255, 255, 0.72);
+  --glass-dark: rgba(9, 22, 18, 0.44);
+  --glass-line: rgba(255, 255, 255, 0.16);
+  --glass-blur: blur(22px) saturate(180%);
+
+  /* Elevation gains a coloured floor: a neutral grey shadow under a green
+     product reads as dirt, a green-tinted one reads as depth. */
+  --shadow-lift: 0 1px 2px rgba(7, 42, 31, 0.06), 0 6px 16px rgba(7, 42, 31, 0.07);
+  --shadow-deep: 0 8px 24px rgba(7, 42, 31, 0.1), 0 28px 64px rgba(7, 42, 31, 0.14);
+  --shadow-glow: 0 6px 20px rgba(27, 107, 84, 0.28);
+
+  --dur-slow: 520ms;
+
   --header-height: 3.5rem;
   --chat-column: 43rem;   /* ~688px: under 80 characters at 17px */
   --page-column: 68rem;

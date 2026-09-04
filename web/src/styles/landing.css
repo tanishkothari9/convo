@@ -1,0 +1,886 @@
+/*
+ * The landing page and the marketing surfaces.
+ *
+ * The whole page is dark, not just the hero. An animated green-and-indigo
+ * field cannot be followed by a white sheet: the eye reads the seam as two
+ * different products stapled together, and every card below it has to fight
+ * the colour it just left. So the field keeps going — dimmed to a floor the
+ * sections sit on — and the page stays one lit room from the headline to the
+ * footer.
+ *
+ * The dashboard and the storefront stay light on purpose. They are working
+ * surfaces full of figures and photographs, and a merchant reading a ledger or
+ * a customer judging a fabric is better served by paper than by atmosphere.
+ */
+
+.landing {
+  overflow-x: clip;
+  position: relative;
+  isolation: isolate;
+  background: var(--green-950);
+  color: rgba(255, 255, 255, 0.88);
+  /*
+   * Tokens are re-pointed rather than overridden per rule, so every shared
+   * component — buttons, chips, inputs, cards — comes out dark here without a
+   * single `.landing .btn` override anywhere.
+   */
+  --canvas: #04160f;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-sunken: rgba(255, 255, 255, 0.03);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --ink: #ffffff;
+  --ink-secondary: rgba(255, 255, 255, 0.7);
+  --ink-muted: rgba(255, 255, 255, 0.46);
+  --line: rgba(255, 255, 255, 0.11);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --accent-tint: rgba(47, 176, 138, 0.14);
+  /* Bright enough to separate from the field it sits on. A primary action the
+     same value as its background is not a primary action. */
+  --brand: var(--green-400);
+  --brand-hover: var(--cyan-400);
+  --brand-contrast: #04160f;
+  --brand-ring: rgba(55, 208, 196, 0.3);
+  --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-deep: 0 12px 32px rgba(0, 0, 0, 0.4), 0 36px 80px rgba(0, 0, 0, 0.45);
+  /* The light-surface ramp bottoms out at a green too dark to read here, so
+     the whole gradient is lifted rather than a separate class introduced. */
+  /* The mark paints itself with --accent; on this field the bottle green
+     recedes into the background it is sitting on. */
+  --accent: var(--green-400);
+  --grad-brand: linear-gradient(120deg, var(--green-400) 0%, var(--cyan-400) 60%, #a7f3d0 120%);
+  --grad-brand-hover: linear-gradient(120deg, var(--cyan-400), #a7f3d0);
+}
+
+/*
+ * The floor. A single very dim aurora spanning the whole page, so the sections
+ * below the hero are lit by the same source rather than sitting on flat black.
+ */
+.landing::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 45% at 12% 8%, rgba(27, 107, 84, 0.5) 0%, transparent 60%),
+    radial-gradient(60% 40% at 88% 34%, rgba(43, 42, 114, 0.42) 0%, transparent 62%),
+    radial-gradient(75% 45% at 45% 92%, rgba(20, 184, 166, 0.22) 0%, transparent 64%),
+    var(--green-950);
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  color: #fff;
+  padding-bottom: var(--space-8);
+}
+
+/*
+ * The shader fades out at its lower edge instead of ending at one, so the hero
+ * hands over to the page's own floor with no seam to notice.
+ */
+.hero .shader-field {
+  mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%);
+}
+
+.hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.hero-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5) 0 var(--space-8);
+}
+
+.hero-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wordmark-invert {
+  color: #fff;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: var(--space-7);
+  align-items: center;
+  padding-bottom: var(--space-8);
+}
+
+/* One orchestrated entrance for the hero, staggered top to bottom. Everything
+   else on the page animates only in response to a person. */
+.hero-copy > * {
+  animation: hero-in 720ms var(--ease-out) both;
+}
+
+.hero-copy > *:nth-child(1) { animation-delay: 40ms; }
+.hero-copy > *:nth-child(2) { animation-delay: 120ms; }
+.hero-copy > *:nth-child(3) { animation-delay: 200ms; }
+.hero-copy > *:nth-child(4) { animation-delay: 280ms; }
+.hero-copy > *:nth-child(5) { animation-delay: 360ms; }
+
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/*
+ * The entrance is decoration, and decoration must never be what makes the
+ * headline visible. With reduced motion the copy is simply there.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .hero-copy > *,
+  .hero-demo,
+  .swap-chip,
+  .swap-layer,
+  .activity-row {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.3125rem var(--space-3);
+  border-radius: var(--radius-chip);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+  font-size: var(--text-sm);
+  letter-spacing: 0.002em;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.pill-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--cyan-400);
+  box-shadow: 0 0 0 3px rgba(55, 208, 196, 0.22);
+  animation: pill-pulse 2.4s var(--ease-in-out) infinite;
+}
+
+@keyframes pill-pulse {
+  50% {
+    box-shadow: 0 0 0 6px rgba(55, 208, 196, 0.05);
+  }
+}
+
+.hero-headline {
+  margin-top: var(--space-5);
+  font-size: clamp(2.25rem, 5.2vw, 3.75rem);
+  line-height: 1.03;
+  /* Large text reads too loose as it grows; tighten it as it scales. */
+  letter-spacing: -0.032em;
+  font-weight: var(--weight-semibold);
+  text-wrap: balance;
+}
+
+.hero-headline em {
+  font-style: italic;
+  /* The one italic on the page, on the one word that is the whole promise. */
+  background: linear-gradient(100deg, var(--cyan-400), #a7f3d0 60%, #fff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-lede {
+  margin-top: var(--space-5);
+  max-width: 34rem;
+  font-size: var(--text-lg);
+  line-height: 1.62;
+  letter-spacing: var(--text-lg-ls);
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.hero-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.hero-facts dt {
+  font-size: var(--text-xs);
+  letter-spacing: var(--text-xs-ls);
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.hero-facts dd {
+  margin-top: 0.125rem;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+}
+
+.hero-demo {
+  animation: hero-in 900ms var(--ease-out) 240ms both;
+}
+
+@media (max-width: 60rem) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .hero-demo {
+    max-width: 26rem;
+  }
+}
+
+/* ── The live demo ──────────────────────────────────────────────────────── */
+
+.demo {
+  /* Denser than the shared glass: the field behind it is busy, and a device
+     you are meant to read has to sit on top of that rather than in it. */
+  background: linear-gradient(165deg, rgba(6, 26, 20, 0.82), rgba(4, 18, 14, 0.9));
+  border-color: rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sheet);
+  overflow: hidden;
+  box-shadow: var(--shadow-deep);
+  /* Sat back very slightly, so it reads as a device held at an angle rather
+     than a flat rectangle pasted onto the page. */
+  transform: perspective(1400px) rotateY(-3deg) rotateX(1.5deg);
+}
+
+.demo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.demo-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.demo-badge {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 0.4375rem;
+  background: linear-gradient(140deg, #a8425f, #6d213a);
+  font-size: 0.6875rem;
+  font-weight: var(--weight-semibold);
+  color: #fff;
+}
+
+.demo-cart {
+  position: relative;
+  color: rgba(255, 255, 255, 0.6);
+  display: grid;
+  place-items: center;
+}
+
+.demo-cart-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--cyan-400);
+  animation: pop-in 300ms var(--ease-out);
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+.demo-body {
+  min-height: 15.5rem;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.demo-bubble {
+  align-self: flex-end;
+  max-width: 82%;
+  padding: 0.4375rem var(--space-3);
+  border-radius: 0.875rem 0.875rem 0.25rem 0.875rem;
+  background: linear-gradient(140deg, #a8425f, #7d2844);
+  color: #fff;
+  animation: pop-in 260ms var(--ease-out);
+}
+
+.demo-status,
+.demo-reply {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: rgba(255, 255, 255, 0.68);
+  animation: pop-in 240ms var(--ease-out);
+}
+
+.demo-reply {
+  color: rgba(255, 255, 255, 0.94);
+}
+
+/* The demo's thinking orb is the shared one in components/ui.css. */
+
+.demo-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.demo-card {
+  padding: var(--space-2);
+  border-radius: 0.625rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  animation: card-rise 420ms var(--ease-out) both;
+}
+
+@keyframes card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+
+.demo-card-art {
+  height: 3.25rem;
+  border-radius: 0.375rem;
+  /* Stand-in artwork, so it is saturated enough to read as a photograph. */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.demo-card-name {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.demo-card-price {
+  font-size: 0.75rem;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.demo-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: 0.625rem;
+  background: rgba(47, 176, 138, 0.14);
+  border: 1px solid rgba(47, 176, 138, 0.3);
+  animation: card-rise 380ms var(--ease-out);
+}
+
+.demo-total span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.demo-total strong {
+  font-size: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+}
+
+.demo-composer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.demo-input {
+  flex: 1;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-chip);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.demo-placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.demo-caret {
+  display: inline-block;
+  width: 0.09375rem;
+  height: 0.95em;
+  margin-left: 0.125rem;
+  background: var(--cyan-400);
+  animation: caret 1s steps(2, start) infinite;
+}
+
+.demo-send {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--grad-brand);
+  color: #fff;
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo {
+    transform: none;
+  }
+
+  .pill-dot {
+    animation: none;
+  }
+}
+
+/* ── Buttons the hero needs ─────────────────────────────────────────────── */
+
+/* Glass over the shader: it has to read on whatever colour is behind it at
+   that moment, which a flat translucent fill does not. */
+.btn-glass {
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-glass:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.36);
+  }
+}
+
+.btn-quiet {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-quiet:hover:not(:disabled) {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.09);
+  }
+}
+
+/* ── Band ───────────────────────────────────────────────────────────────── */
+
+.band {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-5) var(--space-7);
+}
+
+/* The band sits between a dark panel and the first light section, so it holds
+   the transition; the rule tells you the hero has ended. */
+.band + .section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.band-inner {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+/* Three across or one down. Two across leaves the third step sitting next to
+   a hole, which reads as a layout that broke rather than one that wrapped. */
+@media (max-width: 62rem) {
+  .band-inner {
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
+}
+
+.step {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.step-mark {
+  display: grid;
+  place-items: center;
+  width: 2.375rem;
+  height: 2.375rem;
+  flex: none;
+  border-radius: 0.75rem;
+  color: var(--green-950);
+  background: linear-gradient(140deg, var(--cyan-400), var(--green-400));
+  box-shadow: 0 6px 20px rgba(47, 176, 138, 0.28);
+}
+
+.step-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-heading);
+  line-height: var(--text-heading-lh);
+  letter-spacing: var(--text-heading-ls);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-1);
+}
+
+/* A number belongs here because these genuinely are a sequence. */
+.step-index {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--cyan-400);
+}
+
+/* ── Sections ───────────────────────────────────────────────────────────── */
+
+.section {
+  padding: var(--space-8) 0;
+}
+
+.section-tight {
+  padding-top: 0;
+}
+
+.section-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.section-head {
+  max-width: 40rem;
+  margin-bottom: var(--space-7);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.25rem var(--space-3);
+  border-radius: var(--radius-chip);
+  background: rgba(47, 176, 138, 0.13);
+  border: 1px solid rgba(47, 176, 138, 0.24);
+  color: var(--cyan-400);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-4);
+}
+
+.section-title {
+  font-size: clamp(1.75rem, 3.6vw, 2.625rem);
+  line-height: 1.08;
+  letter-spacing: -0.026em;
+  font-weight: var(--weight-semibold);
+  text-wrap: balance;
+}
+
+.section-lede {
+  margin-top: var(--space-4);
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  letter-spacing: var(--text-lg-ls);
+}
+
+/* ── Capability cards ───────────────────────────────────────────────────── */
+
+.capability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: var(--space-4);
+}
+
+.capability {
+  position: relative;
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  /* Glass over the floor rather than a filled tile: the aurora behind it
+     shows through, which is what ties the cards to the hero. */
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow: hidden;
+  transition:
+    transform var(--dur-enter) var(--ease-out),
+    box-shadow var(--dur-enter) var(--ease-out),
+    border-color var(--dur-quick) ease;
+}
+
+/* A wash that only appears under the pointer, so the grid is calm at rest and
+   the card you are reading is the lit one. */
+.capability::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(90% 70% at 20% 0%, rgba(47, 176, 138, 0.16), transparent 66%);
+  opacity: 0;
+  transition: opacity var(--dur-enter) var(--ease-out);
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .capability:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lift);
+    border-color: rgba(47, 176, 138, 0.36);
+  }
+
+  .capability:hover::before {
+    opacity: 1;
+  }
+}
+
+.capability-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  margin-bottom: var(--space-4);
+  color: var(--cyan-400);
+  background: rgba(47, 176, 138, 0.12);
+  border: 1px solid rgba(47, 176, 138, 0.22);
+  transition:
+    color var(--dur-quick) ease,
+    background var(--dur-quick) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .capability:hover .capability-icon {
+    color: var(--green-950);
+    background: linear-gradient(140deg, var(--cyan-400), var(--green-400));
+  }
+}
+
+.capability-title {
+  position: relative;
+  font-size: var(--text-lg);
+  line-height: 1.35;
+  letter-spacing: -0.012em;
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-2);
+}
+
+.capability p {
+  position: relative;
+  line-height: 1.6;
+}
+
+/* ── Model swap ─────────────────────────────────────────────────────────── */
+
+.swap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-7);
+  align-items: center;
+}
+
+@media (max-width: 56rem) {
+  .swap {
+    grid-template-columns: 1fr;
+  }
+}
+
+.swap-copy .btn {
+  margin-top: var(--space-5);
+}
+
+.swap-copy p {
+  margin-top: var(--space-4);
+  line-height: 1.6;
+  max-width: 32rem;
+}
+
+.swap-visual {
+  padding: var(--space-5);
+  border-radius: var(--radius-sheet);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.swap-rail {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.swap-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.3125rem var(--space-3);
+  border-radius: var(--radius-chip);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: var(--text-sm);
+  animation: hero-in 520ms var(--ease-out) both;
+}
+
+.swap-chip-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.swap-chip-dot[data-active='true'] {
+  background: var(--cyan-400);
+  box-shadow: 0 0 0 3px rgba(55, 208, 196, 0.22);
+}
+
+.swap-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  position: relative;
+}
+
+/* The rule tying the swappable models to the layers that do not move. */
+.swap-stack::before {
+  content: '';
+  position: absolute;
+  left: 1.0625rem;
+  top: -0.75rem;
+  bottom: 1.25rem;
+  width: 1px;
+  background: linear-gradient(180deg, var(--cyan-400), transparent);
+}
+
+.swap-layer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: 0.625rem;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  animation: hero-in 520ms var(--ease-out) both;
+}
+
+.swap-layer svg {
+  color: var(--cyan-400);
+  flex: none;
+}
+
+.swap-layer-tag {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  color: var(--ink-muted);
+}
+
+/* ── Closing call to action ─────────────────────────────────────────────── */
+
+.cta {
+  position: relative;
+  isolation: isolate;
+  margin: 0 var(--space-4) var(--space-6);
+  border-radius: 1.5rem;
+  overflow: hidden;
+  color: #fff;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cta-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-5);
+}
+
+.cta-title {
+  font-size: clamp(1.625rem, 4vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.026em;
+  font-weight: var(--weight-semibold);
+  text-wrap: balance;
+}
+
+.cta-lede {
+  margin-top: var(--space-4);
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.cta .hero-actions {
+  justify-content: center;
+}
+
+.landing-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-7);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 34rem) {
+  .hero-facts {
+    gap: var(--space-5);
+  }
+
+  .demo-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

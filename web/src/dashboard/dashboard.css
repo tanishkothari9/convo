@@ -11,34 +11,50 @@
   min-height: 60dvh;
 }
 
-/* ── Wordmark ───────────────────────────────────────────────────────────── */
+/* ── Auth ──────────────────────────────────────────────────────────────── */
 
-.wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-heading);
-  font-weight: var(--weight-semibold);
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-.wordmark-sm {
-  font-size: var(--text-base);
-}
-
-/* ── Auth ───────────────────────────────────────────────────────────────── */
-
+/*
+ * Signing in belongs to Convo's own world, not to the merchant's, so it keeps
+ * the dark field the landing page established. The light starts at the
+ * dashboard — which is the real boundary: marketing on one side, a working
+ * surface full of figures on the other.
+ */
 .auth {
+  position: relative;
+  isolation: isolate;
   min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: var(--space-5);
+  color: rgba(255, 255, 255, 0.9);
+
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.1);
+  --ink: #ffffff;
+  --ink-secondary: rgba(255, 255, 255, 0.68);
+  --ink-muted: rgba(255, 255, 255, 0.45);
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.22);
+  --brand: var(--green-400);
+  --brand-hover: var(--cyan-400);
+  --brand-contrast: #04160f;
+  --brand-ring: rgba(55, 208, 196, 0.3);
+  --danger: #ff8b80;
+  --danger-tint: rgba(255, 139, 128, 0.14);
+  /* The mark paints itself with --accent; on this field the bottle green
+     recedes into the background it is sitting on. */
+  --accent: var(--green-400);
+  --grad-brand: linear-gradient(120deg, var(--green-400), var(--cyan-400) 70%, #a7f3d0);
 }
 
 .auth-panel {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 23rem;
+  max-width: 24rem;
+  padding: var(--space-6);
+  border-radius: var(--radius-sheet);
+  box-shadow: var(--shadow-deep);
 }
 
 .auth-mark {
@@ -48,21 +64,26 @@
 
 .auth-title {
   margin-bottom: var(--space-6);
+  color: #fff;
 }
 
 .auth-alt {
   margin-top: var(--space-5);
 }
 
+.auth-alt a {
+  color: var(--cyan-400);
+}
+
 .auth-demo {
   margin-top: var(--space-3);
-  color: var(--ink-muted);
+  color: rgba(255, 255, 255, 0.45);
   text-align: left;
   transition: color var(--dur-quick) ease;
 }
 
 .auth-demo:hover {
-  color: var(--ink-secondary);
+  color: rgba(255, 255, 255, 0.75);
   text-decoration: underline;
   text-underline-offset: 0.18em;
 }
@@ -70,68 +91,7 @@
 .slug-preview {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
-  color: var(--ink);
-}
-
-/* ── Landing ────────────────────────────────────────────────────────────── */
-
-.landing {
-  max-width: var(--page-column);
-  margin: 0 auto;
-  padding: var(--space-5) var(--space-5) var(--space-8);
-}
-
-.landing-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding-bottom: var(--space-8);
-}
-
-.landing-hero {
-  max-width: 40rem;
-  padding-bottom: var(--space-8);
-}
-
-.landing-headline {
-  /* Fluid, but tracking stays tied to the rendered size via the token. */
-  font-size: clamp(2rem, 5.2vw, 3.25rem);
-  line-height: 1.06;
-  letter-spacing: -0.028em;
-  text-wrap: balance;
-}
-
-.landing-lede {
-  margin-top: var(--space-5);
-  font-size: var(--text-lg);
-  line-height: 1.6;
-  letter-spacing: var(--text-lg-ls);
-  color: var(--ink-secondary);
-  max-width: 34rem;
-}
-
-.landing-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-}
-
-.landing-steps {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: var(--space-6);
-  padding-top: var(--space-7);
-  border-top: 1px solid var(--line);
-}
-
-.landing-step h2 {
-  margin-bottom: var(--space-2);
-}
-
-.landing-foot {
-  padding-top: var(--space-8);
+  color: var(--cyan-400);
 }
 
 /* ── Shell ──────────────────────────────────────────────────────────────── */
@@ -144,6 +104,15 @@
   display: none;
 }
 
+/*
+ * A dark rail against a light working surface.
+ *
+ * This is where Convo's own world meets the merchant's. The marketing pages
+ * and sign-in are dark; the catalogue, the ledger and the storefront are light
+ * because they are full of figures and photographs. Putting the seam inside
+ * one screen — as a rail you navigate from — makes the change of register
+ * deliberate instead of something you fall through between pages.
+ */
 .shell-side {
   position: fixed;
   inset: 0 auto 0 0;
@@ -152,8 +121,23 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  border-right: 1px solid var(--line);
-  background: var(--canvas);
+  color: rgba(255, 255, 255, 0.86);
+  background:
+    radial-gradient(120% 40% at 20% 0%, rgba(47, 176, 138, 0.22) 0%, transparent 62%),
+    radial-gradient(100% 30% at 80% 100%, rgba(43, 42, 114, 0.28) 0%, transparent 60%),
+    var(--green-950);
+
+  --ink: #ffffff;
+  --ink-secondary: rgba(255, 255, 255, 0.66);
+  --ink-muted: rgba(255, 255, 255, 0.44);
+  --line: rgba(255, 255, 255, 0.1);
+  --surface-hover: rgba(255, 255, 255, 0.07);
+  --accent: var(--green-400);
+}
+
+/* The mark reads as the product's own, so it keeps its full colour here. */
+.shell-side .wordmark {
+  color: #fff;
 }
 
 .shell-nav {
@@ -163,14 +147,24 @@
 }
 
 .shell-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-input);
+  border-radius: 0.625rem;
   color: var(--ink-secondary);
   font-size: var(--text-base);
   text-decoration: none;
   transition:
     background-color var(--dur-quick) ease,
     color var(--dur-quick) ease;
+}
+
+.shell-link svg {
+  flex: none;
+  opacity: 0.7;
+  transition: opacity var(--dur-quick) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -181,10 +175,29 @@
 }
 
 .shell-link.is-active {
-  background: var(--surface);
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
   font-weight: var(--weight-medium);
-  box-shadow: var(--shadow-raised);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.shell-link.is-active svg {
+  opacity: 1;
+  color: var(--cyan-400);
+}
+
+/* A lit edge on the active item, so the current page is legible at a glance
+   from the far side of the screen. */
+.shell-link.is-active::before {
+  content: '';
+  position: absolute;
+  left: -0.625rem;
+  top: 0.4375rem;
+  bottom: 0.4375rem;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--cyan-400), var(--green-400));
+  box-shadow: 0 0 12px rgba(55, 208, 196, 0.5);
 }
 
 .shell-side-foot {
@@ -208,9 +221,30 @@
 }
 
 .shell-main {
+  position: relative;
   margin-left: 14rem;
   padding: var(--space-7) var(--space-6) var(--space-8);
   max-width: calc(14rem + var(--page-column));
+}
+
+/* A breath of the same light that lit the rail, so the working surface is a
+   room the rail opens onto rather than a separate white page. */
+.shell-main::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto 14rem;
+  height: 22rem;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 100% at 0% 0%, rgba(47, 176, 138, 0.1) 0%, transparent 70%),
+    radial-gradient(50% 90% at 70% 0%, rgba(43, 42, 114, 0.05) 0%, transparent 70%);
+}
+
+@media (max-width: 60rem) {
+  .shell-main::before {
+    inset: 0 0 auto 0;
+  }
 }
 
 .shell-scrim {
@@ -238,8 +272,7 @@
     z-index: 40;
     transform: translateX(-100%);
     transition: transform var(--dur-sheet) var(--ease-sheet);
-    box-shadow: var(--shadow-float);
-    background: var(--surface);
+    box-shadow: var(--shadow-deep);
   }
 
   .shell-side[data-open='true'] {
@@ -278,6 +311,39 @@
 
 /* ── Page head ──────────────────────────────────────────────────────────── */
 
+.page-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--green-600);
+}
+
+/* A pulse, because the storefront is genuinely live while you are reading. */
+.live-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--green-400);
+  box-shadow: 0 0 0 3px rgba(47, 176, 138, 0.2);
+  animation: pill-pulse 2.4s var(--ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+}
+
+.page-title {
+  font-size: clamp(1.5rem, 3vw, 1.875rem);
+  line-height: 1.15;
+  letter-spacing: -0.022em;
+  font-weight: var(--weight-semibold);
+}
+
 .page-head {
   display: flex;
   align-items: flex-start;
@@ -295,65 +361,165 @@
 /* ── The chat link ──────────────────────────────────────────────────────── */
 
 /*
- * The one place the tenant's own colour appears in the dashboard — this is the
- * thing they came to get, and seeing their accent here is also how the theming
- * is explained without a paragraph about it.
+ * The one lit surface on the page. It carries the tenant's own colour, which
+ * is the thing they came here to get and also the clearest way to explain that
+ * their storefront is theirs and not ours.
  */
-.link-card {
+.link-panel {
+  position: relative;
+  isolation: isolate;
+  margin-bottom: var(--space-6);
   max-width: 50rem;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background:
+    linear-gradient(140deg,
+      color-mix(in srgb, var(--brand) 10%, var(--surface)) 0%,
+      color-mix(in srgb, var(--brand) 4%, var(--surface)) 60%,
+      var(--surface) 100%);
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
+  box-shadow: var(--shadow-lift);
+}
+
+/* A soft light source at the top-left corner, so the panel reads as lit
+   rather than tinted. */
+.link-panel-glow {
+  position: absolute;
+  inset: -40% 40% 40% -20%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--brand) 26%, transparent) 0%, transparent 68%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.link-panel-body {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
   padding: var(--space-4) var(--space-5);
-  margin-bottom: var(--space-6);
-  border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--brand) 7%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
 }
 
-.link-card-label {
-  color: color-mix(in srgb, var(--brand) 72%, var(--ink));
+.link-panel-icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  border-radius: 0.6875rem;
+  color: var(--brand-contrast);
+  background: linear-gradient(140deg, var(--brand), color-mix(in srgb, var(--brand) 70%, #000));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--brand) 34%, transparent);
+}
+
+.link-panel-text {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.link-panel-label {
+  color: color-mix(in srgb, var(--brand) 76%, var(--ink));
+  font-weight: var(--weight-medium);
   margin-bottom: 0.0625rem;
 }
 
-.link-card-url {
+.link-panel-url {
   font-family: var(--font-mono);
   font-size: 0.875rem;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
   overflow-wrap: anywhere;
 }
 
-.link-card-actions {
+.link-panel-actions {
   display: flex;
   gap: var(--space-2);
 }
 
-/* ── Stats ──────────────────────────────────────────────────────────────── */
+/* ── Stats ─────────────────────────────────────────────────────────────── */
 
-/* A rule between figures, not a box around each: easier to compare down a row. */
-.stat-row {
-  max-width: 50rem;
+.stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-  gap: var(--space-5) var(--space-4);
-  padding: var(--space-5) 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  max-width: 50rem;
   margin-bottom: var(--space-7);
 }
 
+/* Two by two rather than three and a stray one: four figures should read as
+   a block whichever way they wrap. */
+@media (max-width: 62rem) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 26rem) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat {
+  position: relative;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: linear-gradient(170deg, #fff 0%, var(--surface-sunken) 130%);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 #fff, var(--shadow-lift);
+  overflow: hidden;
+  transition:
+    transform var(--dur-enter) var(--ease-out),
+    box-shadow var(--dur-enter) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .stat:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lift);
+  }
+}
+
+/* The figure that is money gets the wash; the counts stay plain, so the row
+   has one thing to look at rather than four. */
+.stat[data-accent='true'] {
+  background: linear-gradient(150deg, var(--accent-tint) 0%, var(--surface) 78%);
+  border-color: color-mix(in srgb, var(--green-500) 24%, transparent);
+}
+
+.stat-icon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  margin-bottom: var(--space-3);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+}
+
+.stat[data-accent='true'] .stat-icon {
+  color: #fff;
+  background: var(--grad-brand);
+}
+
+.stat-label {
+  color: var(--ink-muted);
+}
+
 .stat-value {
-  font-size: 1.75rem;
+  font-size: 1.625rem;
   line-height: 1.15;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.022em;
   font-weight: var(--weight-semibold);
-  margin-top: var(--space-1);
+  margin-top: 0.0625rem;
+}
+
+.stat[data-accent='true'] .stat-value {
+  color: var(--green-700);
 }
 
 .stat-note {
   margin-top: 0.125rem;
+  color: var(--ink-muted);
 }
 
 /* ── Panels ─────────────────────────────────────────────────────────────── */
@@ -437,13 +603,14 @@
 .setup-tick {
   display: grid;
   place-items: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin-top: 0.125rem;
+  width: 1.375rem;
+  height: 1.375rem;
+  margin-top: 0.0625rem;
   border-radius: 50%;
   flex: none;
-  color: var(--accent);
-  background: var(--accent-tint);
+  color: #fff;
+  background: var(--grad-brand);
+  box-shadow: 0 2px 8px rgba(27, 107, 84, 0.26);
 }
 
 .setup-row[data-done='false'] .setup-tick {
@@ -477,16 +644,35 @@
 
 .activity-row {
   display: grid;
-  grid-template-columns: 5.25rem 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) 0;
   border-top: 1px solid var(--line);
+  animation: hero-in 400ms var(--ease-out) both;
 }
 
-/* A grid item stretches by default; a badge should hug its own word. */
-.activity-row .badge {
-  justify-self: start;
+/* The icon carries the outcome, so a scan down the column reads as a shape
+   and a colour before it reads as a word. */
+.activity-icon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  border-radius: 0.5rem;
+  color: var(--green-600);
+  background: var(--accent-tint);
+}
+
+.activity-row[data-outcome='blocked'] .activity-icon {
+  color: var(--warning);
+  background: var(--warning-tint);
+}
+
+.activity-row[data-outcome='failed'] .activity-icon {
+  color: var(--danger);
+  background: var(--danger-tint);
 }
 
 .activity-row:first-child {
@@ -516,6 +702,30 @@
 }
 
 /* ── Catalogue ──────────────────────────────────────────────────────────── */
+
+.empty-mark {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.875rem;
+  margin-bottom: var(--space-2);
+  color: var(--green-600);
+  background: var(--accent-tint);
+  border: 1px solid color-mix(in srgb, var(--green-500) 18%, transparent);
+}
+
+.link-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  text-decoration: none;
+  transition: gap var(--dur-quick) var(--ease-out);
+}
+
+.link-arrow:hover {
+  gap: var(--space-2);
+}
 
 .catalog-search {
   max-width: 22rem;
@@ -772,7 +982,54 @@
 }
 
 .audit-table {
-  min-width: 42rem;
+  min-width: 34rem;
+}
+
+.audit-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.audit-action-icon {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  border-radius: 0.4375rem;
+  color: var(--green-600);
+  background: var(--accent-tint);
+}
+
+.audit-action-icon[data-outcome='blocked'] {
+  color: var(--warning);
+  background: var(--warning-tint);
+}
+
+.audit-action-icon[data-outcome='failed'] {
+  color: var(--danger);
+  background: var(--danger-tint);
+}
+
+/* An id is for comparing, not for reading end to end: it gets a fixed measure
+   so the timestamp beside it is never the column that falls off the table. */
+.audit-table .t-id {
+  display: inline-block;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Below this the order column is the first thing to go: the action, the
+   outcome, and the amount are what the row is for. */
+@media (max-width: 52rem) {
+  .audit-table th:nth-child(4),
+  .audit-table td:nth-child(4) {
+    display: none;
+  }
 }
 
 .audit-row {

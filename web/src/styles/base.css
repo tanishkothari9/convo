@@ -17,6 +17,13 @@ html {
   text-size-adjust: 100%;
 }
 
+/* Set by the pages that paint their own dark field; see lib/useDarkSurface.ts. */
+html[data-surface='dark'],
+html[data-surface='dark'] body {
+  background: #04160f;
+  color-scheme: dark;
+}
+
 body {
   font-family: var(--font);
   font-size: var(--text-base);
@@ -169,4 +176,65 @@ a:hover {
   height: 1px;
   background: var(--line);
   border: none;
+}
+
+/* ── Gradient and material utilities ─────────────────────────────────────── */
+
+/*
+ * Text filled with the brand gradient. Falls back to a solid colour wherever
+ * background-clip:text is not honoured, so the word is never invisible.
+ */
+.t-gradient {
+  color: var(--green-600);
+}
+
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .t-gradient {
+    background: var(--grad-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* A surface that reads as glass: blur, a translucent fill, and a lit top edge. */
+.glass {
+  background: var(--glass-light);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow-lift);
+}
+
+.glass-dark {
+  background: var(--glass-dark);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-line);
+}
+
+/*
+ * A one-pixel gradient border. Two backgrounds, one clipped to the padding box
+ * and one to the border box, so the edge can carry a gradient without a
+ * wrapper element.
+ */
+.edge-lit {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--grad-brand) border-box;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-dark {
+    background: var(--green-900);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }

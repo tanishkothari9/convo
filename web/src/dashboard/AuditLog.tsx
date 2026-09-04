@@ -1,8 +1,32 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { api, type AuditEntry } from '../lib/api'
 import { money, when } from '../lib/format'
+import {
+  IconAudit,
+  IconBolt,
+  IconCart,
+  IconCatalogue,
+  IconCheck,
+  IconReceipt,
+  IconRupee,
+  IconShield,
+} from '../components/icons'
 import { PageHead } from './Layout'
 import { outcomeClass } from './Overview'
+
+/** One icon per action, so the trail can be scanned without reading it. */
+export const ACTION_ICONS: Record<string, (p: { size?: number }) => JSX.Element> = {
+  'cart.locked': IconCart,
+  'order.created': IconReceipt,
+  'payment.attempted': IconRupee,
+  'payment.confirmed': IconCheck,
+  'payment.failed': IconBolt,
+  'payment.signature_rejected': IconShield,
+  'order.refunded': IconRupee,
+  'checkout.blocked': IconShield,
+  'catalog.synced': IconCatalogue,
+  'agent.tool_held': IconAudit,
+}
 
 /** Plain names for the actions. The customer-facing product never shows these. */
 export const ACTION_LABELS: Record<string, string> = {
@@ -110,7 +134,17 @@ export function AuditLog() {
                         aria-expanded={expanded === entry.id}
                         data-expanded={expanded === entry.id}
                       >
-                        <td className="cell-strong">{ACTION_LABELS[entry.actionType] ?? entry.actionType}</td>
+                        <td className="cell-strong">
+                          <span className="audit-action">
+                            <span className="audit-action-icon" data-outcome={entry.outcome}>
+                              {(() => {
+                                const Icon = ACTION_ICONS[entry.actionType] ?? IconAudit
+                                return <Icon size={14} />
+                              })()}
+                            </span>
+                            {ACTION_LABELS[entry.actionType] ?? entry.actionType}
+                          </span>
+                        </td>
                         <td>
                           <span className={`badge badge-dot ${outcomeClass(entry.outcome)}`}>
                             {entry.outcome}

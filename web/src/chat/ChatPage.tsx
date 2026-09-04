@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { contrastOn, hexToRgb, shade } from '../lib/format'
+import { IconCart, IconSpark } from '../components/icons'
 import { Thinking } from './Thinking'
 import { Composer } from './Composer'
 import { CartSheet } from './CartSheet'
@@ -287,6 +288,10 @@ export function ChatPage() {
 
   return (
     <div className="chat" style={theme}>
+      {/* A soft field of the brand's own colour behind the conversation, so
+          the page belongs to the shop before a single word is read. */}
+      <div className="chat-ambient" aria-hidden="true" />
+
       <header className="chat-head">
         <div className="chat-head-inner">
           <div className="chat-brand">
@@ -301,7 +306,7 @@ export function ChatPage() {
             onClick={() => setCartOpen(true)}
             aria-label={`Cart, ${cart?.item_count ?? 0} items`}
           >
-            <CartIcon />
+            <IconCart size={18} />
             {cart && cart.item_count > 0 && (
               <span className="cart-count t-num">{cart.item_count}</span>
             )}
@@ -317,6 +322,12 @@ export function ChatPage() {
               {brand.brand.description && (
                 <p className="chat-open-lede">{brand.brand.description}</p>
               )}
+              <p className="chat-open-agent">
+                <span className="chat-open-agent-mark">
+                  <IconSpark size={13} />
+                </span>
+                {brand.brand.assistantName}
+              </p>
               <p className="chat-open-hint t-sm t-muted">
                 {brand.catalogSize > 0
                   ? `${brand.brand.assistantName} can search the catalogue, keep a cart, and take you through checkout.`
@@ -485,18 +496,3 @@ function latestChips(messages: ChatMessage[]): string[] {
   return []
 }
 
-function CartIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-      <path
-        d="M2 2h1.6l1.6 8.4a1.4 1.4 0 0 0 1.4 1.1h6.2a1.4 1.4 0 0 0 1.4-1.1L15.6 5H4.4"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="7" cy="15" r="1.2" fill="currentColor" />
-      <circle cx="13" cy="15" r="1.2" fill="currentColor" />
-    </svg>
-  )
-}
