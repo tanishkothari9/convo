@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Mark } from '../components/Mark'
 import {
   IconAudit,
+  IconBolt,
   IconCatalogue,
   IconClose,
   IconMenu,
@@ -17,6 +18,7 @@ const NAV = [
   { to: '/dashboard/catalog', label: 'Catalogue', icon: IconCatalogue },
   { to: '/dashboard/provider', label: 'Provider', icon: IconProvider },
   { to: '/dashboard/audit', label: 'Audit trail', icon: IconAudit },
+  { to: '/dashboard/developers', label: 'Developers', icon: IconBolt },
   { to: '/dashboard/settings', label: 'Settings', icon: IconSettings },
 ]
 

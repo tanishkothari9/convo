@@ -123,6 +123,41 @@ The agent proposes. The server decides, in
   to an append-only audit log with its tenant, amount, outcome, and the agent's
   own stated reasoning.
 
+## The API
+
+A brand whose inventory lives in its own system loads a catalogue with one
+call. Full reference at **`/docs`** — signed in, it fills in your own key and
+host, so the first example on the page is a request against your own catalogue.
+
+```bash
+curl -X POST https://your-convo-host/v1/products/bulk \
+  -H "Authorization: Bearer cvo_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{ "products": [
+        { "external_id": "SKU-1001", "name": "Mysore Silk Saree — Emerald",
+          "price": 8499, "stock": 5, "category": "Sarees",
+          "attributes": { "Colour": "Emerald green", "Occasion": "Wedding" } }
+      ] }'
+```
+
+| | |
+|---|---|
+| `POST /v1/products/bulk` | Upsert up to 500 by your own `external_id` |
+| `GET/POST/PATCH/DELETE /v1/products` | One product at a time |
+| `GET /v1/orders` | What the agent sold |
+| `GET /v1/audit` | The ledger, for reconciliation |
+| `GET /v1/me` | Which brand a key belongs to |
+
+Bulk upsert is addressed by **your** id, so last night's sync is safe to re-run:
+it updates what changed and creates what is new instead of growing a second
+catalogue. The batch is one transaction, so a half-valid payload leaves the
+catalogue untouched rather than half-updated.
+
+Keys are minted in **Dashboard → Developers**, shown once, and stored only as a
+SHA-256 digest — Convo cannot recover one, so a dump of that table is not a set
+of credentials. They carry a `cvo_` prefix so a leaked key is findable by secret
+scanners, and they are scoped (read or write), revocable, and rate-limited.
+
 ## Providers
 
 A provider implements three methods
@@ -136,6 +171,16 @@ verifyPayment(credentials, payload)        // → PaymentResult
 
 Adding Shopify, WooCommerce, or a generic REST catalogue is those three
 methods. No agent code, no route, and no UI changes.
+
+A brand takes its **catalogue** from one provider and its **payments** from
+another — Shopify for products, Razorpay for money — and a provider is only
+offered a role its adapter can actually fill.
+
+**Shopify** is catalogue-only, deliberately: Shopify's checkout belongs to
+Shopify, and a customer buying inside a Convo conversation is not in it. It
+reads the Admin REST API, and the store name is restricted to a single label
+under `myshopify.com` so a merchant-supplied host cannot become a request
+forgery.
 
 **Razorpay** is implemented against the published API: catalogue from
 [`GET /v1/items`](https://razorpay.com/docs/api/payments/invoices/fetch-all-items/),
@@ -224,16 +269,43 @@ have arrived.
 npm test
 ```
 
-29 tests over the rules that must hold whichever model is running: fencing
+49 tests over the rules that must hold whichever model is running: fencing
 against forged turn markers and fence escapes, signature verification against
 tampering and cross-order replay, the tool surface, and the money path against
 a real database — the total recomputed after a price move, an item selling out
 stopping the charge, stock leaving only on confirmation, and a superseded order
-staying unpayable even with a valid signature.
+staying unpayable even with a valid signature — plus a security suite covering
+tenant isolation, API-key handling, stored-XSS image URLs, credential
+encryption, and the Shopify host invariant.
+
+## Security
+
+What is enforced, and where:
+
+- **Rate limiting** ([`ratelimit.ts`](server/src/lib/ratelimit.ts)) on auth, the
+  chat turn, the dashboard and the API. The chat route runs a model turn per
+  request, so an unthrottled endpoint is an unbounded bill; it is budgeted per
+  customer session rather than per IP, because a shop's customers share
+  addresses behind carrier NAT.
+- **No account enumeration.** Sign-in burns the same work whether or not the
+  email exists, so neither the wording nor the timing answers the question.
+- **No stored XSS through imagery.** SVG is refused in both URL and data form,
+  in the dashboard and the API, because it carries script and these render in a
+  customer's browser on merchant-controlled content.
+- **No SSRF through a merchant-supplied host.** The Shopify store name resolves
+  to one label under `myshopify.com` or is refused.
+- **Credentials** are AES-256-GCM at rest and never returned to any client; API
+  keys are digests, not recoverable secrets.
+- **Security headers** on every response, with a CSP written for what the app
+  actually loads.
+- **Tenant isolation** is asserted, not assumed —
+  [`security.test.ts`](server/test/security.test.ts) fails if one brand can
+  reach another's products, orders, carts, audit entries or keys.
 
 ## What a deployment would add
 
 Convo is complete as a working system, not as a production deployment. Before
-real money moves: rate limiting in front of the chat routes, a queue for
-provider calls, webhook handling for asynchronous payment updates, key rotation
-for `CONVO_SECRET`, and Postgres in place of SQLite. See `DECISIONS.md`.
+real money moves: a shared rate-limit store once there is more than one
+instance, a queue for provider calls, webhook handling for asynchronous payment
+updates, key rotation for `CONVO_SECRET`, and Postgres in place of SQLite. See
+`DECISIONS.md`.

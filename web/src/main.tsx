@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import './styles/base.css'
 import './components/ui.css'
 import './styles/landing.css'
+import './styles/docs.css'
 import './dashboard/dashboard.css'
 import './chat/chat.css'
 import { AuthProvider, RequireAuth } from './dashboard/auth'
@@ -17,6 +18,8 @@ import { AuditLog } from './dashboard/AuditLog'
 import { Settings } from './dashboard/Settings'
 import { ChatPage } from './chat/ChatPage'
 import { Landing } from './Landing'
+import { ApiDocs } from './docs/ApiDocs'
+import { Developers } from './dashboard/Developers'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -27,6 +30,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/login" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/chat/:slug" element={<ChatPage />} />
+          <Route path="/docs" element={<ApiDocs />} />
           <Route
             path="/dashboard"
             element={
@@ -39,6 +43,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="catalog" element={<Catalog />} />
             <Route path="provider" element={<Providers />} />
             <Route path="audit" element={<AuditLog />} />
+            <Route path="developers" element={<Developers />} />
             <Route path="settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

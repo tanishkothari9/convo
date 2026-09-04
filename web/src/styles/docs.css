@@ -1,0 +1,465 @@
+/*
+ * The API reference.
+ *
+ * Dark, like Convo's other own-brand surfaces, because a developer reading this
+ * is usually reading it beside an editor. Two columns: a sticky index that says
+ * where you are, and a single reading measure for the prose with the examples
+ * allowed to run wider.
+ */
+
+.docs {
+  min-height: 100dvh;
+  background: var(--green-950);
+  color: rgba(255, 255, 255, 0.86);
+
+  --canvas: #04160f;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-sunken: rgba(255, 255, 255, 0.03);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --ink: #ffffff;
+  --ink-secondary: rgba(255, 255, 255, 0.7);
+  --ink-muted: rgba(255, 255, 255, 0.46);
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --brand: var(--green-400);
+  --brand-hover: var(--cyan-400);
+  --brand-contrast: #04160f;
+  --accent: var(--green-400);
+  --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+/* ── Bar ────────────────────────────────────────────────────────────────── */
+
+.docs-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--header-height);
+  padding: 0 var(--space-5);
+  background: rgba(4, 22, 15, 0.78);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.docs-bar-title {
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  padding-left: var(--space-4);
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.docs-bar-actions {
+  margin-left: auto;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+
+.docs-body {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: var(--space-7);
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-8);
+}
+
+.docs-nav {
+  position: sticky;
+  top: calc(var(--header-height) + var(--space-5));
+  align-self: start;
+  max-height: calc(100dvh - var(--header-height) - var(--space-7));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding-right: var(--space-2);
+}
+
+.docs-nav-group {
+  margin-top: var(--space-4);
+}
+
+.docs-nav-heading {
+  font-size: var(--text-xs);
+  letter-spacing: var(--text-xs-ls);
+  color: var(--ink-muted);
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.docs-nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+  text-decoration: none;
+  transition:
+    background-color var(--dur-quick) ease,
+    color var(--dur-quick) ease;
+}
+
+.docs-nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.docs-nav-link.is-active {
+  background: rgba(47, 176, 138, 0.14);
+  color: #fff;
+}
+
+/* The verb is the fastest way to scan an index of endpoints, so it is coloured
+   by what it does rather than by house style. */
+.docs-verb {
+  flex: none;
+  min-width: 3.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 0.125rem 0.3125rem;
+  border-radius: 0.25rem;
+  text-align: center;
+}
+
+.docs-verb-get {
+  color: #7fd8ff;
+  background: rgba(127, 216, 255, 0.14);
+}
+.docs-verb-post {
+  color: #6ee7b7;
+  background: rgba(110, 231, 183, 0.14);
+}
+.docs-verb-patch {
+  color: #fcd34d;
+  background: rgba(252, 211, 77, 0.14);
+}
+.docs-verb-delete {
+  color: #fca5a5;
+  background: rgba(252, 165, 165, 0.14);
+}
+
+/* ── Prose ──────────────────────────────────────────────────────────────── */
+
+.docs-main {
+  min-width: 0;
+}
+
+.docs-title {
+  font-size: clamp(1.875rem, 4vw, 2.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.026em;
+  font-weight: var(--weight-semibold);
+  color: #fff;
+}
+
+.docs-lede {
+  margin-top: var(--space-4);
+  max-width: 40rem;
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  color: var(--ink-secondary);
+}
+
+.docs-h1 {
+  font-size: var(--text-title);
+  line-height: var(--text-title-lh);
+  letter-spacing: var(--text-title-ls);
+  font-weight: var(--weight-semibold);
+  color: #fff;
+}
+
+.docs-h2 {
+  margin-top: var(--space-6);
+  font-size: var(--text-heading);
+  line-height: var(--text-heading-lh);
+  letter-spacing: var(--text-heading-ls);
+  font-weight: var(--weight-semibold);
+  color: #fff;
+}
+
+.docs-endpoint .docs-h2 {
+  margin-top: 0;
+}
+
+.docs-p {
+  margin-top: var(--space-3);
+  max-width: 44rem;
+  line-height: 1.62;
+  color: var(--ink-secondary);
+}
+
+.docs-p code,
+.docs-table code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  padding: 0.0625rem 0.25rem;
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d8fff2;
+}
+
+.docs-note {
+  margin-top: var(--space-3);
+  max-width: 44rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 0.625rem;
+  border-left: 2px solid var(--cyan-400);
+  background: rgba(47, 176, 138, 0.08);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-secondary);
+}
+
+.docs-warn {
+  margin-top: var(--space-3);
+  max-width: 44rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 0.625rem;
+  background: rgba(252, 211, 77, 0.1);
+  border: 1px solid rgba(252, 211, 77, 0.24);
+  font-size: var(--text-sm);
+  color: #fde68a;
+}
+
+.docs-section {
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.docs-section-head {
+  margin-bottom: var(--space-6);
+}
+
+/* ── Key panel ──────────────────────────────────────────────────────────── */
+
+.docs-key {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.docs-key-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  border-radius: 0.5rem;
+  color: var(--cyan-400);
+  background: rgba(47, 176, 138, 0.14);
+}
+
+.docs-key-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.docs-key-label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--text-xs-ls);
+  color: var(--ink-muted);
+}
+
+.docs-key-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: #d8fff2;
+  overflow-wrap: anywhere;
+}
+
+/* ── Endpoints ──────────────────────────────────────────────────────────── */
+
+.docs-endpoint {
+  margin-bottom: var(--space-8);
+  scroll-margin-top: calc(var(--header-height) + var(--space-5));
+}
+
+.docs-endpoint-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.docs-route {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.docs-route code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--ink-secondary);
+}
+
+.docs-fields {
+  margin-top: var(--space-5);
+}
+
+.docs-pane-label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--text-xs-ls);
+  color: var(--ink-muted);
+  margin-bottom: var(--space-2);
+}
+
+.docs-table-wrap {
+  overflow-x: auto;
+  border-radius: 0.625rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.docs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.docs-table th {
+  text-align: left;
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  white-space: nowrap;
+}
+
+.docs-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--ink-secondary);
+  vertical-align: top;
+}
+
+.docs-table tr:last-child td {
+  border-bottom: none;
+}
+
+.docs-field-name {
+  white-space: nowrap;
+}
+
+.docs-field-type {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.docs-required {
+  display: inline-block;
+  margin-left: var(--space-2);
+  font-size: 0.625rem;
+  letter-spacing: 0.03em;
+  color: #fca5a5;
+}
+
+/* ── Code ───────────────────────────────────────────────────────────────── */
+
+.docs-panes {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+@media (min-width: 68rem) {
+  .docs-panes {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.docs-code {
+  position: relative;
+  border-radius: 0.625rem;
+  background: #020d09;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.docs-code pre {
+  margin: 0;
+  padding: var(--space-4);
+  padding-right: 3rem;
+  overflow-x: auto;
+}
+
+.docs-code code {
+  font-family: var(--font-mono);
+  font-size: 0.78125rem;
+  line-height: 1.65;
+  color: #cfe9df;
+  white-space: pre;
+}
+
+.docs-copy {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: 0.4375rem;
+  color: var(--ink-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition:
+    color var(--dur-quick) ease,
+    background-color var(--dur-quick) ease;
+}
+
+.docs-copy:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.docs-foot {
+  margin-top: var(--space-8);
+  padding-top: var(--space-5);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 62rem) {
+  .docs-body {
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
+
+  .docs-nav {
+    position: static;
+    max-height: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .docs-nav-group {
+    display: contents;
+  }
+
+  .docs-nav-heading {
+    display: none;
+  }
+}

@@ -1,7 +1,7 @@
 # Ship-ready plan
 
-Ordered by what stops this being shippable, not by what is fun. Each item says
-what is wrong now and what "done" means.
+**Status: done.** Every item below is implemented and verified; what each
+says it would fix, it fixes. Kept as the record of what was wrong.
 
 ---
 
