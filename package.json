@@ -1,0 +1,18 @@
+{
+  "name": "convo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Convo — a conversational commerce platform. Brands connect a catalog and a payment provider and get a shareable AI storefront.",
+  "workspaces": ["server", "web"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "npm run dev --workspace=server & npm run dev --workspace=web",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:web": "npm run dev --workspace=web",
+    "build": "npm run build --workspace=server && npm run build --workspace=web",
+    "start": "npm run start --workspace=server",
+    "seed": "npm run seed --workspace=server",
+    "typecheck": "npm run typecheck --workspace=server && npm run typecheck --workspace=web",
+    "test": "npm run test --workspace=server"
+  }
+}
