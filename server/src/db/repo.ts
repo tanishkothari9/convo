@@ -5,6 +5,7 @@
  */
 import { all, get, run, transaction } from './index.js'
 import { id, nowIso } from '../lib/ids.js'
+import { STOCK_UNTRACKED } from '../commerce/razorpay/adapter.js'
 import type {
   AuditAction,
   AuditLogEntry,
@@ -558,6 +559,13 @@ export const products = {
           [tenantId, item.providerNativeId],
         )
         if (existing) {
+          // A provider that carries no imagery or no inventory must not wipe
+          // what the merchant filled in here. Razorpay's Items API has neither,
+          // so a sync that overwrote both would erase their work every time.
+          const current = products.byId(tenantId, String(existing.id))
+          const images = item.images.length > 0 ? item.images : (current?.images ?? [])
+          const stock =
+            item.stock === STOCK_UNTRACKED && current ? current.stock : item.stock
           run(
             `UPDATE products SET name = ?, description = ?, price_minor = ?, currency = ?, images = ?,
                stock = ?, category = ?, attributes = ?, is_active = 1, source = ?, updated_at = ?
@@ -567,9 +575,9 @@ export const products = {
               item.description,
               item.priceMinor,
               item.currency,
-              JSON.stringify(item.images),
-              item.stock,
-              item.category,
+              JSON.stringify(images),
+              stock,
+              item.category ?? current?.category ?? null,
               JSON.stringify(item.attributes),
               source,
               now,

@@ -34,14 +34,16 @@ const unix = () => Math.floor(Date.now() / 1000)
  * A merchant who connects real Razorpay test keys gets their own items instead.
  */
 const MOCK_ITEMS: RazorpayItem[] = [
-  ['Banarasi Silk Saree — Deep Maroon', 'Handwoven Banarasi silk with a real zari border and matching blouse piece.', 1249900],
-  ['Chanderi Cotton-Silk Saree — Sage', 'Feather-light Chanderi weave with a fine gold-thread butti across the body.', 689900],
-  ['Kanjivaram Silk Saree — Peacock Blue', 'Pure mulberry silk from Kanchipuram with a contrast temple border.', 1899900],
+  ['Banarasi Silk Saree — Deep Maroon', 'Handwoven Banarasi silk with a real zari border and a matching blouse piece.', 1249900],
+  ['Chanderi Cotton-Silk Saree — Sage', 'Feather-light Chanderi weave with fine gold-thread butti across the body.', 689900],
+  ['Kanjivaram Silk Saree — Violet and Gold', 'Pure mulberry silk from Kanchipuram with a contrast temple border.', 1899900],
+  ['Linen Saree — Ivory', 'Pure linen with a fine silver border. Softens with every wash.', 349900],
   ['Anarkali Kurta Set — Ivory Chikankari', 'Hand-embroidered Lucknowi chikankari on cotton mul, with churidar and dupatta.', 549900],
-  ['Straight Kurta — Indigo Block Print', 'Hand-block printed cotton in natural indigo. Everyday wear, gets softer with each wash.', 189900],
-  ['Sharara Set — Rose Gold Georgette', 'Sequin-worked georgette kurta with flared sharara and a scalloped dupatta.', 799900],
-  ['Cotton Silk Kurta — Mustard', 'Structured cotton-silk with a mandarin collar and side slits.', 249900],
+  ['Sharara Set — Wine Georgette', 'Thread-worked georgette kurta with a flared sharara and scalloped dupatta.', 799900],
+  ['Straight Kurta — Indigo Block Print', 'Hand-block printed cotton in natural indigo. Gets softer with each wash.', 189900],
+  ['Cotton Silk Kurta — Olive', 'Structured cotton-silk with a mandarin collar and side slits.', 249900],
   ['Bandhani Dupatta — Ruby', 'Kutch bandhani tied by hand, on a soft georgette base.', 179900],
+  ['Juttis — Teal Embroidered', 'Hand-embroidered juttis with silver thread and a cushioned sole.', 219900],
 ]
   .map(([name, description, amount], index) => ({
     id: `item_convomock${String(index + 1).padStart(6, '0')}`,
@@ -53,6 +55,9 @@ const MOCK_ITEMS: RazorpayItem[] = [
     currency: 'INR',
     type: 'invoice',
     unit: null,
+    // Razorpay Items carry no imagery, no category, and no inventory. That is
+    // exactly why a merchant still edits a synced catalogue in Convo, and why
+    // `replaceSynced` preserves what they filled in.
     tax_inclusive: true,
     hsn_code: null,
     sac_code: null,
