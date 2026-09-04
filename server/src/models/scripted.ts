@@ -341,7 +341,11 @@ function present(
     const empty = /cart is empty/i.test(cart.content)
     const wasWrite = /^(Added|Removed|Updated)/.test(cart.content)
     return {
-      text: empty ? 'Your cart is empty right now.' : summarise(cart.content),
+      // A read renders the cart card, which carries the figures; repeating the
+      // subtotal in the sentence above it says the same thing twice. A write
+      // renders no card, so there the sentence is the only report of what
+      // changed and the figure belongs in it.
+      text: empty ? 'Your cart is empty right now.' : summarise(cart.content, wasWrite),
       toolCalls: [
         // A write already refreshed the cart panel; only a read posts a card.
         ...(empty || wasWrite ? [] : [call('present_cart', {})]),
@@ -631,11 +635,15 @@ function forcedCall(name: string, intent: Intent, messages: ModelMessage[]): Mod
  * the fence — so the id is dropped here rather than read out. The figure comes
  * from the result verbatim; none is invented.
  */
-function summarise(content: string): string {
+function summarise(content: string, withFigures = true): string {
   const first = (content.split('\n').find((line) => line.trim() !== '') ?? '')
     .replace(/<[^>]*>/g, '')
     .trim()
   if (first === '') return 'Your cart is updated.'
+  if (!withFigures) {
+    if (/^The cart has\b/.test(first)) return 'Here is what you have so far.'
+    return first.replace(/,?\s*subtotal [^.]*/i, '').replace(/\bprd_[a-z0-9]+\s*/g, '').trim()
+  }
   const tail = /Cart now has (.+?)\.?$/.exec(first)?.[1]
   const lead = /^Added\b/.test(first)
     ? 'Added to your cart'

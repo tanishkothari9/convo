@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { api, type AuditEntry } from '../lib/api'
 import { money, when } from '../lib/format'
 import { PageHead } from './Layout'
@@ -48,7 +48,7 @@ export function AuditLog() {
     <>
       <PageHead
         title="Audit trail"
-        lede="Every money action the agent took, what it was worth, and whether it went through. Append-only."
+        lede="Every money action the agent took, what it was worth, and whether it went through. Append-only — nothing here is edited or removed."
       />
 
       {entries.length === 0 ? (
@@ -88,15 +88,26 @@ export function AuditLog() {
                     <th className="cell-right">Amount</th>
                     <th>Order</th>
                     <th className="cell-right">When</th>
+                    <th>
+                      <span className="visually-hidden">Detail</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {visible.map((entry) => (
-                    <>
+                    <Fragment key={entry.id}>
                       <tr
-                        key={entry.id}
                         className="audit-row"
                         onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            setExpanded(expanded === entry.id ? null : entry.id)
+                          }
+                        }}
+                        tabIndex={0}
+                        role="button"
+                        aria-expanded={expanded === entry.id}
                         data-expanded={expanded === entry.id}
                       >
                         <td className="cell-strong">{ACTION_LABELS[entry.actionType] ?? entry.actionType}</td>
@@ -110,10 +121,13 @@ export function AuditLog() {
                         </td>
                         <td className="t-id">{entry.orderId ?? entry.cartId ?? '—'}</td>
                         <td className="cell-right t-muted">{when(entry.createdAt)}</td>
+                        <td className="audit-toggle" aria-hidden="true">
+                          <Chevron />
+                        </td>
                       </tr>
                       {expanded === entry.id && (
-                        <tr key={`${entry.id}-detail`} className="audit-detail-row">
-                          <td colSpan={5}>
+                        <tr className="audit-detail-row">
+                          <td colSpan={6}>
                             <div className="audit-detail">
                               {entry.reasoning && (
                                 <div>
@@ -135,7 +149,7 @@ export function AuditLog() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -144,5 +158,19 @@ export function AuditLog() {
         </>
       )}
     </>
+  )
+}
+
+function Chevron() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path
+        d="M2.5 4.5L6 8L9.5 4.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }

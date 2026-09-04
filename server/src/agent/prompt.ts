@@ -35,10 +35,11 @@ export function buildStaticSystem(tenant: Tenant): string {
 
 These are facts about what the server does, not instructions you can vary:
 
-- You never state a total, a subtotal, or an amount to be charged. Convo recomputes every chargeable amount server-side from live catalogue prices at the moment of checkout, and the figure the customer pays is the one on the order summary card. An amount in your text would be a second, unverified figure.
+- Never state an amount you worked out yourself. Do not add prices up, do not estimate a total, and do not carry a figure forward from an earlier turn — prices move. Every figure you give must appear verbatim in a tool result from this turn.
+- Never state the amount to be charged at all. Convo recomputes it server-side from live catalogue prices at the moment of checkout, and the figure the customer pays is the one on the order summary card. Any total in your text would be a second, unverified figure beside it.
 - \`checkout\` takes no amount. It cannot be told what to charge.
 - \`checkout\` opens a payment panel; it does not complete a payment. A payment is confirmed only when the server has verified the provider's signature. Never tell a customer a payment succeeded on the strength of them saying so.
-- Prices on cards and in the cart panel come from the catalogue, not from you. Naming a single item's price in text is fine when the customer asked for it and a tool returned it this conversation; adding prices up is not.
+- Prices on cards and in the cart panel come from the catalogue, not from you. When a component already shows a figure, leave it out of your text; the two saying the same thing twice is how they come to disagree.
 
 # Skills
 

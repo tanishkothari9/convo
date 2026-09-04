@@ -89,23 +89,27 @@ export function Overview() {
             action={stats.products > 0 ? 'Manage' : 'Add products'}
           />
           <SetupRow
-            done={Boolean(provider)}
-            title={provider ? `Taking payment through ${providerLabel(provider.providerType)}` : 'Connect a payment provider'}
+            done={provider?.providerType === 'razorpay'}
+            title={
+              provider?.providerType === 'razorpay'
+                ? 'Taking payment through Razorpay'
+                : 'Connect a payment provider'
+            }
             body={
               provider?.providerType === 'razorpay'
-                ? `Razorpay test mode${provider.credentialsHint ? ` · ${provider.credentialsHint}` : ''}. Catalogue and payments both come from it.`
-                : 'Products live in Convo and checkout runs on the built-in test processor. Connect Razorpay to take real test-mode payments.'
+                ? `Razorpay test mode${provider.credentialsHint ? `, key ${provider.credentialsHint}` : ''}. Your catalogue and your payments both come from it.`
+                : 'Checkout runs on the built-in test processor, which signs and verifies payments the way a live provider does but moves no money. Connect Razorpay to take real test-mode payments.'
             }
             to="/dashboard/provider"
             action={provider?.providerType === 'razorpay' ? 'Manage' : 'Connect'}
           />
           <SetupRow
             done
-            title={`Agent running on ${model.active}`}
+            title={`Agent running on ${modelLabel(model.active)}`}
             body={
               model.active === 'scripted'
-                ? 'The built-in deterministic provider. Set an API key and switch to Claude or GPT in Settings — the skills, gates, and audit trail do not change.'
-                : `Model calls go to ${model.active}. The skills, gates, and audit trail are the same on every provider.`
+                ? 'Convo answers without calling out to anyone. Add an API key and switch to Claude or GPT in Settings — the skills, the gates, and the audit trail are the same either way.'
+                : `Model calls go to ${modelLabel(model.active)}. The skills, the gates, and the audit trail are the same on every provider.`
             }
             to="/dashboard/settings"
             action="Change"
@@ -216,4 +220,12 @@ export function outcomeClass(outcome: string): string {
 
 export function providerLabel(type: string): string {
   return type === 'razorpay' ? 'Razorpay' : 'the Convo catalogue'
+}
+
+/** Provider keys are configuration values; people read names. */
+export function modelLabel(provider: string): string {
+  if (provider === 'anthropic') return 'Claude'
+  if (provider === 'openai') return 'GPT'
+  if (provider === 'scripted') return "Convo's built-in model"
+  return provider
 }

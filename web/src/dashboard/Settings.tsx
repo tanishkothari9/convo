@@ -3,9 +3,11 @@ import { api, ApiError, type Overview, type Tenant } from '../lib/api'
 import { Toaster, useToast } from '../components/Toast'
 import { PageHead } from './Layout'
 import { useAuth } from './auth'
+import { modelLabel } from './Overview'
 
 const PROVIDER_NOTES: Record<string, string> = {
-  scripted: 'Built into Convo. Deterministic, no network, no API key — the same skills, gates, and audit trail as any other provider.',
+  scripted:
+    'Built into Convo. Deterministic, no network call, no API key — and the same skills, gates, and audit trail as any other provider.',
   anthropic: 'Claude, through the Anthropic Messages API.',
   openai: 'GPT, through the OpenAI Chat Completions API.',
 }
@@ -196,10 +198,12 @@ export function Settings() {
               value={form.llmProvider}
               onChange={(e) => setForm({ ...form, llmProvider: e.target.value })}
             >
-              <option value="">Platform default ({overview.model.platformDefault})</option>
+              <option value="">
+                Platform default — {modelLabel(overview.model.platformDefault)}
+              </option>
               {overview.model.providers.map((provider) => (
                 <option key={provider.name} value={provider.name} disabled={!provider.available}>
-                  {provider.name} — {provider.model}
+                  {modelLabel(provider.name)} — {provider.model}
                   {provider.available ? '' : ' (no API key set)'}
                 </option>
               ))}

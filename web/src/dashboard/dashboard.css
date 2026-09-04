@@ -300,6 +300,7 @@
  * is explained without a paragraph about it.
  */
 .link-card {
+  max-width: 50rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -333,9 +334,10 @@
 
 /* A rule between figures, not a box around each: easier to compare down a row. */
 .stat-row {
+  max-width: 50rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: var(--space-5);
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: var(--space-5) var(--space-4);
   padding: var(--space-5) 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -416,6 +418,7 @@
 .setup-list {
   list-style: none;
   padding: 0;
+  max-width: 50rem;
 }
 
 .setup-row {
@@ -469,15 +472,21 @@
 .activity {
   list-style: none;
   padding: 0;
+  max-width: 50rem;
 }
 
 .activity-row {
   display: grid;
-  grid-template-columns: 6rem 1fr auto auto;
+  grid-template-columns: 5.25rem 1fr auto auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) 0;
   border-top: 1px solid var(--line);
+}
+
+/* A grid item stretches by default; a badge should hug its own word. */
+.activity-row .badge {
+  justify-self: start;
 }
 
 .activity-row:first-child {
@@ -498,7 +507,7 @@
 
 @media (max-width: 34rem) {
   .activity-row {
-    grid-template-columns: 5.5rem 1fr auto;
+    grid-template-columns: 5.25rem 1fr auto;
   }
 
   .activity-time {
@@ -509,13 +518,14 @@
 /* ── Catalogue ──────────────────────────────────────────────────────────── */
 
 .catalog-search {
-  max-width: 20rem;
+  max-width: 22rem;
   margin-bottom: var(--space-5);
 }
 
 .product-list {
   list-style: none;
   padding: 0;
+  max-width: 56rem;
 }
 
 .product-row {
@@ -593,8 +603,19 @@
   opacity: 1;
 }
 
+/*
+ * Delete sits beside Edit, so it must not read as the louder of the two. It
+ * stays neutral until you are actually on it, then says what it is.
+ */
 .product-delete {
-  color: var(--danger);
+  color: var(--ink-muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .product-delete:hover {
+    color: var(--danger);
+    background: var(--danger-tint);
+  }
 }
 
 @media (max-width: 48rem) {
@@ -757,6 +778,30 @@
 .audit-row {
   cursor: pointer;
   transition: background-color var(--dur-quick) ease;
+}
+
+/* The chevron is the only thing that says a row opens. It stays quiet until
+   the row is under the pointer, then turns to face the content it reveals. */
+.audit-toggle {
+  width: 1.5rem;
+  color: var(--ink-muted);
+  opacity: 0.5;
+  transition:
+    opacity var(--dur-quick) ease,
+    transform var(--dur-enter) var(--ease-out);
+}
+
+.audit-row:hover .audit-toggle,
+.audit-row:focus-visible .audit-toggle {
+  opacity: 1;
+}
+
+.audit-toggle svg {
+  transition: transform var(--dur-enter) var(--ease-out);
+}
+
+.audit-row[data-expanded='true'] .audit-toggle svg {
+  transform: rotate(180deg);
 }
 
 @media (hover: hover) and (pointer: fine) {
