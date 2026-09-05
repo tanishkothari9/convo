@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { Mark } from './components/Mark'
 import { LiveDemo } from './components/LiveDemo'
 import { PixelMarket } from './components/PixelMarket'
-import { ShaderField } from './components/ShaderField'
 import {
   IconAgent,
   IconArrow,
@@ -247,7 +246,7 @@ export function Landing() {
       </section>
 
       <section className="cta">
-        <ShaderField speed={0.1} swirl={0.5} distortion={0.6} />
+        <PixelMarket />
         <div className="cta-inner">
           <h2 className="cta-title">Put your catalogue in a conversation.</h2>
           <p className="cta-lede">

@@ -243,7 +243,7 @@
 
   /* ── Colour ramp ─────────────────────────────────────────────────────────
      Kept for the few places that genuinely need a range of the accent: the
-     landing field, the shader fallback, chart-ish fills. Buttons and cards are
+     landing field, the closing panel, chart-ish fills. Buttons and cards are
      flat — a gradient on a small surface reads as decoration, and this system
      does not decorate. */
   --green-950: #04160f;
@@ -261,7 +261,7 @@
   --grad-brand: linear-gradient(var(--accent), var(--accent));
   --grad-brand-hover: linear-gradient(var(--accent-hover), var(--accent-hover));
 
-  /* Large fields only: the landing hero and the shader's CSS fallback. */
+  /* Large fields only: the hero and the closing panel. */
   --grad-field: linear-gradient(150deg, var(--green-950) 0%, var(--green-800) 38%, var(--green-600) 68%, var(--teal-400) 105%);
   --grad-aurora: radial-gradient(120% 90% at 12% 0%, rgba(47, 176, 138, 0.5) 0%, transparent 55%),
     radial-gradient(100% 80% at 88% 8%, rgba(75, 57, 200, 0.42) 0%, transparent 58%),

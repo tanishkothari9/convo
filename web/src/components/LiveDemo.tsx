@@ -23,24 +23,41 @@ type Frame =
   | { kind: 'cards' }
   | { kind: 'total' }
 
+/*
+ * Real catalogue photography, fetched deliberately tiny.
+ *
+ * The thumbnails used to be smooth CSS gradients, which is the one thing they
+ * could not be on a page whose hero is pixel art — two colours blending
+ * against a scene where nothing blends. These are the actual seeded products,
+ * requested at forty-odd pixels wide and painted up with nearest-neighbour, so
+ * the pixels come from the photograph itself rather than from a filter over
+ * it. Cheaper than a gradient, too: each is a couple of kilobytes.
+ */
+const shot = (id: string) =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=52&h=22&q=70`
+
 const PRODUCTS = [
   {
     name: 'Sharara Set — Wine',
     brand: 'Smart Choice',
     price: '₹7,999',
-    hue: 'linear-gradient(150deg,#6d213a,#a8425f)',
+    hue: '#6d213a',
+    image: shot('photo-1756483509254-3cc48a5a15b2'),
   },
   {
-    name: 'Kundan Choker Set',
+    // From the other brand, which is the whole point of the total below.
+    name: 'Oxidised Silver Jhumkas',
     brand: 'Kalaa Studio',
-    price: '₹3,299',
-    hue: 'linear-gradient(150deg,#8a6a1f,#d4ac47)',
+    price: '₹3,450',
+    hue: '#3c4a52',
+    image: shot('photo-1762686130435-897de4b26aac'),
   },
   {
     name: 'Juttis — Teal',
     brand: 'Smart Choice',
     price: '₹2,199',
-    hue: 'linear-gradient(150deg,#155e63,#2a9d8f)',
+    hue: '#155e63',
+    image: shot('photo-1777980808039-c8be538797f0'),
   },
 ]
 
@@ -136,7 +153,9 @@ export function LiveDemo() {
           <div className="demo-cards">
             {PRODUCTS.map((product, i) => (
               <div key={product.name} className="demo-card" style={{ animationDelay: `${i * 70}ms` }}>
-                <span className="demo-card-art" style={{ background: product.hue }} />
+                <span className="demo-card-art" style={{ background: product.hue }}>
+                  <img src={product.image} alt="" loading="lazy" decoding="async" />
+                </span>
                 <span className="demo-card-brand">{product.brand}</span>
                 <span className="demo-card-name">{product.name}</span>
                 <span className="demo-card-price">{product.price}</span>
@@ -151,7 +170,7 @@ export function LiveDemo() {
               <IconSpark size={14} />
               Two brands, two orders, computed on the server
             </span>
-            <strong>₹13,497</strong>
+            <strong>₹13,648</strong>
           </div>
         )}
       </div>

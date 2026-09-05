@@ -30,10 +30,16 @@
   height: 2.5rem;
   border-radius: var(--radius-input);
   font-size: var(--text-base);
-  /* Buttons are set at the same weight as body copy. A label that has to shout
-     to be found is a label in the wrong place. */
-  font-weight: var(--weight-medium);
-  letter-spacing: 0;
+  /*
+   * A step heavier than body copy, and a step tighter.
+   *
+   * At 450 in an off-white on green the label went soft — the button read as
+   * a shape with writing on it rather than as a thing to press. 500 with a
+   * touch of negative tracking is the difference between dull and crisp, and
+   * it is still nowhere near shouting.
+   */
+  font-weight: var(--weight-strong);
+  letter-spacing: -0.004em;
   white-space: nowrap;
   /* A link styled as a button is a button: it does not carry a link's underline. */
   text-decoration: none;
@@ -74,7 +80,9 @@
  */
 .btn-primary {
   background: var(--brand);
-  color: var(--brand-contrast);
+  /* Pure white, not the off-white the page is built from: on a saturated fill
+     the bone tint reads as a smudge rather than as ink. */
+  color: #ffffff;
   box-shadow: var(--shadow-key-accent);
 }
 
@@ -544,53 +552,6 @@
   .spinner {
     animation-duration: 1.6s;
   }
-}
-
-/* ── Shader field ───────────────────────────────────────────────────────── */
-
-.shader-field {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  /* Painted here, not by the shader, so it stands in when WebGL is missing
-     and covers the frame before the GL context is ready. */
-  background: var(--grad-field);
-}
-
-.shader-field-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  /* The canvas fades up over its own CSS fallback rather than replacing it. */
-  animation: field-in 900ms var(--ease-out) both;
-}
-
-@keyframes field-in {
-  from {
-    opacity: 0;
-  }
-}
-
-/* Film grain: an SVG turbulence tile, so it costs nothing to animate over. */
-.shader-field-grain {
-  position: absolute;
-  inset: -50%;
-  opacity: 0.16;
-  mix-blend-mode: overlay;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
-}
-
-/* Darkens the edges so text near the frame keeps its contrast wherever the
-   shader happens to be bright at that moment. */
-.shader-field-vignette {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(120% 80% at 50% 0%, transparent 30%, rgba(4, 22, 15, 0.5) 100%),
-    linear-gradient(180deg, rgba(4, 22, 15, 0.28) 0%, transparent 22%, transparent 62%, rgba(4, 22, 15, 0.72) 100%);
 }
 
 /* ── The pixel field ────────────────────────────────────────────────────────

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ApiError } from '../lib/api'
 import { Mark } from '../components/Mark'
-import { ShaderField } from '../components/ShaderField'
 import { useAuth } from './auth'
 
 const DEMO_BRANDS = [
@@ -36,7 +35,6 @@ export function SignIn() {
 
   return (
     <main className="auth">
-      <ShaderField speed={0.09} swirl={0.4} distortion={0.55} />
       <div className="auth-panel glass-dark">
         <Link to="/" className="auth-mark" aria-label="Convo home">
           <Mark size={26} />
