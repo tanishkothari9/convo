@@ -1400,6 +1400,21 @@
   color: var(--ink);
 }
 
+.agent-pay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.agent-pay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .agent-actions {
   padding: var(--space-4);
   border-top: 1px solid var(--line);

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { IconClose } from "../components/icons";
+import { PaymentPanel } from "./cards/PaymentPanel";
+import type { CheckoutOrder } from "./types";
 
 /**
  * Authorising an agent to spend, and then watching it try.
@@ -43,6 +45,10 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
   const [steps, setSteps] = useState<Step[]>([]);
   const [spent, setSpent] = useState(0);
   const [busy, setBusy] = useState(false);
+  /* What the agent placed, so whoever authorised it can actually pay. */
+  const [placed, setPlaced] = useState<CheckoutOrder[]>([]);
+  const [paying, setPaying] = useState<CheckoutOrder | null>(null);
+  const [paid, setPaid] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -168,10 +174,8 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
       }).then((r) => r.json());
 
       if (result.ok) {
-        const orders = result.checkout.orders as Array<{
-          brand_name: string;
-          total_display: string;
-        }>;
+        const orders = result.checkout.orders as CheckoutOrder[];
+        setPlaced(orders);
         const total = (
           result.checkout.orders as Array<{ total_minor?: number }>
         ).reduce((sum, order) => sum + (order.total_minor ?? 0), 0);
@@ -179,7 +183,7 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
         for (const order of orders) {
           say({
             label: `Order placed · ${order.brand_name}`,
-            detail: order.total_display,
+            detail: `${order.total_display} · awaiting payment`,
             tone: "ok",
           });
         }
@@ -302,6 +306,37 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
             </ol>
           )}
 
+          {placed.length > 0 && (
+            <div className="agent-pay">
+              <p className="t-sm">
+                {paid.size === placed.length
+                  ? "All paid."
+                  : "The agent placed these. Paying is still yours."}
+              </p>
+              {placed.map((order) => (
+                <div key={order.order_id} className="agent-pay-row">
+                  <span className="t-sm">
+                    {order.brand_name}
+                    <span className="t-xs t-muted">
+                      {" "}
+                      · {order.total_display}
+                    </span>
+                  </span>
+                  {paid.has(order.order_id) ? (
+                    <span className="t-xs t-muted">Paid</span>
+                  ) : (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setPaying(order)}
+                    >
+                      Pay
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {error && <p className="notice notice-danger">{error}</p>}
         </div>
 
@@ -338,6 +373,48 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
           )}
         </div>
       </div>
+
+      {/* The same panel the chat uses. It works here because the mandate was
+          issued against this browser's own session, so the orders the agent
+          placed are this shopper's orders. */}
+      {paying && (
+        <PaymentPanel
+          payload={paying}
+          onCancel={() => setPaying(null)}
+          onResult={async (result) => {
+            const order = paying;
+            setPaying(null);
+            if (!order) return;
+            try {
+              const outcome = await fetch(
+                `/api/shop/orders/${order.order_id}/confirm`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "same-origin",
+                  body: JSON.stringify(result),
+                },
+              ).then((r) => r.json());
+              if (outcome.paid) {
+                setPaid((current) => new Set(current).add(order.order_id));
+                say({
+                  label: `Paid · ${order.brand_name}`,
+                  detail: order.total_display,
+                  tone: "ok",
+                });
+              } else {
+                say({
+                  label: `Payment failed · ${order.brand_name}`,
+                  detail: outcome.reason,
+                  tone: "refused",
+                });
+              }
+            } catch {
+              setError("Could not confirm that payment.");
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

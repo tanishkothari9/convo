@@ -136,8 +136,22 @@ agentRoutes.post(
       }
     }
 
-    // The agent shops as its own customer, so its cart and orders are its own.
-    const customerSessionId = `agent-${agentId}-${Date.now().toString(36)}`;
+    /*
+     * Delegate from the shopper's own session when there is one.
+     *
+     * A mandate issued in a browser is a person handing their own budget over,
+     * so the orders that come out of it have to be theirs: in their order list,
+     * on their cart, payable from the panel they already use. Minting a
+     * separate session for the agent produced orders nobody could reach — the
+     * run said "order placed" and there was no screen that could pay it.
+     *
+     * An outside agent has no cookie, and still gets a session of its own.
+     */
+    const cookieSession = req.cookies?.convo_customer as string | undefined;
+    const customerSessionId =
+      typeof cookieSession === "string" && cookieSession.length > 20
+        ? cookieSession
+        : `agent-${agentId}-${Date.now().toString(36)}`;
     const conversation = conversations.ensure(customerSessionId);
     const now = Math.floor(Date.now() / 1000);
 
