@@ -564,3 +564,48 @@
     radial-gradient(120% 80% at 50% 0%, transparent 30%, rgba(4, 22, 15, 0.5) 100%),
     linear-gradient(180deg, rgba(4, 22, 15, 0.28) 0%, transparent 22%, transparent 62%, rgba(4, 22, 15, 0.72) 100%);
 }
+
+/* ── The pixel field ────────────────────────────────────────────────────────
+ *
+ * A low-resolution canvas stretched over the hero with `image-rendering:
+ * pixelated`, so the browser scales it with nearest-neighbour and every pixel
+ * stays a hard square. Smoothing here would turn deliberate pixel art into a
+ * blurry photograph of pixel art, which is the one thing it must not be.
+ */
+
+.pixel-field {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: #0d1120;
+}
+
+/* The grid is generated at the hero's own proportions, so this stretches
+   exactly and crops nothing. `fill` rather than `cover` for the same reason. */
+.pixel-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Contrast insurance for the headline, and the fade into the page's own floor
+   at the bottom edge. */
+.pixel-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(9, 13, 26, 0.7) 0%, rgba(9, 13, 26, 0.24) 46%, transparent 78%),
+    linear-gradient(180deg, rgba(9, 13, 26, 0.42) 0%, transparent 30%);
+}
+
+@media (max-width: 60rem) {
+  .pixel-vignette {
+    background:
+      linear-gradient(180deg, rgba(9, 13, 26, 0.62) 0%, rgba(9, 13, 26, 0.28) 34%, rgba(9, 13, 26, 0.66) 100%);
+  }
+}

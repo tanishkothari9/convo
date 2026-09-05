@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Mark } from './components/Mark'
 import { LiveDemo } from './components/LiveDemo'
+import { PixelMarket } from './components/PixelMarket'
 import { ShaderField } from './components/ShaderField'
 import {
   IconAgent,
@@ -62,7 +63,7 @@ export function Landing() {
   return (
     <main className="landing">
       <section className="hero hero-dark">
-        <ShaderField />
+        <PixelMarket />
 
         <div className="hero-inner">
           <header className="hero-nav">
