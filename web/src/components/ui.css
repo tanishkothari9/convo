@@ -578,7 +578,9 @@
   inset: 0;
   z-index: -1;
   overflow: hidden;
-  background: #0d1120;
+  /* Sky, so any frame before the canvas paints is sky rather than a black
+     rectangle. */
+  background: #27a6f7;
 }
 
 /* The grid is generated at the hero's own proportions, so this stretches
@@ -598,14 +600,26 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /*
+   * Light enough to leave the picture alone.
+   *
+   * Written for a night scene, this was a heavy navy wash that turned a bright
+   * afternoon into dusk — the scrim was doing more work than the illustration.
+   * It only has to hold white text against sky and cloud, and a shade this
+   * gentle does that while the blues stay blue.
+   */
   background:
-    linear-gradient(90deg, rgba(9, 13, 26, 0.7) 0%, rgba(9, 13, 26, 0.24) 46%, transparent 78%),
-    linear-gradient(180deg, rgba(9, 13, 26, 0.42) 0%, transparent 30%);
+    linear-gradient(100deg, rgba(8, 30, 38, 0.54) 0%, rgba(8, 30, 38, 0.26) 40%, rgba(8, 30, 38, 0.06) 66%, transparent 84%),
+    linear-gradient(180deg, rgba(8, 30, 38, 0.22) 0%, transparent 22%);
 }
 
 @media (max-width: 60rem) {
   .pixel-vignette {
-    background:
-      linear-gradient(180deg, rgba(9, 13, 26, 0.62) 0%, rgba(9, 13, 26, 0.28) 34%, rgba(9, 13, 26, 0.66) 100%);
+    background: linear-gradient(
+      180deg,
+      rgba(8, 30, 38, 0.34) 0%,
+      rgba(8, 30, 38, 0.44) 38%,
+      rgba(8, 30, 38, 0.22) 100%
+    );
   }
 }
