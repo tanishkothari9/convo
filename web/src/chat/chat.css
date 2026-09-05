@@ -11,15 +11,14 @@
  * The page runs on --brand, which is Convo's own green rather than any one
  * shop's colour. The shelf holds many brands; painting the chrome in one of
  * their palettes would be quietly picking a favourite, and would lurch every
- * time the conversation moved from one label to another.
+ * time the conversation moved from one label to another. Those come from
+ * tokens.css like everything else — this page used to keep its own copy of
+ * them, which had drifted a shade off the real ones (#175a47 where the rest of
+ * the product used #155943) and would have gone on drifting every time the
+ * accent moved.
  */
 
 .chat {
-  --brand: #1b6b54;
-  --brand-hover: #175a47;
-  --brand-tint: #eef5f2;
-  --brand-ring: rgba(27, 107, 84, 0.3);
-  --brand-contrast: #ffffff;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -40,9 +39,21 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(78% 58% at 6% -4%, color-mix(in srgb, var(--brand) 20%, transparent) 0%, transparent 60%),
-    radial-gradient(66% 52% at 96% 2%, color-mix(in srgb, var(--brand) 13%, transparent) 0%, transparent 58%),
-    radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--brand) 5%, transparent) 0%, transparent 70%);
+    radial-gradient(
+      78% 58% at 6% -4%,
+      color-mix(in srgb, var(--brand) 20%, transparent) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      66% 52% at 96% 2%,
+      color-mix(in srgb, var(--brand) 13%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      120% 60% at 50% 0%,
+      color-mix(in srgb, var(--brand) 5%, transparent) 0%,
+      transparent 70%
+    );
 }
 
 .chat-boot {
@@ -81,19 +92,34 @@
   gap: var(--space-3);
 }
 
-.chat-brand {
+/* Two groups rather than four loose children: space-between across four
+   things spreads them evenly, which puts the wordmark somewhere arbitrary. */
+.chat-head-side {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-width: 0;
 }
 
-.chat-brand-name {
-  font-weight: var(--weight-semibold);
-  letter-spacing: -0.014em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.chat-head-btn {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  border: none;
+  background: none;
+  border-radius: var(--radius-input);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.chat-head-btn:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
 }
 
 .cart-button {
@@ -169,8 +195,55 @@
 
 /* An empty screen is an invitation, so it opens with the brand and three ways in. */
 .chat-open {
-  margin: auto 0;
-  padding: var(--space-6) 0;
+  position: relative;
+  isolation: isolate;
+  /* Pushed to the foot of the scroller rather than centred in it: the street
+     is the ground this screen stands on, and ground that stops halfway up with
+     bone underneath is a picture of ground. Its base meets the composer. */
+  margin: auto 0 0;
+  /* The bottom padding is the street's room — the chips end where the awnings
+     begin, so the market has somewhere to be that is not behind text. */
+  padding: var(--space-6) 0 21rem;
+}
+
+/*
+ * The market, behind the opening screen.
+ *
+ * Full-bleed and bottom-anchored, running under the content rather than beside
+ * it. It has no top edge — the canvas erases itself upward — so there is no
+ * rectangle for the eye to find, and the headline is set on plain bone.
+ */
+.pixel-street {
+  position: absolute;
+  /* A fixed height matching the canvas grid exactly (112 rows x 4px), so the art
+     is never stretched off its own pixel size. */
+  bottom: 0;
+  height: 28rem;
+  inset-inline: calc(50% - 50vw);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.pixel-street-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+/* The street holds still under reduced motion — the canvas paints one frame and
+   never starts its loop — and a viewer who has asked for less going on visually
+   is also asking for less scenery, so it steps back further. The copy stops
+   settling in and is simply there. */
+@media (prefers-reduced-motion: reduce) {
+  .pixel-street {
+    opacity: 0.55;
+  }
+
+  .settle-word,
+  .chat-openers .chip {
+    animation: none;
+  }
 }
 
 .chat-open-name {
@@ -178,25 +251,36 @@
   line-height: 1.08;
   letter-spacing: -0.012em;
   font-weight: var(--weight-regular);
-  animation: rise var(--dur-enter) var(--ease-out) both;
 }
 
-.chat-open-lede {
-  margin-top: var(--space-3);
-  font-size: var(--text-lg);
-  line-height: 1.6;
-  letter-spacing: var(--text-lg-ls);
-  color: var(--ink-secondary);
-  max-width: 32rem;
-  animation: rise var(--dur-enter) var(--ease-out) 60ms both;
+/*
+ * The opening screen settles rather than slides.
+ *
+ * Everything here used to arrive on a six-pixel `rise`, which is the house
+ * transition for a component appearing in a running conversation — the right
+ * length for something you have just caused, and much too brisk for the first
+ * thing a customer ever sees. This is slower and softer: each word comes up out
+ * of a blur, the blur clearing before the opacity finishes so the word is sharp
+ * while it is still arriving. Nothing moves, which is what keeps it calm.
+ */
+@keyframes settle {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+  60% {
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
 }
 
-/* Under the rail, not above it: the money rule reads better once a customer
-   has seen what they might be buying. */
-.chat-open-foot {
-  margin-top: var(--space-4);
-  max-width: 34rem;
-  animation: rise var(--dur-enter) var(--ease-out) 260ms both;
+.settle-word {
+  display: inline-block;
+  white-space: pre;
+  animation: settle 1100ms var(--ease-out) both;
 }
 
 .chat-openers {
@@ -204,11 +288,12 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-5);
-  animation: rise var(--dur-enter) var(--ease-out) 150ms both;
 }
 
+/* The delay comes in per chip from the component, so they arrive in the order
+   they are written rather than all at once. */
 .chat-openers .chip {
-  animation: rise var(--dur-enter) var(--ease-out) both;
+  animation: settle 1100ms var(--ease-out) both;
 }
 
 @keyframes rise {
@@ -240,7 +325,11 @@
   padding: var(--space-3) var(--space-4);
   border-radius: 1.125rem 1.125rem 0.3125rem 1.125rem;
   background: var(--brand);
-  background-image: linear-gradient(140deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 52%);
+  background-image: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0) 52%
+  );
   color: var(--brand-contrast);
   font-size: var(--text-lg);
   line-height: 1.5;
@@ -272,8 +361,8 @@
 
 /* A caret while the reply is still arriving. */
 /* A caret, not a block: it should sit in the text, not shout over it. */
-.reply[data-streaming='true']::after {
-  content: '';
+.reply[data-streaming="true"]::after {
+  content: "";
   display: inline-block;
   width: 0.125rem;
   height: 1.05em;
@@ -366,7 +455,7 @@
     transform 130ms var(--ease-out);
 }
 
-.thinking-status[data-fading='true'] {
+.thinking-status[data-fading="true"] {
   opacity: 0;
   filter: blur(3px);
   transform: translateY(-2px);
@@ -381,12 +470,12 @@
     transition: opacity 120ms ease;
   }
 
-  .thinking-status[data-fading='true'] {
+  .thinking-status[data-fading="true"] {
     filter: none;
     transform: none;
   }
 
-  .reply[data-streaming='true']::after {
+  .reply[data-streaming="true"]::after {
     animation: none;
   }
 }
@@ -426,7 +515,6 @@
 .cards-carousel .pcard {
   scroll-snap-align: start;
 }
-
 
 .cards-grid {
   grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
@@ -480,8 +568,13 @@
   position: relative;
   aspect-ratio: 4 / 5;
   overflow: hidden;
-  border-radius: calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px) 0 0;
-  background: linear-gradient(150deg, var(--surface-sunken), color-mix(in srgb, var(--brand) 7%, var(--surface-sunken)));
+  border-radius: calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px) 0
+    0;
+  background: linear-gradient(
+    150deg,
+    var(--surface-sunken),
+    color-mix(in srgb, var(--brand) 7%, var(--surface-sunken))
+  );
 }
 
 .pcard-image img {
@@ -949,23 +1042,26 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-.chip-rail {
-  max-width: var(--chat-column);
-  margin: 0 auto;
-  padding: var(--space-3) var(--space-4) 0;
+/*
+ * Suggestions, in the transcript.
+ *
+ * They wrap rather than scroll sideways. A rail above the composer had to
+ * scroll because it was pinned to one line in a strip with no room; down here
+ * there is a whole column, so three chips can simply sit on two lines if they
+ * need to, and none of them is hidden off the right-hand edge.
+ */
+.suggestions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
+  margin-top: var(--space-2);
 }
 
-.chip-rail::-webkit-scrollbar {
-  display: none;
+.turn-suggestions {
+  margin-top: 0;
 }
 
 .chip-suggestion {
-  flex: none;
   animation: rise var(--dur-enter) var(--ease-out) both;
 }
 
@@ -1018,7 +1114,11 @@
   flex: none;
   border-radius: 50%;
   background: var(--brand);
-  background-image: linear-gradient(140deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 52%);
+  background-image: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.2),
+    rgba(255, 255, 255, 0) 52%
+  );
   box-shadow: 0 2px 10px color-mix(in srgb, var(--brand) 30%, transparent);
   color: var(--brand-contrast);
   transition:
@@ -1042,6 +1142,133 @@
 @media (hover: hover) and (pointer: fine) {
   .composer-send:hover:not(:disabled) {
     background: var(--brand-hover);
+  }
+}
+
+/* ── Chats ──────────────────────────────────────────────────────────────── */
+
+/*
+ * The chat list, as a sheet from the left — the mirror of the cart's from the
+ * right, so the two ends of the header open the two sides of the screen.
+ */
+.chats-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.chats-sheet {
+  position: relative;
+  width: min(20rem, 100%);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-float);
+  animation: chats-in var(--dur-sheet) var(--ease-sheet);
+}
+
+@keyframes chats-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+.chats-new {
+  padding: var(--space-4) var(--space-4) var(--space-2);
+}
+
+.chats-new-btn {
+  width: 100%;
+}
+
+.chats-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-3) var(--space-4);
+  list-style: none;
+  margin: 0;
+}
+
+.chats-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-input);
+}
+
+.chats-row:hover {
+  background: var(--surface-hover);
+}
+
+.chats-row[data-current="true"],
+.chats-row[data-current="true"]:hover {
+  background: var(--accent-tint);
+}
+
+.chats-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  border-radius: var(--radius-input);
+}
+
+/* One line, always. A chat titled with somebody's whole first sentence must
+   not get to set the width of the sheet. */
+.chats-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.chats-remove {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin-right: var(--space-1);
+  flex: none;
+  border: none;
+  background: none;
+  border-radius: var(--radius-input);
+  color: var(--ink-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+/* Revealed on hover, but always reachable by keyboard — an action that only
+   exists for a mouse is an action half the people cannot take. */
+.chats-row:hover .chats-remove,
+.chats-remove:focus-visible {
+  opacity: 1;
+}
+
+.chats-remove:hover {
+  color: var(--danger);
+}
+
+.chats-foot {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 40rem) {
+  .chats-sheet {
+    width: min(18rem, 84%);
   }
 }
 
@@ -1168,8 +1395,20 @@
   margin-top: var(--space-6);
   margin-inline: calc(50% - 50vw);
   /* Cards travel in and out rather than starting and stopping at an edge. */
-  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 4%,
+    #000 96%,
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 4%,
+    #000 96%,
+    transparent
+  );
   animation: rise var(--dur-enter) var(--ease-out) 200ms both;
 }
 
@@ -1198,7 +1437,7 @@
 /* Hovering is someone trying to read one; stop moving it out from under them. */
 .marquee:hover .marquee-track,
 .marquee:focus-within .marquee-track,
-.marquee[data-paused='true'] .marquee-track {
+.marquee[data-paused="true"] .marquee-track {
   animation-play-state: paused;
 }
 
@@ -1228,7 +1467,7 @@
 
 /* A hairline inside the radius, so a pale photograph still has an edge. */
 .marquee-card::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
@@ -1258,7 +1497,11 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: linear-gradient(150deg, var(--surface-sunken), color-mix(in srgb, var(--brand) 12%, var(--surface-sunken)));
+  background: linear-gradient(
+    150deg,
+    var(--surface-sunken),
+    color-mix(in srgb, var(--brand) 12%, var(--surface-sunken))
+  );
 }
 
 .marquee-art img {
@@ -1504,7 +1747,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .address-option:hover:not(:disabled):not([data-selected='true']) {
+  .address-option:hover:not(:disabled):not([data-selected="true"]) {
     border-color: color-mix(in srgb, var(--brand) 40%, transparent);
     background: var(--brand-tint);
   }
@@ -1514,7 +1757,7 @@
   transform: scale(0.99);
 }
 
-.address-option[data-selected='true'] {
+.address-option[data-selected="true"] {
   border-color: var(--brand);
   background: var(--brand-tint);
 }
@@ -1540,7 +1783,7 @@
     border-color var(--dur-quick) ease;
 }
 
-.address-option[data-selected='true'] .address-option-mark {
+.address-option[data-selected="true"] .address-option-mark {
   background: var(--brand);
   border-color: var(--brand);
 }
@@ -1631,8 +1874,8 @@
 
 /* A paid brand recedes rather than disappearing: the customer still wants to
    see what they bought, but their attention belongs on what is still owed. */
-.order-brand[data-state='paid'] .order-lines,
-.order-brand[data-state='paid'] .order-brand-total {
+.order-brand[data-state="paid"] .order-lines,
+.order-brand[data-state="paid"] .order-brand-total {
   opacity: 0.55;
 }
 
