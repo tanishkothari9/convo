@@ -21,6 +21,17 @@ const { gatedAddToCart, gatedCheckout, gatedConfirmPayment } = await import('../
 const { ConvoStorefront, ensureSession } = await import('../src/agent/storefront.js')
 const { DEFAULT_AGENT_CONFIG } = await import('../src/agent/config.js')
 const { signManualPayment } = await import('../src/commerce/manual.js')
+const { readAddress, AddressError } = await import('../src/domain/address.js')
+
+const GOOD_ADDRESS = {
+  name: 'Anika Rao',
+  phone: '9876543210',
+  line1: '12 MG Road',
+  line2: 'Near Devaraja Market',
+  city: 'Mysuru',
+  state: 'Karnataka',
+  postalCode: '570001',
+}
 
 const backend = new ConvoStorefront()
 const config = DEFAULT_AGENT_CONFIG
@@ -108,6 +119,8 @@ test('a payment cannot be confirmed without a valid signature', async () => {
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
   await gatedCheckout({ session, tenant, config })
   const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+  // Otherwise valid, so the refusal below is the signature and nothing else.
+  orders.setShippingAddress(tenantId, order.id, readAddress(GOOD_ADDRESS))
 
   const outcome = await gatedConfirmPayment({
     session,
@@ -123,6 +136,7 @@ test('a correctly signed payment marks the order paid and takes the stock', asyn
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 2 })
   await gatedCheckout({ session, tenant, config })
   const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+  orders.setShippingAddress(tenantId, order.id, readAddress(GOOD_ADDRESS))
 
   const paymentId = 'cvpay_test_ok'
   const outcome = await gatedConfirmPayment({
@@ -214,4 +228,98 @@ test('a cart write for a product this conversation has not seen is held', async 
   })
   assert.equal(outcome.heldBy, 'provenance')
   assert.equal(carts.ensureOpen(tenantId, session.conversationId).items.length, 0)
+})
+
+
+// ── Delivery address ────────────────────────────────────────────────────────
+
+test('an order with nowhere to send it cannot be paid, even with a valid signature', async () => {
+  const { product, session, tenant } = scenario('no-address-item', 600, 5)
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+  await gatedCheckout({ session, tenant, config })
+  const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+
+  const paymentId = 'cvpay_no_address'
+  const outcome = await gatedConfirmPayment({
+    session,
+    orderId: order.id,
+    payload: {
+      payment_id: paymentId,
+      signature: signManualPayment(order.providerOrderId!, paymentId),
+    },
+  })
+
+  assert.equal(outcome.heldBy, 'address')
+  assert.notEqual(orders.byId(tenantId, order.id)!.status, 'paid')
+  assert.equal(products.byId(tenantId, product.id)!.stock, 5, 'stock left the shelf without an address')
+})
+
+test('the address is frozen onto the order it was given for', async () => {
+  const { product, session, tenant } = scenario('frozen-address-item', 300, 5)
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+  await gatedCheckout({ session, tenant, config })
+  const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+
+  orders.setShippingAddress(tenantId, order.id, readAddress(GOOD_ADDRESS))
+  const stored = orders.byId(tenantId, order.id)!.shippingAddress!
+  assert.equal(stored.city, 'Mysuru')
+  assert.equal(stored.postalCode, '570001')
+
+  // A later order gets its own copy, so changing one cannot rewrite history.
+  orders.setShippingAddress(
+    tenantId,
+    order.id,
+    readAddress({ ...GOOD_ADDRESS, city: 'Bengaluru', postalCode: '560001' }),
+  )
+  assert.equal(orders.byId(tenantId, order.id)!.shippingAddress!.city, 'Bengaluru')
+})
+
+test('an address is pre-filled from the last one used in the same conversation', async () => {
+  const { product, session, tenant } = scenario('prefill-item', 200, 9)
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+  await gatedCheckout({ session, tenant, config })
+  const first = orders.listForConversation(tenantId, session.conversationId)[0]!
+  orders.setShippingAddress(tenantId, first.id, readAddress(GOOD_ADDRESS))
+
+  const recalled = orders.lastShippingAddress(tenantId, session.conversationId)!
+  assert.equal(recalled.name, 'Anika Rao')
+
+  // And it does not leak into another conversation.
+  const other = ensureSession(tenantId, `other-${Math.random()}`, 'INR')
+  assert.equal(orders.lastShippingAddress(tenantId, other.conversationId), null)
+})
+
+test('an address is validated and normalised however it was typed', () => {
+  const messy = readAddress({
+    ...GOOD_ADDRESS,
+    name: '  Anika   Rao ',
+    phone: '+91 98765-43210',
+    line1: '12  MG Road',
+    postalCode: '570 001',
+  })
+  assert.equal(messy.name, 'Anika Rao')
+  assert.equal(messy.phone, '9876543210')
+  assert.equal(messy.line1, '12 MG Road')
+  assert.equal(messy.postalCode, '570001')
+  assert.equal(messy.country, 'India')
+})
+
+test('an address that could not be delivered to is refused', () => {
+  const bad: Array<[Record<string, unknown>, string]> = [
+    [{ ...GOOD_ADDRESS, name: 'A' }, 'name'],
+    [{ ...GOOD_ADDRESS, phone: '12345' }, 'phone'],
+    [{ ...GOOD_ADDRESS, phone: '1234567890' }, 'phone'],
+    [{ ...GOOD_ADDRESS, line1: '' }, 'line1'],
+    [{ ...GOOD_ADDRESS, city: '' }, 'city'],
+    [{ ...GOOD_ADDRESS, state: 'Atlantis' }, 'state'],
+    [{ ...GOOD_ADDRESS, postalCode: '57000' }, 'postalCode'],
+    [{ ...GOOD_ADDRESS, postalCode: '070001' }, 'postalCode'],
+  ]
+  for (const [input, field] of bad) {
+    assert.throws(
+      () => readAddress(input),
+      (error: unknown) => error instanceof AddressError && error.field === field,
+      `accepted an undeliverable address, expected ${field} to fail`,
+    )
+  }
 })

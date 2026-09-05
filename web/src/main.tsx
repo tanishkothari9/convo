@@ -15,6 +15,7 @@ import { Overview } from './dashboard/Overview'
 import { Catalog } from './dashboard/Catalog'
 import { Providers } from './dashboard/Providers'
 import { AuditLog } from './dashboard/AuditLog'
+import { Orders } from './dashboard/Orders'
 import { Settings } from './dashboard/Settings'
 import { ChatPage } from './chat/ChatPage'
 import { Landing } from './Landing'
@@ -42,6 +43,7 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<Overview />} />
             <Route path="catalog" element={<Catalog />} />
             <Route path="provider" element={<Providers />} />
+            <Route path="orders" element={<Orders />} />
             <Route path="audit" element={<AuditLog />} />
             <Route path="developers" element={<Developers />} />
             <Route path="settings" element={<Settings />} />

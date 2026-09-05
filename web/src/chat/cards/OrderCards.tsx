@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import type { Component, OrderConfirmationPayload, OrderSummaryPayload } from '../types'
 import { PaymentPanel } from './PaymentPanel'
+import { AddressForm, AddressSummary, type ShippingAddress } from './AddressForm'
 
 /**
  * The order summary and its payment button.
@@ -26,6 +27,14 @@ export function OrderSummaryCard({
     'checking',
   )
   const [reason, setReason] = useState<string | null>(null)
+  const [address, setAddress] = useState<ShippingAddress | null>(null)
+  const [editingAddress, setEditingAddress] = useState(false)
+
+  // A brand that ships needs somewhere to ship to before it can be paid. The
+  // server enforces the same rule; this only means the customer meets it in
+  // the right order rather than after a refusal.
+  const needsAddress = payload.requires_address !== false
+  const addressReady = !needsAddress || address !== null
 
   /*
    * A card stays in the transcript, so scrolling back reaches an order that may
@@ -35,7 +44,13 @@ export function OrderSummaryCard({
   useEffect(() => {
     let live = true
     api
-      .get<{ order: { status: string; failureReason: string | null } }>(
+      .get<{
+        order: {
+          status: string
+          failureReason: string | null
+          shippingAddress: ShippingAddress | null
+        }
+      }>(
         `/chat/${slug}/orders/${payload.order_id}`,
       )
       .then(({ order }) => {
@@ -124,14 +139,30 @@ export function OrderSummaryCard({
 
       {payload.note && <p className="order-note t-sm t-secondary">{payload.note}</p>}
 
+      {state === 'open' && needsAddress && (address === null || editingAddress) && (
+        <AddressForm
+          slug={slug}
+          orderId={payload.order_id}
+          initial={address ?? payload.suggested_address ?? null}
+          onSaved={(saved) => {
+            setAddress(saved)
+            setEditingAddress(false)
+          }}
+        />
+      )}
+
+      {state === 'open' && needsAddress && address !== null && !editingAddress && (
+        <AddressSummary address={address} onEdit={() => setEditingAddress(true)} editable={!disabled} />
+      )}
+
       {state === 'open' && (
         <>
           <button
             className="btn btn-primary btn-lg btn-block"
             onClick={() => setPaying(true)}
-            disabled={disabled}
+            disabled={disabled || !addressReady}
           >
-            Pay {payload.total_display}
+            {addressReady ? `Pay ${payload.total_display}` : 'Add a delivery address to pay'}
           </button>
           <p className="order-fineprint t-xs t-muted">
             {payload.payment.provider === 'razorpay'

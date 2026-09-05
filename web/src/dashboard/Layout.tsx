@@ -9,6 +9,7 @@ import {
   IconMenu,
   IconOverview,
   IconProvider,
+  IconReceipt,
   IconSettings,
 } from '../components/icons'
 import { useAuth } from './auth'
@@ -17,6 +18,7 @@ const NAV = [
   { to: '/dashboard', label: 'Overview', icon: IconOverview, end: true },
   { to: '/dashboard/catalog', label: 'Catalogue', icon: IconCatalogue },
   { to: '/dashboard/provider', label: 'Provider', icon: IconProvider },
+  { to: '/dashboard/orders', label: 'Orders', icon: IconReceipt },
   { to: '/dashboard/audit', label: 'Audit trail', icon: IconAudit },
   { to: '/dashboard/developers', label: 'Developers', icon: IconBolt },
   { to: '/dashboard/settings', label: 'Settings', icon: IconSettings },

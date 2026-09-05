@@ -397,6 +397,18 @@ apiRoutes.get(
           quantity: line.quantity,
           line_total_minor: line.lineTotalMinor,
         })),
+        // Null until the customer completes checkout, and never present on an
+        // order that was not paid for.
+        shipping_address: order.shippingAddress && {
+          name: order.shippingAddress.name,
+          phone: order.shippingAddress.phone,
+          line1: order.shippingAddress.line1,
+          line2: order.shippingAddress.line2,
+          city: order.shippingAddress.city,
+          state: order.shippingAddress.state,
+          postal_code: order.shippingAddress.postalCode,
+          country: order.shippingAddress.country,
+        },
         failure_reason: order.failureReason,
         created_at: order.createdAt,
       })),

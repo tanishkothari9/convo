@@ -8,6 +8,8 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly code?: string,
+    /** Set when the failure belongs to one form field. */
+    readonly field?: string,
   ) {
     super(message)
   }
@@ -31,11 +33,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    const body = payload as { error?: string; code?: string; detail?: string } | null
+    const body = payload as
+      | { error?: string; code?: string; detail?: string; field?: string }
+      | null
     throw new ApiError(
       response.status,
       body?.error ?? body?.detail ?? 'Something went wrong. Try again.',
       body?.code,
+      body?.field,
     )
   }
   return payload as T
@@ -113,6 +118,17 @@ export interface AuditEntry {
   createdAt: string
 }
 
+export interface ShippingAddressRecord {
+  name: string
+  phone: string
+  line1: string
+  line2: string | null
+  city: string
+  state: string
+  postalCode: string
+  country: string
+}
+
 export interface Order {
   id: string
   totalAmountMinor: number
@@ -122,6 +138,7 @@ export interface Order {
   providerOrderId: string | null
   providerPaymentId: string | null
   lineItems: Array<{ productId: string; name: string; quantity: number; lineTotalMinor: number }>
+  shippingAddress: ShippingAddressRecord | null
   failureReason: string | null
   createdAt: string
 }

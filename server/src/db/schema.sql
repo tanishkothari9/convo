@@ -241,3 +241,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_products_external
 -- separate flags rather than one `is_active`.
 ALTER TABLE provider_connections ADD COLUMN is_catalog_source INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE provider_connections ADD COLUMN is_payment_processor INTEGER NOT NULL DEFAULT 0;
+
+-- Where the order goes. Frozen onto the order like its line items, so a
+-- customer editing a saved address later cannot change where a past order was
+-- sent. Null until the customer fills the form, and the payment gate refuses
+-- to mark an order paid without it when the brand ships physical goods.
+ALTER TABLE orders ADD COLUMN shipping_address TEXT;
+
+-- A brand selling digital goods turns this off; everyone else ships.
+ALTER TABLE tenants ADD COLUMN requires_shipping INTEGER NOT NULL DEFAULT 1;

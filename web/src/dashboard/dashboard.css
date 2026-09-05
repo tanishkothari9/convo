@@ -1369,3 +1369,125 @@
   letter-spacing: var(--text-heading-ls);
   font-weight: var(--weight-semibold);
 }
+
+/* ── Orders ─────────────────────────────────────────────────────────────── */
+
+.order-list {
+  list-style: none;
+  padding: 0;
+  max-width: 56rem;
+}
+
+.order-item {
+  border-top: 1px solid var(--line);
+}
+
+.order-item:first-child {
+  border-top: none;
+}
+
+.order-summary-row {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) 0;
+  text-align: left;
+  transition: opacity var(--dur-quick) ease;
+}
+
+.order-summary-row .badge {
+  justify-self: start;
+}
+
+.order-item-name {
+  font-size: var(--text-sm);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-item-total {
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.order-item[data-expanded='true'] .order-summary-row {
+  opacity: 1;
+}
+
+/*
+ * The expanded row is a packing slip: what is in the box, where it goes, and
+ * the references you would quote in a support thread.
+ */
+.order-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-5);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--surface-sunken);
+  animation: detail-in var(--dur-enter) var(--ease-out);
+}
+
+.order-detail-block > * + * {
+  margin-top: var(--space-2);
+}
+
+.order-detail-lines {
+  list-style: none;
+  padding: 0;
+  font-size: var(--text-sm);
+}
+
+.order-detail-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.125rem 0;
+  color: var(--ink-secondary);
+}
+
+.order-address {
+  font-style: normal;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.order-refs > div + div {
+  margin-top: var(--space-2);
+}
+
+.order-refs dd {
+  margin-top: 0.0625rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 40rem) {
+  .order-summary-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'status total'
+      'name when';
+    row-gap: var(--space-1);
+  }
+
+  .order-summary-row .badge {
+    grid-area: status;
+  }
+  .order-item-name {
+    grid-area: name;
+  }
+  .order-item-total {
+    grid-area: total;
+    text-align: right;
+  }
+  .order-item-when {
+    grid-area: when;
+    text-align: right;
+  }
+}

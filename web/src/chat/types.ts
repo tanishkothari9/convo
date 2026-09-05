@@ -1,3 +1,5 @@
+import type { ShippingAddress } from './cards/AddressForm'
+
 export interface BrandInfo {
   name: string
   slug: string
@@ -64,6 +66,10 @@ export interface OrderSummaryPayload {
   total_display: string
   item_count: number
   note: string | null
+  /** False for a brand selling something that needs no delivering. */
+  requires_address: boolean
+  /** The last address used in this conversation, for pre-filling the form. */
+  suggested_address: ShippingAddress | null
   lines: Array<{
     product_id: string
     name: string

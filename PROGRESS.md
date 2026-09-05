@@ -17,7 +17,7 @@ build order is done, and the last thing done was the polish pass.
 | Per-brand persona, accent colour, and model choice | Driven in a browser |
 | Layout at laptop, tablet, and 375px phone widths | Measured and screenshotted |
 
-`npm test` → 49 passing. `npm run typecheck` → clean, both workspaces. Production
+`npm test` → 54 passing. `npm run typecheck` → clean, both workspaces. Production
 build → clean. Every page loads with no failed requests and no console errors.
 
 ## The graceful failure cases
@@ -64,6 +64,8 @@ See `DECISIONS.md` for what each of those means in detail.
 | **API reference** | `/docs` — fills in your own key and host when signed in, so the first example is a live request. |
 | **Shopify** | Catalogue source. Brands can now take products from one provider and payments from another. |
 | **Storefront marquee** | The brand's real catalogue drifting on the opening screen, tappable to start a conversation. |
+| **Delivery address** | Collected in the order card before payment, enforced at the gate, frozen onto the order, and exposed to the merchant and the API for fulfilment. |
+| **Orders page** | What was sold and where it goes, with a copy-the-address button. |
 | **Security** | Rate limiting, no account enumeration, no SVG image XSS, no SSRF through a shop name, security headers, tenant isolation under test. |
 
 ## Known limits

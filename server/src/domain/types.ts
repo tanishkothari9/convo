@@ -1,3 +1,5 @@
+import type { ShippingAddress } from './address.js'
+
 /**
  * Convo's domain models. Adapted from the shopping-agent types in
  * anthropics/commerce-agents (Apache-2.0), with two changes for Convo:
@@ -13,6 +15,8 @@ export interface Tenant {
   brandVoice: string
   currency: string
   accentColor: string
+  /** False for a brand selling something that does not need delivering. */
+  requiresShipping: boolean
   llmProvider: string | null
   createdAt: string
   updatedAt: string
@@ -181,6 +185,8 @@ export interface Order {
   providerOrderId: string | null
   providerPaymentId: string | null
   lineItems: OrderLineItem[]
+  /** Frozen at checkout, so a later edit cannot change where this was sent. */
+  shippingAddress: ShippingAddress | null
   failureReason: string | null
   createdAt: string
   updatedAt: string

@@ -6,6 +6,7 @@
 import { all, get, run, transaction } from './index.js'
 import { id, nowIso } from '../lib/ids.js'
 import { STOCK_UNTRACKED } from '../commerce/razorpay/adapter.js'
+import type { ShippingAddress } from '../domain/address.js'
 import type {
   AuditAction,
   AuditLogEntry,
@@ -50,6 +51,7 @@ function toTenant(r: Record<string, unknown>): Tenant {
     brandVoice: String(r.brand_voice),
     currency: String(r.currency),
     accentColor: String(r.accent_color),
+    requiresShipping: r.requires_shipping === undefined ? true : bool(r.requires_shipping),
     llmProvider: (r.llm_provider as string) ?? null,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
@@ -90,6 +92,7 @@ function toOrder(r: Record<string, unknown>): Order {
     providerOrderId: (r.provider_order_id as string) ?? null,
     providerPaymentId: (r.provider_payment_id as string) ?? null,
     lineItems: json<OrderLineItem[]>(r.line_items, []),
+    shippingAddress: json<ShippingAddress | null>(r.shipping_address, null),
     failureReason: (r.failure_reason as string) ?? null,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
@@ -151,6 +154,7 @@ export const tenants = {
         | 'accentColor'
         | 'llmProvider'
         | 'slug'
+        | 'requiresShipping'
       >
     >,
   ): Tenant | undefined {
@@ -162,6 +166,7 @@ export const tenants = {
       brandVoice: 'brand_voice',
       accentColor: 'accent_color',
       llmProvider: 'llm_provider',
+      requiresShipping: 'requires_shipping',
     }
     const sets: string[] = []
     const params: unknown[] = []
@@ -169,7 +174,7 @@ export const tenants = {
       const value = (patch as Record<string, unknown>)[key]
       if (value !== undefined) {
         sets.push(`${column} = ?`)
-        params.push(value)
+        params.push(typeof value === 'boolean' ? (value ? 1 : 0) : value)
       }
     }
     if (sets.length === 0) return tenants.byId(tenantId)
@@ -1044,6 +1049,33 @@ export const orders = {
        ORDER BY created_at`,
       [tenantId, conversationId],
     ).map(toOrder)
+  },
+
+  /** Freezes the delivery address onto the order. */
+  setShippingAddress(tenantId: string, orderId: string, address: ShippingAddress): void {
+    run('UPDATE orders SET shipping_address = ?, updated_at = ? WHERE tenant_id = ? AND id = ?', [
+      JSON.stringify(address),
+      nowIso(),
+      tenantId,
+      orderId,
+    ])
+  },
+
+  /**
+   * The last address this conversation used, for pre-filling the form.
+   *
+   * Scoped to the conversation rather than to a customer account, because
+   * there are no customer accounts — the session cookie is the identity, so
+   * this remembers within one person's thread and nowhere wider.
+   */
+  lastShippingAddress(tenantId: string, conversationId: string): ShippingAddress | null {
+    const r = get<{ shipping_address: string | null }>(
+      `SELECT shipping_address FROM orders
+       WHERE tenant_id = ? AND conversation_id = ? AND shipping_address IS NOT NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [tenantId, conversationId],
+    )
+    return r?.shipping_address ? json<ShippingAddress | null>(r.shipping_address, null) : null
   },
 
   setProviderOrderId(tenantId: string, orderId: string, providerOrderId: string): void {

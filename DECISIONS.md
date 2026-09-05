@@ -233,6 +233,32 @@ currency this product counts in seeds the set. Settings is the one exception,
 turned vertical, because it sits under Provider in the rail and two icons of
 horizontal lines and beads are not distinguishable at 17px.
 
+### The delivery address is a form, not a conversation
+
+Two reasons it is not collected by the agent. A model parsing free text into
+`line1 / line2 / city / state / PIN` gets it subtly wrong in ways nobody
+notices until a parcel is lost — and asking in chat puts a customer's home
+address into the model's context and into the stored transcript, where it does
+not need to be.
+
+So it sits inside the order card, above the pay button, in the order a person
+thinks: what am I buying, where is it going, then pay. **The gate enforces it,
+not the form** — `gatedConfirmPayment` refuses to mark an order paid with no
+address, because the form runs in a browser the customer controls and an order
+that reaches "paid" with nowhere to send it is money taken for a parcel nobody
+can post.
+
+The address is frozen onto the order like its line items, so editing a later
+one cannot rewrite where an earlier parcel went. It is pre-filled from the last
+address used *in the same conversation* — not from an account, because there
+are no customer accounts; the session cookie is the identity, so the memory
+stops at one person's thread.
+
+Validation is India-shaped: a six-digit PIN, a ten-digit mobile, states from a
+list. `country` exists so widening it is a validation change rather than a
+migration. `requires_shipping` is per brand, so a brand selling something
+digital turns the whole step off.
+
 ## What a deployment still owns
 
 Convo is complete as a working system, not as a production deployment. Before

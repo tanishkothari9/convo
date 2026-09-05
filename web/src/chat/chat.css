@@ -1274,3 +1274,94 @@
     max-width: 8.5rem;
   }
 }
+
+/* ── Delivery address ───────────────────────────────────────────────────── */
+
+/*
+ * Inside the order card, above the pay button, because that is the order the
+ * customer thinks in: what am I buying, where is it going, then pay.
+ */
+.address-form {
+  margin: var(--space-4) 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.address-form > * + * {
+  margin-top: var(--space-3);
+}
+
+.address-form-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+
+.address-grid {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.address-phone {
+  padding-left: 3rem;
+}
+
+.field-optional {
+  font-weight: var(--weight-regular);
+  color: var(--ink-muted);
+}
+
+/* The saved state: enough to check at a glance, and a way back to change it. */
+.address-saved {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-input);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+}
+
+.address-saved-tick {
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.0625rem;
+  flex: none;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--success);
+}
+
+.address-saved-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.address-saved-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  margin-bottom: 0.0625rem;
+}
+
+.address-saved-edit {
+  flex: none;
+  color: var(--brand);
+  font-weight: var(--weight-medium);
+  transition: opacity var(--dur-quick) ease;
+}
+
+.address-saved-edit:hover {
+  opacity: 0.75;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+@media (max-width: 30rem) {
+  .address-grid {
+    grid-template-columns: 6rem minmax(0, 1fr);
+  }
+}

@@ -210,7 +210,8 @@ export const SECTIONS: Section[] = [
         method: 'GET',
         path: '/v1/orders',
         title: 'List orders',
-        summary: 'Newest first, with their line items and outcome.',
+        summary:
+          'Newest first, with their line items, delivery address and outcome — everything a fulfilment system needs.',
         params: [{ name: 'limit', type: 'integer', detail: '1–100. Defaults to 50.' }],
         request: `curl ${BASE_URL_PLACEHOLDER}/v1/orders?limit=1 \\
   -H "Authorization: Bearer ${KEY_PLACEHOLDER}"`,
@@ -228,6 +229,16 @@ export const SECTIONS: Section[] = [
       "line_items": [
         { "product_id": "prd_75j3apt4utq1ph", "name": "Linen Saree — Ivory", "quantity": 1, "line_total_minor": 349900 }
       ],
+      "shipping_address": {
+        "name": "Anika Rao",
+        "phone": "9876543210",
+        "line1": "12 MG Road",
+        "line2": "Near Devaraja Market",
+        "city": "Mysuru",
+        "state": "Karnataka",
+        "postal_code": "570001",
+        "country": "India"
+      },
       "failure_reason": null,
       "created_at": "2026-09-05T03:42:11.204Z"
     }

@@ -17,7 +17,7 @@
  *     catalogue prices immediately before the provider is called. No amount
  *     the model produced is ever sent to a payment provider.
  */
-import { audit, carts, orders, products, provenance } from '../db/repo.js'
+import { audit, carts, orders, products, provenance, tenants } from '../db/repo.js'
 import { transaction } from '../db/index.js'
 import type { OrderLineItem, PricedCart, Tenant } from '../domain/types.js'
 import { formatMoney } from '../lib/money.js'
@@ -37,6 +37,7 @@ export const PROVENANCE_GATE = 'provenance'
 export const STOCK_GATE = 'stock'
 export const EMPTY_CART_GATE = 'empty_cart'
 export const AMOUNT_GATE = 'amount'
+export const ADDRESS_GATE = 'address'
 
 function provenanceError(productId: string): string {
   return (
@@ -477,6 +478,12 @@ export async function gatedCheckout(args: {
               total_display: formatMoney(amountMinor, priced.currency),
               item_count: priced.itemCount,
               note,
+              requires_address: tenant.requiresShipping,
+              // Pre-filled from the last order in this conversation, so a
+              // second purchase is not a second round of typing.
+              suggested_address: tenant.requiresShipping
+                ? orders.lastShippingAddress(session.tenantId, session.conversationId)
+                : null,
               lines: lineItems.map((line) => ({
                 product_id: line.productId,
                 name: line.name,
@@ -573,6 +580,34 @@ export async function gatedConfirmPayment(args: {
           },
         },
       ],
+    )
+  }
+
+  /*
+   * Nothing gets marked paid without somewhere to send it.
+   *
+   * Enforced here rather than by the form, because the form is a suggestion —
+   * it runs in a browser the customer controls. An order that reaches "paid"
+   * with no address is money taken for a parcel nobody can post.
+   */
+  const tenant = tenants.byId(session.tenantId)
+  if (tenant?.requiresShipping && !order.shippingAddress) {
+    audit.record({
+      tenantId: session.tenantId,
+      conversationId: session.conversationId,
+      cartId: order.cartId,
+      orderId: order.id,
+      actionType: 'checkout.blocked',
+      amountMinor: order.totalAmountMinor,
+      currency: order.currency,
+      outcome: 'blocked',
+      reasoning: args.reasoning ?? null,
+      detail: { gate: ADDRESS_GATE },
+    })
+    return held(
+      ADDRESS_GATE,
+      'This order has no delivery address, so it cannot be paid for. The customer fills that in ' +
+        'on the order card; ask them to complete it there rather than typing it in the chat.',
     )
   }
 

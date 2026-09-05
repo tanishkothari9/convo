@@ -21,6 +21,7 @@ import { gatedConfirmPayment } from '../agent/gates.js'
 import { mockRazorpay } from '../commerce/razorpay/mock.js'
 import { signManualPayment } from '../commerce/manual.js'
 import { resolveProvider } from '../commerce/registry.js'
+import { AddressError, readAddress } from '../domain/address.js'
 import type { Product, Tenant } from '../domain/types.js'
 
 export const chatRoutes = Router()
@@ -199,6 +200,45 @@ chatRoutes.post(
   }),
 )
 
+/**
+ * Where the order is going.
+ *
+ * A form rather than the conversation: a model parsing a free-text address into
+ * structured fields gets it subtly wrong in ways nobody notices until a parcel
+ * is lost, and this keeps a customer's home address out of the model's context
+ * and out of the stored transcript.
+ */
+chatRoutes.post(
+  '/chat/:slug/orders/:orderId/address',
+  route(async (req, res) => {
+    const tenant = tenantBySlug(req.params.slug!)
+    const session = ensureSession(tenant.id, customerSession(req, res), tenant.currency)
+    const order = orders.byId(tenant.id, req.params.orderId!)
+
+    if (!order || order.conversationId !== session.conversationId) throw notFound('No such order.')
+    if (order.status === 'paid') {
+      throw badRequest('This order is already paid; its address cannot be changed.', 'already_paid')
+    }
+    if (order.status === 'cancelled') {
+      throw badRequest('This order was replaced by a newer one.', 'order_cancelled')
+    }
+
+    let address
+    try {
+      address = readAddress(req.body)
+    } catch (error) {
+      if (error instanceof AddressError) {
+        res.status(400).json({ error: error.message, code: 'invalid_address', field: error.field })
+        return
+      }
+      throw error
+    }
+
+    orders.setShippingAddress(tenant.id, order.id, address)
+    res.json({ address })
+  }),
+)
+
 /** The customer cancelled at the payment panel. Nothing was charged. */
 chatRoutes.post(
   '/chat/:slug/orders/:orderId/cancel',
@@ -298,6 +338,7 @@ chatRoutes.get(
         status: order.status,
         total_display: formatMoney(order.totalAmountMinor, order.currency),
         failureReason: order.failureReason,
+        shippingAddress: order.shippingAddress,
         lines: order.lineItems,
       },
     })
