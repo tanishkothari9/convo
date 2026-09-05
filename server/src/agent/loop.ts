@@ -211,9 +211,22 @@ export async function* runTurn(
       });
       history.push({ role: "tool", results });
 
-      // A turn whose last components are a card plus its chips is complete;
-      // the model does not need another round to say so.
-      if (endsTurn(response.toolCalls.map((call) => call.name))) break;
+      /*
+       * A turn whose last components are a card plus its chips is complete, and
+       * the model does not need another round to say so — as long as it has
+       * said something. If it has not, ending here leaves a card and silence,
+       * which is what a customer sees when they ask a direct question and the
+       * model answers it by rendering a panel. Asking "how many items are in my
+       * cart" returned a cart card and no sentence at all.
+       *
+       * So the shortcut only applies once there is prose to go with the card.
+       */
+      if (
+        endsTurn(response.toolCalls.map((call) => call.name)) &&
+        assistantText.trim() !== ""
+      ) {
+        break;
+      }
     }
   } catch (error) {
     const message =
@@ -378,7 +391,7 @@ function groundingRule(
   return undefined;
 }
 
-/** A turn is done once the chips have gone out. */
+/** A turn is done once the chips have gone out, and something has been said. */
 function endsTurn(names: string[]): boolean {
   return names.includes("present_suggestions");
 }
