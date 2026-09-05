@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
+import { IconCheck } from '../../components/icons'
 import type { Component, OrderConfirmationPayload, OrderSummaryPayload } from '../types'
 import { PaymentPanel } from './PaymentPanel'
 import {
@@ -261,37 +262,46 @@ export function OrderSummaryCard({
 }
 
 export function OrderConfirmationCard({ payload }: { payload: OrderConfirmationPayload }) {
+  const address = payload.shipping_address
   return (
     <div className="confirm-card">
-      <span className="confirm-tick" aria-hidden="true">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M3 8.5L6.5 12L13 4"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </span>
-      <div className="confirm-body">
-        <p className="confirm-title">Paid — {payload.total_display}</p>
-        <p className="t-sm t-secondary">
-          {payload.lines.map((line) => line.name).join(', ')}
-        </p>
-        <dl className="confirm-refs">
-          <div>
-            <dt className="t-xs t-muted">Order</dt>
-            <dd className="t-id">{payload.order_id}</dd>
-          </div>
-          {payload.payment_reference && (
-            <div>
-              <dt className="t-xs t-muted">Payment</dt>
-              <dd className="t-id">{payload.payment_reference}</dd>
-            </div>
-          )}
-        </dl>
+      <div className="confirm-head">
+        <span className="confirm-tick" aria-hidden="true">
+          <IconCheck size={15} />
+        </span>
+        <div className="confirm-body">
+          <p className="confirm-title">Paid — {payload.total_display}</p>
+          <p className="t-sm t-secondary">{payload.lines.map((line) => line.name).join(', ')}</p>
+        </div>
       </div>
+
+      {address && (
+        <div className="confirm-delivery">
+          <p className="t-xs confirm-delivery-label">Delivering to</p>
+          <address className="confirm-address">
+            {address.name}
+            <br />
+            {[address.line1, address.line2].filter(Boolean).join(', ')}
+            <br />
+            {address.city}, {address.state} <span className="t-num">{address.postalCode}</span>
+            <br />
+            <span className="t-num">+91 {address.phone}</span>
+          </address>
+        </div>
+      )}
+
+      <dl className="confirm-refs">
+        <div>
+          <dt className="t-xs t-muted">Order</dt>
+          <dd className="t-id">{payload.order_id}</dd>
+        </div>
+        {payload.payment_reference && (
+          <div>
+            <dt className="t-xs t-muted">Payment</dt>
+            <dd className="t-id">{payload.payment_reference}</dd>
+          </div>
+        )}
+      </dl>
     </div>
   )
 }

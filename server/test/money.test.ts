@@ -151,6 +151,12 @@ test('a correctly signed payment marks the order paid and takes the stock', asyn
   assert.equal(outcome.isError, false)
   assert.equal(orders.byId(tenantId, order.id)!.status, 'paid')
   assert.equal(products.byId(tenantId, product.id)!.stock, 3, 'stock comes off only once paid')
+
+  // The receipt has to say where it is going, or the customer never gets a
+  // chance to notice it is headed to the wrong house.
+  const receipt = outcome.components.find((c) => c.component === 'order_confirmation')!
+  const shownAddress = receipt.payload.shipping_address as { city?: string } | null
+  assert.equal(shownAddress?.city, 'Mysuru', 'the confirmation did not show the delivery address')
   assert.ok(
     audit.list(tenantId, 50).some((e) => e.actionType === 'payment.confirmed' && e.orderId === order.id),
   )

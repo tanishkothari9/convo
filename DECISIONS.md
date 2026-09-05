@@ -270,7 +270,13 @@ addresses is a scrolling problem rather than a convenience.
 Choosing a row attaches it immediately: there is no separate confirm, because
 the selection *is* the decision and the pay button below it is the confirm. What
 the row sends is re-validated server-side like any other address, so being on
-the list buys it no trust. Attaching rather than suggesting matters: the order is genuinely
+the list buys it no trust.
+
+The address appears again on the **paid confirmation**, in its own panel rather
+than as small print. That card is the last thing a customer looks at, and it is
+by far the cheapest place to catch a parcel headed to the wrong house — after
+that the only remedy is a support conversation. It is stored with the message,
+so it survives a reload like the rest of the receipt. Attaching rather than suggesting matters: the order is genuinely
 payable, so nothing depends on the browser re-submitting a form for the gate to
 pass.
 

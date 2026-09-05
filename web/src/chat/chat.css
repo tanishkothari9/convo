@@ -497,8 +497,12 @@
   background: linear-gradient(150deg, var(--surface-sunken), color-mix(in srgb, var(--brand) 7%, var(--surface-sunken)));
 }
 
-/* Photography carries these products, so it gets a moment as it decodes. */
 .pcard-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--dur-slow) var(--ease-out);
+  /* Photography carries these products, so it gets a moment as it decodes. */
   animation: image-in 320ms var(--ease-out);
 }
 
@@ -506,13 +510,6 @@
   from {
     opacity: 0;
   }
-}
-
-.pcard-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform var(--dur-slow) var(--ease-out);
 }
 
 .pcard-image-empty {
@@ -807,10 +804,40 @@
 /* ── Confirmation ───────────────────────────────────────────────────────── */
 
 .confirm-card {
-  display: flex;
-  gap: var(--space-3);
   border-color: var(--success-line);
   background: var(--success-tint);
+}
+
+.confirm-head {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/*
+ * Where it is going, on the receipt.
+ *
+ * The last moment a customer looks at this order, and the cheapest place to
+ * catch a parcel headed to the wrong house. Given its own panel rather than a
+ * line of small print, because someone skimming should still see it.
+ */
+.confirm-delivery {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-input);
+  background: color-mix(in srgb, #fff 62%, transparent);
+  border: 1px solid var(--success-line);
+}
+
+.confirm-delivery-label {
+  color: var(--success-strong);
+  margin-bottom: var(--space-1);
+}
+
+.confirm-address {
+  font-style: normal;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--ink);
 }
 
 .confirm-tick {
@@ -843,6 +870,8 @@
   gap: var(--space-5);
   flex-wrap: wrap;
   margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--success-line);
 }
 
 .confirm-refs dd {

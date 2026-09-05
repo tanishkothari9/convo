@@ -23,6 +23,7 @@ import type { OrderLineItem, PricedCart, Tenant } from '../domain/types.js'
 import { formatMoney } from '../lib/money.js'
 import { log } from '../lib/logger.js'
 import { resolveProvider } from '../commerce/registry.js'
+import type { ShippingAddress } from '../domain/address.js'
 import { ProviderApiError, ProviderConfigError } from '../commerce/types.js'
 import type { AgentConfig } from './config.js'
 import { failed, held, ok, type ToolOutcome } from './outcome.js'
@@ -771,7 +772,16 @@ export async function gatedConfirmPayment(args: {
   )
 }
 
-function orderConfirmationComponent(orderId: string, order: { totalAmountMinor: number; currency: string; lineItems: OrderLineItem[]; providerPaymentId: string | null }) {
+function orderConfirmationComponent(
+  orderId: string,
+  order: {
+    totalAmountMinor: number
+    currency: string
+    lineItems: OrderLineItem[]
+    providerPaymentId: string | null
+    shippingAddress: ShippingAddress | null
+  },
+) {
   return {
     component: 'order_confirmation',
     payload: {
@@ -781,6 +791,10 @@ function orderConfirmationComponent(orderId: string, order: { totalAmountMinor: 
       total_display: formatMoney(order.totalAmountMinor, order.currency),
       currency: order.currency,
       payment_reference: order.providerPaymentId,
+      // On the receipt as well as the order card: this is the last moment a
+      // customer will look, and the cheapest place to catch a parcel headed
+      // to the wrong house.
+      shipping_address: order.shippingAddress,
       lines: order.lineItems.map((line) => ({
         product_id: line.productId,
         name: line.name,

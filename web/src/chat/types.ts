@@ -98,5 +98,7 @@ export interface OrderConfirmationPayload {
   order_id: string
   total_display: string
   payment_reference: string | null
+  /** Null only for a brand that sells something needing no delivery. */
+  shipping_address: ShippingAddress | null
   lines: Array<{ product_id: string; name: string; quantity: number; line_total_display: string }>
 }
