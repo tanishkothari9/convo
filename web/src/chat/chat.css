@@ -1365,3 +1365,9 @@
     grid-template-columns: 6rem minmax(0, 1fr);
   }
 }
+
+.address-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

@@ -249,10 +249,18 @@ that reaches "paid" with nowhere to send it is money taken for a parcel nobody
 can post.
 
 The address is frozen onto the order like its line items, so editing a later
-one cannot rewrite where an earlier parcel went. It is pre-filled from the last
-address used *in the same conversation* — not from an account, because there
-are no customer accounts; the session cookie is the identity, so the memory
-stops at one person's thread.
+one cannot rewrite where an earlier parcel went. A customer who has already told this shop where they live is not asked again.
+The last address used in that conversation is **attached to the next order as
+it is staged**, not merely offered to a form — so the card opens showing where
+the parcel is going, with Pay enabled and a Change link, and the second purchase
+is one tap. Attaching rather than suggesting matters: the order is genuinely
+payable, so nothing depends on the browser re-submitting a form for the gate to
+pass.
+
+The memory is scoped to the conversation, not to an account, because there are
+no customer accounts — the session cookie is the identity, so it stops at one
+person's thread with one brand. Buying from a second brand with the same browser
+starts fresh, which is asserted by a test.
 
 Validation is India-shaped: a six-digit PIN, a ten-digit mobile, states from a
 list. `country` exists so widening it is a validation change rather than a

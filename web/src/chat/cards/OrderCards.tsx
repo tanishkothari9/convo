@@ -27,7 +27,11 @@ export function OrderSummaryCard({
     'checking',
   )
   const [reason, setReason] = useState<string | null>(null)
-  const [address, setAddress] = useState<ShippingAddress | null>(null)
+  // Seeded from the order itself: a returning customer's address is already on
+  // it, so the card opens showing where this is going rather than an empty form.
+  const [address, setAddress] = useState<ShippingAddress | null>(
+    payload.shipping_address ?? null,
+  )
   const [editingAddress, setEditingAddress] = useState(false)
 
   // A brand that ships needs somewhere to ship to before it can be paid. The
@@ -143,16 +147,21 @@ export function OrderSummaryCard({
         <AddressForm
           slug={slug}
           orderId={payload.order_id}
-          initial={address ?? payload.suggested_address ?? null}
+          initial={address}
           onSaved={(saved) => {
             setAddress(saved)
             setEditingAddress(false)
           }}
+          {...(address ? { onCancel: () => setEditingAddress(false) } : {})}
         />
       )}
 
       {state === 'open' && needsAddress && address !== null && !editingAddress && (
-        <AddressSummary address={address} onEdit={() => setEditingAddress(true)} editable={!disabled} />
+        <AddressSummary
+          address={address}
+          onEdit={() => setEditingAddress(true)}
+          editable={!disabled}
+        />
       )}
 
       {state === 'open' && (

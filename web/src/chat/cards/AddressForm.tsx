@@ -39,11 +39,14 @@ export function AddressForm({
   orderId,
   initial,
   onSaved,
+  onCancel,
 }: {
   slug: string
   orderId: string
   initial: ShippingAddress | null
   onSaved(address: ShippingAddress): void
+  /** Only offered when there is a saved address to go back to. */
+  onCancel?: () => void
 }) {
   const [form, setForm] = useState({
     name: initial?.name ?? '',
@@ -212,10 +215,17 @@ export function AddressForm({
         </p>
       )}
 
-      <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
-        {busy && <span className="spinner" />}
-        {busy ? 'Saving' : 'Save address'}
-      </button>
+      <div className="address-actions">
+        <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
+          {busy && <span className="spinner" />}
+          {busy ? 'Saving' : 'Save address'}
+        </button>
+        {onCancel && (
+          <button className="btn btn-ghost btn-block" type="button" onClick={onCancel} disabled={busy}>
+            Keep the one I had
+          </button>
+        )}
+      </div>
     </form>
   )
 }

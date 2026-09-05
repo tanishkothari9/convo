@@ -377,6 +377,20 @@ export async function gatedCheckout(args: {
 
     // The cart is locked and the order recorded before the provider is called,
     // so a provider that answers slowly cannot be charged for twice.
+    /*
+     * Carry the address forward.
+     *
+     * A customer who has already told this shop where they live should not be
+     * asked again — so the last address used in this conversation is attached
+     * to the new order as it is staged, not merely offered to a form. That
+     * means the order is payable the moment it appears, and the gate below is
+     * satisfied without the browser having to do anything. Changing it is one
+     * tap on the card.
+     */
+    const carriedAddress = tenant.requiresShipping
+      ? orders.lastShippingAddress(session.tenantId, session.conversationId)
+      : null
+
     const order = transaction(() => {
       for (const stale of superseded) {
         orders.setStatus(session.tenantId, stale.id, 'cancelled', {
@@ -407,7 +421,7 @@ export async function gatedCheckout(args: {
         reasoning: args.reasoning ?? null,
         detail: { line_count: lineItems.length, item_count: priced.itemCount },
       })
-      return orders.create({
+      const created = orders.create({
         tenantId: session.tenantId,
         cartId: cart.id,
         conversationId: session.conversationId,
@@ -418,6 +432,10 @@ export async function gatedCheckout(args: {
         lineItems,
         status: 'created',
       })
+      if (carriedAddress) {
+        orders.setShippingAddress(session.tenantId, created.id, carriedAddress)
+      }
+      return created
     })
 
     try {
@@ -479,11 +497,9 @@ export async function gatedCheckout(args: {
               item_count: priced.itemCount,
               note,
               requires_address: tenant.requiresShipping,
-              // Pre-filled from the last order in this conversation, so a
-              // second purchase is not a second round of typing.
-              suggested_address: tenant.requiresShipping
-                ? orders.lastShippingAddress(session.tenantId, session.conversationId)
-                : null,
+              // Already attached, not merely suggested: present means the
+              // order can be paid for as it stands.
+              shipping_address: carriedAddress,
               lines: lineItems.map((line) => ({
                 product_id: line.productId,
                 name: line.name,

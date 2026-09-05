@@ -323,3 +323,77 @@ test('an address that could not be delivered to is refused', () => {
     )
   }
 })
+
+test('a returning customer is not asked for the same address twice', async () => {
+  const { product, session, tenant } = scenario('repeat-buyer-item', 450, 20)
+
+  // First purchase: the address is given once.
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+  await gatedCheckout({ session, tenant, config })
+  const first = orders.listForConversation(tenantId, session.conversationId)[0]!
+  orders.setShippingAddress(tenantId, first.id, readAddress(GOOD_ADDRESS))
+
+  const firstPayment = 'cvpay_repeat_one'
+  await gatedConfirmPayment({
+    session,
+    orderId: first.id,
+    payload: {
+      payment_id: firstPayment,
+      signature: signManualPayment(first.providerOrderId!, firstPayment),
+    },
+  })
+  assert.equal(orders.byId(tenantId, first.id)!.status, 'paid')
+
+  // Second purchase: the address arrives already attached, so the order is
+  // payable without the customer touching a form.
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+  const outcome = await gatedCheckout({ session, tenant, config })
+  const second = orders.listForConversation(tenantId, session.conversationId)[0]!
+
+  assert.notEqual(second.id, first.id)
+  assert.equal(second.shippingAddress?.postalCode, '570001', 'the address was not carried forward')
+
+  const card = outcome.components.find((c) => c.component === 'order_summary')!
+  assert.ok(card.payload.shipping_address, 'the card should open showing where this is going')
+
+  const secondPayment = 'cvpay_repeat_two'
+  const paid = await gatedConfirmPayment({
+    session,
+    orderId: second.id,
+    payload: {
+      payment_id: secondPayment,
+      signature: signManualPayment(second.providerOrderId!, secondPayment),
+    },
+  })
+  assert.equal(paid.isError, false)
+  assert.equal(orders.byId(tenantId, second.id)!.status, 'paid')
+})
+
+test('a carried address does not follow the customer to another brand', async () => {
+  const other = tenants.create({ name: 'Other Brand', slug: `other-${process.pid}` })
+  connections.upsert({
+    tenantId: other.id,
+    providerType: 'manual',
+    capabilities: 'catalog+payment',
+    credentialsEnc: null,
+    credentialsHint: null,
+  })
+  connections.activate(other.id, 'manual', ['catalog', 'payment'])
+
+  const shared = `shopper-${process.pid}`
+  const here = ensureSession(tenantId, shared, 'INR')
+  const there = ensureSession(other.id, shared, 'INR')
+
+  const mine = products.create({ tenantId, name: 'Mine', priceMinor: 10_000, stock: 3 })
+  provenance.remember(tenantId, here.conversationId, [mine.id])
+  await gatedAddToCart({ backend, config, session: here, productId: mine.id, quantity: 1 })
+  await gatedCheckout({ session: here, tenant: tenants.byId(tenantId)!, config })
+  const order = orders.listForConversation(tenantId, here.conversationId)[0]!
+  orders.setShippingAddress(tenantId, order.id, readAddress(GOOD_ADDRESS))
+
+  assert.equal(
+    orders.lastShippingAddress(other.id, there.conversationId),
+    null,
+    'an address leaked between brands',
+  )
+})

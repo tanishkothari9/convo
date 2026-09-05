@@ -68,8 +68,12 @@ export interface OrderSummaryPayload {
   note: string | null
   /** False for a brand selling something that needs no delivering. */
   requires_address: boolean
-  /** The last address used in this conversation, for pre-filling the form. */
-  suggested_address: ShippingAddress | null
+  /**
+   * Already attached to the order, carried from the last one this customer
+   * placed. Present means the order is payable as it stands; null means the
+   * form has to be filled first.
+   */
+  shipping_address: ShippingAddress | null
   lines: Array<{
     product_id: string
     name: string
