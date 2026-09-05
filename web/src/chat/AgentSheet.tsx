@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { IconClose } from "../components/icons";
-import { PaymentPanel } from "./cards/PaymentPanel";
-import type { CheckoutOrder } from "./types";
 
 /**
  * Authorising an agent to spend, and then watching it try.
@@ -45,10 +43,6 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
   const [steps, setSteps] = useState<Step[]>([]);
   const [spent, setSpent] = useState(0);
   const [busy, setBusy] = useState(false);
-  /* What the agent placed, so whoever authorised it can actually pay. */
-  const [placed, setPlaced] = useState<CheckoutOrder[]>([]);
-  const [paying, setPaying] = useState<CheckoutOrder | null>(null);
-  const [paid, setPaid] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -119,90 +113,6 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
     }
   }
 
-  /** One product from each brand on the shelf, then a checkout. */
-  async function run() {
-    if (!mandate) return;
-    setBusy(true);
-    setError(null);
-    const auth = {
-      Authorization: `Bearer ${mandate.session}`,
-      "Content-Type": "application/json",
-    };
-
-    try {
-      say({ label: "Searching the shelf", tone: "run" });
-      const catalog = await fetch("/v1/agent/catalog?limit=50", {
-        headers: auth,
-      }).then((r) => r.json());
-
-      // One from each brand that exists, whether or not the mandate allows it —
-      // picking only allowed brands would hide the refusal this is here to show.
-      const perBrand = new Map<
-        string,
-        { id: string; name: string; brand_name: string }
-      >();
-      for (const product of catalog.products as Array<{
-        id: string;
-        name: string;
-        brand_id: string;
-        brand_name: string;
-        in_stock: boolean;
-      }>) {
-        if (product.in_stock && !perBrand.has(product.brand_id)) {
-          perBrand.set(product.brand_id, product);
-        }
-      }
-
-      for (const product of perBrand.values()) {
-        const added = await fetch("/v1/agent/cart", {
-          method: "POST",
-          headers: auth,
-          body: JSON.stringify({ productId: product.id, quantity: 1 }),
-        }).then((r) => r.json());
-        say({
-          label: `Added ${product.name}`,
-          detail: product.brand_name,
-          tone: added.ok ? "run" : "refused",
-        });
-      }
-
-      say({ label: "Checking out against the mandate", tone: "run" });
-      const result = await fetch("/v1/agent/checkout", {
-        method: "POST",
-        headers: auth,
-        body: JSON.stringify({ mandate: mandate.token }),
-      }).then((r) => r.json());
-
-      if (result.ok) {
-        const orders = result.checkout.orders as CheckoutOrder[];
-        setPlaced(orders);
-        const total = (
-          result.checkout.orders as Array<{ total_minor?: number }>
-        ).reduce((sum, order) => sum + (order.total_minor ?? 0), 0);
-        setSpent(total);
-        for (const order of orders) {
-          say({
-            label: `Order placed · ${order.brand_name}`,
-            detail: `${order.total_display} · awaiting payment`,
-            tone: "ok",
-          });
-        }
-      } else {
-        say({
-          label: "Refused",
-          detail: String(result.reason ?? "").replace(/^\[held: \w+\]\s*/, ""),
-          tone: "refused",
-        });
-      }
-    } catch (problem) {
-      setError(
-        problem instanceof Error ? problem.message : "The agent run failed.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const remaining = Math.max(0, budget * 100 - spent);
   const used = budget > 0 ? Math.min(100, (spent / (budget * 100)) * 100) : 0;
 
@@ -233,9 +143,9 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
 
         <div className="agent-body">
           <p className="t-sm t-secondary">
-            Sign a budget over to an AI agent and watch it spend against it. The
-            signature and the limits are checked server-side; only the agent
-            itself is standing in for an outside one.
+            Sign a budget over, then shop the way you always do. Every checkout
+            in this chat is checked against what you signed, and one that falls
+            outside it is refused before anything is charged.
           </p>
 
           <label className="agent-field">
@@ -306,37 +216,6 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
             </ol>
           )}
 
-          {placed.length > 0 && (
-            <div className="agent-pay">
-              <p className="t-sm">
-                {paid.size === placed.length
-                  ? "All paid."
-                  : "The agent placed these. Paying is still yours."}
-              </p>
-              {placed.map((order) => (
-                <div key={order.order_id} className="agent-pay-row">
-                  <span className="t-sm">
-                    {order.brand_name}
-                    <span className="t-xs t-muted">
-                      {" "}
-                      · {order.total_display}
-                    </span>
-                  </span>
-                  {paid.has(order.order_id) ? (
-                    <span className="t-xs t-muted">Paid</span>
-                  ) : (
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => setPaying(order)}
-                    >
-                      Pay
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
           {error && <p className="notice notice-danger">{error}</p>}
         </div>
 
@@ -351,13 +230,13 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
             </button>
           ) : (
             <>
-              <button
-                className="btn btn-primary btn-block"
-                onClick={run}
-                disabled={busy}
-              >
-                {busy ? "The agent is shopping…" : "Send the agent shopping"}
+              <button className="btn btn-primary btn-block" onClick={onClose}>
+                Start shopping
               </button>
+              <p className="t-xs t-muted agent-hint">
+                Ask for what you want in the chat. Products, the cart and the
+                payment all appear there as usual.
+              </p>
               <button
                 className="btn btn-ghost btn-block"
                 onClick={() => {
@@ -377,44 +256,6 @@ export function AgentSheet({ onClose }: { onClose(): void }) {
       {/* The same panel the chat uses. It works here because the mandate was
           issued against this browser's own session, so the orders the agent
           placed are this shopper's orders. */}
-      {paying && (
-        <PaymentPanel
-          payload={paying}
-          onCancel={() => setPaying(null)}
-          onResult={async (result) => {
-            const order = paying;
-            setPaying(null);
-            if (!order) return;
-            try {
-              const outcome = await fetch(
-                `/api/shop/orders/${order.order_id}/confirm`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  credentials: "same-origin",
-                  body: JSON.stringify(result),
-                },
-              ).then((r) => r.json());
-              if (outcome.paid) {
-                setPaid((current) => new Set(current).add(order.order_id));
-                say({
-                  label: `Paid · ${order.brand_name}`,
-                  detail: order.total_display,
-                  tone: "ok",
-                });
-              } else {
-                say({
-                  label: `Payment failed · ${order.brand_name}`,
-                  detail: outcome.reason,
-                  tone: "refused",
-                });
-              }
-            } catch {
-              setError("Could not confirm that payment.");
-            }
-          }}
-        />
-      )}
     </div>
   );
 }

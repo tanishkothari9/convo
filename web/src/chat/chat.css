@@ -1400,6 +1400,10 @@
   color: var(--ink);
 }
 
+.agent-hint {
+  text-align: center;
+}
+
 .agent-pay {
   display: flex;
   flex-direction: column;

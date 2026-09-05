@@ -257,3 +257,42 @@ export function checkMandate(input: {
 export function mandateId(token: string): string {
   return `mnd_${createHmac("sha256", "mandate-id").update(token).digest("hex").slice(0, 24)}`;
 }
+
+/**
+ * The mandate currently in force for a shopper.
+ *
+ * Held in memory rather than a table, deliberately: the demo signs with a key
+ * generated at boot, so a mandate cannot outlive the process that issued it
+ * anyway. Persisting one would only create rows that can never verify again.
+ *
+ * This is what lets a mandate bound the *conversation* rather than a separate
+ * API surface. A shopper signs one, then shops the way they always do, and
+ * every checkout in that chat is tested against it.
+ */
+const active = new Map<string, { token: string; payload: OpenMandate }>();
+
+export function holdMandate(
+  customerSessionId: string,
+  token: string,
+  payload: OpenMandate,
+): void {
+  active.set(customerSessionId, { token, payload });
+}
+
+export function activeMandate(
+  customerSessionId: string,
+): { token: string; payload: OpenMandate } | undefined {
+  const held = active.get(customerSessionId);
+  if (!held) return undefined;
+  // Expiry is checked here as well as at verification: a mandate that lapsed
+  // mid-conversation must stop authorising, not linger until the next signature.
+  if (held.payload.exp <= Math.floor(Date.now() / 1000)) {
+    active.delete(customerSessionId);
+    return undefined;
+  }
+  return held;
+}
+
+export function releaseMandate(customerSessionId: string): void {
+  active.delete(customerSessionId);
+}

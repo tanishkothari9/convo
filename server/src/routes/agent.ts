@@ -19,6 +19,7 @@ import { DEFAULT_AGENT_CONFIG } from "../agent/config.js";
 import {
   generateMandateKeypair,
   MandateError,
+  holdMandate,
   signMandate,
   verifyMandate,
   type OpenMandate,
@@ -168,6 +169,12 @@ agentRoutes.post(
       iat: now,
       exp: now + ttlSeconds,
     };
+
+    holdMandate(
+      customerSessionId,
+      signMandate(payload, demoKey.privatePem),
+      payload,
+    );
 
     log.info("mandate issued", {
       agentId,

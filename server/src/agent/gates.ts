@@ -33,7 +33,12 @@ import {
 import { transaction } from "../db/index.js";
 import { settleOrder } from "./settle.js";
 import { AddressError, readAddress } from "../domain/address.js";
-import { checkMandate, mandateId, type OpenMandate } from "./mandate.js";
+import {
+  activeMandate,
+  checkMandate,
+  mandateId,
+  type OpenMandate,
+} from "./mandate.js";
 import { id } from "../lib/ids.js";
 import type {
   Order,
@@ -629,11 +634,18 @@ export async function gatedCheckout(args: {
      * against the whole cart, because checking it per brand would let an agent
      * spend the same allowance once at every merchant.
      */
+    /*
+     * A mandate signed in this browser bounds this conversation, so a checkout
+     * started by chatting is tested against it exactly like one started over
+     * the agent API. Passing it explicitly still wins, for the API path.
+     */
+    const inForce = args.mandate ?? activeMandate(session.customerSessionId);
+
     let mandateRef: string | null = null;
-    if (args.mandate) {
-      mandateRef = mandateId(args.mandate.token);
+    if (inForce) {
+      mandateRef = mandateId(inForce.token);
       const verdict = checkMandate({
-        mandate: args.mandate.payload,
+        mandate: inForce.payload,
         perBrandMinor: groups.map((group) => ({
           tenantId: group.tenantId,
           amountMinor: group.amountMinor,
@@ -657,7 +669,7 @@ export async function gatedCheckout(args: {
             detail: {
               gate: "mandate",
               mandate_id: mandateRef,
-              agent: args.mandate.payload.agent,
+              agent: inForce.payload.agent,
               violations: verdict.violations,
             },
           });
