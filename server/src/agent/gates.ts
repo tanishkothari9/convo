@@ -154,34 +154,44 @@ function cartSummary(cart: PricedCart): string {
  * placement — which is why a write no longer leaves a duplicate card behind.
  */
 function cartComponent(cart: PricedCart, kind: 'cart' | 'cart_state' = 'cart_state') {
+  return { component: kind, payload: cartPayload(cart) }
+}
+
+/**
+ * The cart as the page reads it.
+ *
+ * Split out of `cartComponent` so the routes that hand a cart back directly —
+ * the panel's refresh, and the history a reload rebuilds from — return the
+ * same shape the agent emits. They used to return the internal record instead,
+ * which meant a customer who reloaded with items in their cart got a badge
+ * showing nothing and a sheet of blank prices.
+ */
+export function cartPayload(cart: PricedCart) {
   return {
-    component: kind,
-    payload: {
-      cart_id: cart.cartId,
-      currency: cart.currency,
-      item_count: cart.itemCount,
-      subtotal_minor: cart.subtotalMinor,
-      subtotal_display: formatMoney(cart.subtotalMinor, cart.currency),
-      // Grouped for the sheet, which shows a heading per brand: a cart with
-      // two labels in it is two deliveries and two charges, and the customer
-      // should see that before checkout rather than after.
-      brands: [...new Set(cart.lines.map((line) => line.brandName))],
-      lines: cart.lines.map((line) => ({
-        product_id: line.productId,
-        tenant_id: line.tenantId,
-        brand_name: line.brandName,
-        name: line.name,
-        image_url: line.imageUrl,
-        quantity: line.quantity,
-        unit_price_minor: line.unitPriceMinor,
-        unit_price_display: formatMoney(line.unitPriceMinor, cart.currency),
-        line_total_minor: line.lineTotalMinor,
-        line_total_display: formatMoney(line.lineTotalMinor, cart.currency),
-        in_stock: line.inStock,
-        available_stock: line.availableStock,
-        price_changed: line.priceChangedSinceAdd,
-      })),
-    },
+    cart_id: cart.cartId,
+    currency: cart.currency,
+    item_count: cart.itemCount,
+    subtotal_minor: cart.subtotalMinor,
+    subtotal_display: formatMoney(cart.subtotalMinor, cart.currency),
+    // Grouped for the sheet, which shows a heading per brand: a cart with
+    // two labels in it is two deliveries and two charges, and the customer
+    // should see that before checkout rather than after.
+    brands: [...new Set(cart.lines.map((line) => line.brandName))],
+    lines: cart.lines.map((line) => ({
+      product_id: line.productId,
+      tenant_id: line.tenantId,
+      brand_name: line.brandName,
+      name: line.name,
+      image_url: line.imageUrl,
+      quantity: line.quantity,
+      unit_price_minor: line.unitPriceMinor,
+      unit_price_display: formatMoney(line.unitPriceMinor, cart.currency),
+      line_total_minor: line.lineTotalMinor,
+      line_total_display: formatMoney(line.lineTotalMinor, cart.currency),
+      in_stock: line.inStock,
+      available_stock: line.availableStock,
+      price_changed: line.priceChangedSinceAdd,
+    })),
   }
 }
 

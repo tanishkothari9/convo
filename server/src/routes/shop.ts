@@ -29,7 +29,7 @@ import { env } from '../env.js'
 import { log } from '../lib/logger.js'
 import { runTurn, type TurnEvent } from '../agent/loop.js'
 import { ensureSession, priceCart } from '../agent/storefront.js'
-import { gatedConfirmPayment } from '../agent/gates.js'
+import { cartPayload, gatedConfirmPayment } from '../agent/gates.js'
 import { mockRazorpay } from '../commerce/razorpay/mock.js'
 import { signManualPayment } from '../commerce/manual.js'
 import { resolveProvider } from '../commerce/registry.js'
@@ -101,7 +101,7 @@ shopRoutes.get(
         components: message.ui ?? [],
         createdAt: message.createdAt,
       })),
-      cart: priceCart(session, cart.id),
+      cart: cartPayload(priceCart(session, cart.id)),
     })
   }),
 )
@@ -168,7 +168,7 @@ shopRoutes.get(
   route(async (req, res) => {
     const session = ensureSession(customerSession(req, res), CURRENCY)
     const cart = carts.ensureOpen(session.conversationId)
-    res.json({ cart: priceCart(session, cart.id) })
+    res.json({ cart: cartPayload(priceCart(session, cart.id)) })
   }),
 )
 
@@ -202,7 +202,7 @@ shopRoutes.post(
       // What is still owed in the same checkout, so a split card can move
       // straight on to the next brand without a round trip.
       checkout: order ? checkoutState(session.conversationId, order.checkoutId) : null,
-      cart: priceCart(session, carts.ensureOpen(session.conversationId).id),
+      cart: cartPayload(priceCart(session, carts.ensureOpen(session.conversationId).id)),
     })
   }),
 )

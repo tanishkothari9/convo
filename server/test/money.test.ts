@@ -17,8 +17,10 @@ const { db, closeDb } = await import('../src/db/index.js')
 const { carts, connections, orders, products, provenance, tenants, audit } = await import(
   '../src/db/repo.js'
 )
-const { gatedAddToCart, gatedCheckout, gatedConfirmPayment } = await import('../src/agent/gates.js')
-const { ConvoStorefront, ensureSession } = await import('../src/agent/storefront.js')
+const { cartPayload, gatedAddToCart, gatedCheckout, gatedConfirmPayment, viewCart } = await import(
+  '../src/agent/gates.js'
+)
+const { ConvoStorefront, ensureSession, priceCart } = await import('../src/agent/storefront.js')
 const { DEFAULT_AGENT_CONFIG } = await import('../src/agent/config.js')
 const { signManualPayment } = await import('../src/commerce/manual.js')
 const { readAddress, AddressError } = await import('../src/domain/address.js')
@@ -414,6 +416,36 @@ test('an address follows the shopper across brands, but not to another shopper',
     null,
     'an address leaked to another shopper',
   )
+})
+
+test('the cart the page is handed is the cart the agent emits', async () => {
+  /*
+   * These were two different shapes for months: the agent's component used
+   * snake_case with display strings, and the routes that hand a cart back
+   * directly returned the internal record. Nothing failed loudly — a customer
+   * who reloaded with items in their cart just got a badge showing nothing and
+   * a sheet of blank prices. Both go through cartPayload now, and this fails
+   * if either grows a field the other lacks.
+   */
+  const { product, session } = scenario('shape-item', 250, 4)
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 2 })
+  await alsoFrom(session, 'shape-item-b', 125)
+
+  const outcome = await viewCart({ backend, session })
+  const emitted = outcome.components!.find((c) => c.component === 'cart_state')!.payload
+  const handed = cartPayload(priceCart(session, carts.ensureOpen(session.conversationId).id))
+
+  assert.deepEqual(handed, emitted, 'the route and the component disagree about the cart')
+
+  // The fields the page actually reads, named here so removing one fails.
+  for (const key of ['cart_id', 'item_count', 'subtotal_display', 'brands', 'lines']) {
+    assert.ok(key in handed, `the cart payload lost ${key}`)
+  }
+  const [line] = handed.lines
+  for (const key of ['product_id', 'brand_name', 'name', 'unit_price_display', 'line_total_display']) {
+    assert.ok(key in line!, `a cart line lost ${key}`)
+  }
+  assert.deepEqual([...handed.brands].sort(), ['Other Brand', 'Test Brand'])
 })
 
 // ── the split ───────────────────────────────────────────────────────────────
