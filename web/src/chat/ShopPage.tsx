@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
-import { IconCart, IconSpark } from '../components/icons'
+import { IconCart } from '../components/icons'
 import { Mark } from '../components/Mark'
 import { Thinking } from './Thinking'
 import { ProductMarquee } from './ProductMarquee'
@@ -296,19 +296,13 @@ export function ShopPage() {
         <div className="chat-column">
           {empty ? (
             <section className="chat-open">
+              {/* Two lines before the goods, not four. The brands used to be
+                  named in a pill of their own and the money rule set above the
+                  chips; the first is now on every card in the rail, and the
+                  second reads better underneath it, where a customer has
+                  already seen what they might be buying. */}
               <h1 className="chat-open-name">Ask for what you want</h1>
               <p className="chat-open-lede">{lede(shop)}</p>
-              <p className="chat-open-agent">
-                <span className="chat-open-agent-mark">
-                  <IconSpark size={13} />
-                </span>
-                {brandLine(shop.brands)}
-              </p>
-              <p className="chat-open-hint t-sm t-muted">
-                {shop.catalogSize > 0
-                  ? 'One cart across every brand here. Each one is paid directly, so you will see a charge per brand.'
-                  : 'Nothing is on sale here yet. Come back once a brand has listed.'}
-              </p>
               {shop.catalogSize > 0 && (
                 <div className="chat-openers">
                   {shop.openers.map((opener, index) => (
@@ -330,6 +324,13 @@ export function ShopPage() {
                 products={shop.showcase ?? []}
                 onPick={(product) => send(`Tell me about the ${product.name}`)}
               />
+
+              {shop.brandCount > 1 && (
+                <p className="chat-open-foot t-sm t-muted">
+                  One cart across every brand. Each is paid to that brand directly, so a cart from
+                  two shops is two charges.
+                </p>
+              )}
             </section>
           ) : (
             <ol className="chat-log">
@@ -469,16 +470,25 @@ function renderComponent(
  * platform's merchant count.
  */
 function lede(shop: ShopInfo): string {
-  if (shop.catalogSize === 0) return 'No brands have listed here yet.'
-  const brands = shop.brandCount === 1 ? 'one brand' : `${shop.brandCount} brands`
-  return `${shop.catalogSize} pieces from ${brands}, searched by asking rather than by filtering.`
+  if (shop.catalogSize === 0) {
+    return 'Nothing is on sale here yet. Come back once a brand has listed.'
+  }
+  return `${shop.catalogSize} pieces from ${brandLine(shop.brands)}. Describe what you are after — colour, occasion, budget — rather than working down a filter.`
 }
 
-/** Who is on the shelf, named — up to the point where a list stops helping. */
+/**
+ * Who is on the shelf, named.
+ *
+ * Named rather than counted, because "2 brands" tells a shopper nothing and
+ * "Smart Choice and Kalaa Studio" tells them whether this is a shop for them.
+ * It falls back to a count past the point where a list stops being readable.
+ */
 function brandLine(brands: string[]): string {
-  if (brands.length === 0) return 'Convo'
-  if (brands.length <= 3) return brands.join(' · ')
-  return `${brands.slice(0, 3).join(' · ')} and ${brands.length - 3} more`
+  if (brands.length === 0) return 'the brands listed here'
+  if (brands.length === 1) return brands[0]!
+  if (brands.length === 2) return `${brands[0]} and ${brands[1]}`
+  if (brands.length === 3) return `${brands[0]}, ${brands[1]} and ${brands[2]}`
+  return `${brands[0]}, ${brands[1]} and ${brands.length - 2} more brands`
 }
 
 /** The chips from the most recent turn, which are the ones still on offer. */

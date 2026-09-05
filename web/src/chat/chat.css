@@ -191,34 +191,12 @@
   animation: rise var(--dur-enter) var(--ease-out) 60ms both;
 }
 
-.chat-open-agent {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
-  padding: 0.25rem var(--space-3) 0.25rem 0.25rem;
-  border-radius: var(--radius-chip);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  box-shadow: var(--shadow-lift);
-  animation: rise var(--dur-enter) var(--ease-out) 110ms both;
-}
-
-.chat-open-agent-mark {
-  display: grid;
-  place-items: center;
-  width: 1.375rem;
-  height: 1.375rem;
-  border-radius: 50%;
-  color: var(--brand-contrast);
-  background: linear-gradient(140deg, var(--brand), color-mix(in srgb, var(--brand) 68%, #000));
-}
-
-.chat-open-hint {
-  margin-top: var(--space-3);
-  animation: rise var(--dur-enter) var(--ease-out) 150ms both;
+/* Under the rail, not above it: the money rule reads better once a customer
+   has seen what they might be buying. */
+.chat-open-foot {
+  margin-top: var(--space-4);
+  max-width: 34rem;
+  animation: rise var(--dur-enter) var(--ease-out) 260ms both;
 }
 
 .chat-openers {
@@ -226,6 +204,7 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-5);
+  animation: rise var(--dur-enter) var(--ease-out) 150ms both;
 }
 
 .chat-openers .chip {
@@ -1164,16 +1143,20 @@
  * stops inside the column reads as a finished list rather than a shelf
  * continuing out of frame.
  */
+/* ── The shelf ──────────────────────────────────────────────────────────────
+ *
+ * Full-bleed and faded at both ends, so goods travel in and out of the page
+ * rather than starting and stopping at a margin. This is the one place on the
+ * page where motion is not feedback — it is the shop being open — so it is
+ * also the only thing here allowed to move on its own.
+ */
+
 .marquee {
   margin-top: var(--space-6);
   margin-inline: calc(50% - 50vw);
-  padding-inline: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  /* Faded at both ends so cards enter and leave rather than being cut off. */
-  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  /* Cards travel in and out rather than starting and stopping at an edge. */
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
   animation: rise var(--dur-enter) var(--ease-out) 200ms both;
 }
 
@@ -1185,25 +1168,16 @@
   display: flex;
   gap: var(--space-3);
   width: max-content;
-  animation-name: marquee-left;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-
-.marquee-row[data-direction='right'] .marquee-track {
-  animation-name: marquee-right;
+  /* Room for the hover lift and its shadow, which would otherwise be clipped
+     by the row's own overflow. */
+  padding: 0.5rem var(--space-4) 1rem;
+  animation: marquee-left 72s linear infinite;
 }
 
 /* The list is duplicated, so -50% is exactly one full copy and the loop has
    no seam. */
 @keyframes marquee-left {
   to {
-    transform: translateX(-50%);
-  }
-}
-
-@keyframes marquee-right {
-  from {
     transform: translateX(-50%);
   }
 }
@@ -1215,28 +1189,50 @@
   animation-play-state: paused;
 }
 
+/*
+ * A tall card, because the goods are tall.
+ *
+ * 3:4 is the crop the catalogue photography is already in, so nothing is
+ * cropped twice. The card is the photograph — the text sits on it rather than
+ * beside it, which keeps the whole rail reading as a window display instead of
+ * as a row of search results. That distinction matters: the cards inside the
+ * conversation are answers to a question, and these are not.
+ */
 .marquee-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  position: relative;
   flex: none;
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
-  border-radius: var(--radius-chip);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  width: 10.5rem;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-card);
+  overflow: hidden;
   text-align: left;
+  background: var(--surface-sunken);
   box-shadow: var(--shadow-lift);
   transition:
     transform var(--dur-enter) var(--ease-out),
-    border-color var(--dur-quick) ease,
     box-shadow var(--dur-enter) var(--ease-out);
+}
+
+/* A hairline inside the radius, so a pale photograph still has an edge. */
+.marquee-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 20, 0.14);
+  pointer-events: none;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .marquee-card:hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--brand) 38%, transparent);
-    box-shadow: 0 6px 18px color-mix(in srgb, var(--brand) 18%, transparent);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--brand) 22%, transparent);
+  }
+
+  /* The photograph moves a little further than the card, which is what makes
+     the hover read as depth rather than as a nudge. */
+  .marquee-card:hover .marquee-art img {
+    transform: scale(1.05);
   }
 }
 
@@ -1245,56 +1241,119 @@
 }
 
 .marquee-art {
-  width: 2.75rem;
-  height: 2.75rem;
-  flex: none;
-  border-radius: 999px;
-  overflow: hidden;
-  background: linear-gradient(150deg, var(--surface-sunken), color-mix(in srgb, var(--brand) 10%, var(--surface-sunken)));
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, var(--surface-sunken), color-mix(in srgb, var(--brand) 12%, var(--surface-sunken)));
 }
 
 .marquee-art img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 460ms var(--ease-out);
+}
+
+.marquee-art-blank {
+  font-size: 1.5rem;
+  font-weight: var(--weight-semibold);
+  color: color-mix(in srgb, var(--brand) 42%, transparent);
+}
+
+/*
+ * Weighted to the foot, and heavier than it looks like it needs to be.
+ *
+ * The photography belongs to the merchants: some of it is a silver bracelet
+ * shot on white, and white-on-white is how a caption disappears. The scrim
+ * cannot be tuned per image, so it is built for the worst case — near-opaque
+ * where the text sits, gone by the time it would touch the subject.
+ */
+.marquee-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(8, 13, 11, 0.94) 0%,
+    rgba(8, 13, 11, 0.86) 16%,
+    rgba(8, 13, 11, 0.58) 36%,
+    rgba(8, 13, 11, 0.18) 60%,
+    transparent 82%
+  );
 }
 
 .marquee-meta {
+  position: absolute;
+  inset: auto 0 0 0;
   display: flex;
   flex-direction: column;
   gap: 0.0625rem;
-  min-width: 0;
+  padding: var(--space-3);
+  color: #fff;
+  /* Belt and braces over a photograph that might be bright right at the foot. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.marquee-brand {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.012em;
+  color: rgba(255, 255, 255, 0.82);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .marquee-name {
   font-size: var(--text-sm);
-  line-height: 1.25;
+  line-height: 1.3;
   font-weight: var(--weight-medium);
-  white-space: nowrap;
-  max-width: 11rem;
+  /* Two lines, so a long name is legible rather than truncated to nothing. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .marquee-price {
-  font-size: var(--text-xs);
-  color: var(--ink-secondary);
+  margin-top: 0.1875rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.008em;
 }
 
-/* Reduced motion: the products are the content, so they stay — only the
-   drifting goes. */
-.marquee-still {
-  flex-direction: row;
-  flex-wrap: wrap;
-  margin-inline: 0;
-  mask-image: none;
-  -webkit-mask-image: none;
-  gap: var(--space-2);
+/*
+ * Reduced motion: the products are the content, so they stay and only the
+ * drifting goes. It becomes a rail the customer pushes themselves, which is
+ * motion they asked for rather than motion happening at them.
+ */
+.marquee-still .marquee-row {
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.marquee-still .marquee-row::-webkit-scrollbar {
+  display: none;
+}
+
+.marquee-still .marquee-track {
+  animation: none;
+}
+
+.marquee-still .marquee-card {
+  scroll-snap-align: center;
 }
 
 @media (max-width: 34rem) {
-  .marquee-name {
-    max-width: 8.5rem;
+  .marquee-card {
+    width: 8.5rem;
+  }
+
+  .marquee-meta {
+    padding: var(--space-2) var(--space-3) var(--space-3);
   }
 }
 
@@ -1510,21 +1569,6 @@
   letter-spacing: 0.02em;
   text-transform: none;
   margin-bottom: 0.1rem;
-}
-
-.marquee-line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.marquee-brand {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .cart-split {
