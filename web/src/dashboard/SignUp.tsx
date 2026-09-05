@@ -1,54 +1,65 @@
-import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ApiError } from '../lib/api'
-import { Mark } from '../components/Mark'
-import { useAuth } from './auth'
+import { useState } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import { ApiError } from "../lib/api";
+import { useAuth } from "./auth";
+import { PixelSummit } from "../components/PixelSummit";
+import { Wordmark } from "../components/Wordmark";
 
 function slugPreview(name: string): string {
   const slug = name
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48)
-  return slug || 'your-brand'
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return slug || "your-brand";
 }
 
 export function SignUp() {
-  const { session, signUp, loading } = useAuth()
-  const navigate = useNavigate()
-  const [brandName, setBrandName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const { session, signUp, loading } = useAuth();
+  const navigate = useNavigate();
+  const [brandName, setBrandName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  if (loading) return <div className="boot" aria-busy="true" />
-  if (session) return <Navigate to="/dashboard" replace />
+  if (loading) return <div className="boot" aria-busy="true" />;
+  if (session) return <Navigate to="/dashboard" replace />;
 
   async function submit(event: React.FormEvent) {
-    event.preventDefault()
-    setError(null)
-    setBusy(true)
+    event.preventDefault();
+    setError(null);
+    setBusy(true);
     try {
-      await signUp({ brandName, email, password })
-      navigate('/dashboard', { replace: true })
+      await signUp({ brandName, email, password });
+      navigate("/dashboard", { replace: true });
     } catch (caught) {
       setError(
-        caught instanceof ApiError ? caught.message : 'Could not create the account. Try again.',
-      )
-      setBusy(false)
+        caught instanceof ApiError
+          ? caught.message
+          : "Could not create the account. Try again.",
+      );
+      setBusy(false);
     }
   }
 
   return (
     <main className="auth">
+      <PixelSummit />
       <div className="auth-panel">
+        {/* The mark, not a second heading. At lg it was set at the same size
+            as the h1 below it and the two competed; here it reads as a
+            letterhead and the action underneath is the thing you look at. */}
         <Link to="/" className="auth-mark" aria-label="Convo home">
-          <Mark size={26} />
+          <Wordmark />
         </Link>
         <h1 className="t-title auth-title">Add your brand</h1>
 
-        <form className="stack" style={{ gap: 'var(--space-4)' }} onSubmit={submit}>
+        <form
+          className="stack"
+          style={{ gap: "var(--space-4)" }}
+          onSubmit={submit}
+        >
           <div className="field">
             <label className="field-label" htmlFor="brand">
               Brand name
@@ -64,7 +75,7 @@ export function SignUp() {
             />
             {/* The link is the product; show it forming as they type. */}
             <p className="field-hint">
-              Your brand will be identified as{' '}
+              Your brand will be identified as{" "}
               <span className="slug-preview">{slugPreview(brandName)}</span>
             </p>
           </div>
@@ -107,9 +118,13 @@ export function SignUp() {
             </p>
           )}
 
-          <button className="btn btn-primary btn-lg btn-block" type="submit" disabled={busy}>
+          <button
+            className="btn btn-primary btn-lg btn-block"
+            type="submit"
+            disabled={busy}
+          >
             {busy && <span className="spinner" />}
-            {busy ? 'Creating' : 'Create brand'}
+            {busy ? "Creating" : "Create brand"}
           </button>
         </form>
 
@@ -118,5 +133,5 @@ export function SignUp() {
         </p>
       </div>
     </main>
-  )
+  );
 }

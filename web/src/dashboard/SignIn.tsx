@@ -1,47 +1,60 @@
-import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ApiError } from '../lib/api'
-import { Mark } from '../components/Mark'
-import { useAuth } from './auth'
+import { useState } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import { ApiError } from "../lib/api";
+import { useAuth } from "./auth";
+import { PixelSummit } from "../components/PixelSummit";
+import { Wordmark } from "../components/Wordmark";
 
 const DEMO_BRANDS = [
-  { name: 'Smart Choice', email: 'owner@smartchoice.demo' },
-  { name: 'Kalaa Studio', email: 'owner@kalaa.demo' },
-]
+  { name: "Smart Choice", email: "owner@smartchoice.demo" },
+  { name: "Kalaa Studio", email: "owner@kalaa.demo" },
+];
 
 export function SignIn() {
-  const { session, signIn, loading } = useAuth()
-  const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const { session, signIn, loading } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  if (loading) return <div className="boot" aria-busy="true" />
-  if (session) return <Navigate to="/dashboard" replace />
+  if (loading) return <div className="boot" aria-busy="true" />;
+  if (session) return <Navigate to="/dashboard" replace />;
 
   async function submit(event: React.FormEvent) {
-    event.preventDefault()
-    setError(null)
-    setBusy(true)
+    event.preventDefault();
+    setError(null);
+    setBusy(true);
     try {
-      await signIn(email, password)
-      navigate('/dashboard', { replace: true })
+      await signIn(email, password);
+      navigate("/dashboard", { replace: true });
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not sign in. Try again.')
-      setBusy(false)
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : "Could not sign in. Try again.",
+      );
+      setBusy(false);
     }
   }
 
   return (
     <main className="auth">
+      <PixelSummit />
       <div className="auth-panel">
+        {/* The mark, not a second heading. At lg it was set at the same size
+            as the h1 below it and the two competed; here it reads as a
+            letterhead and the action underneath is the thing you look at. */}
         <Link to="/" className="auth-mark" aria-label="Convo home">
-          <Mark size={26} />
+          <Wordmark />
         </Link>
-        <h1 className="t-title auth-title">Sign in to Convo</h1>
+        <h1 className="t-title auth-title">Sign in</h1>
 
-        <form className="stack" style={{ gap: 'var(--space-4)' }} onSubmit={submit}>
+        <form
+          className="stack"
+          style={{ gap: "var(--space-4)" }}
+          onSubmit={submit}
+        >
           <div className="field">
             <label className="field-label" htmlFor="email">
               Email
@@ -78,9 +91,13 @@ export function SignIn() {
             </p>
           )}
 
-          <button className="btn btn-primary btn-lg btn-block" type="submit" disabled={busy}>
+          <button
+            className="btn btn-primary btn-lg btn-block"
+            type="submit"
+            disabled={busy}
+          >
             {busy && <span className="spinner" />}
-            {busy ? 'Signing in' : 'Sign in'}
+            {busy ? "Signing in" : "Sign in"}
           </button>
         </form>
 
@@ -98,8 +115,8 @@ export function SignIn() {
               type="button"
               className="auth-demo t-sm"
               onClick={() => {
-                setEmail(brand.email)
-                setPassword('convo-demo-2026')
+                setEmail(brand.email);
+                setPassword("convo-demo-2026");
               }}
             >
               {brand.name}
@@ -108,5 +125,5 @@ export function SignIn() {
         </div>
       </div>
     </main>
-  )
+  );
 }

@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Mark } from './components/Mark'
 import { LiveDemo } from './components/LiveDemo'
 import { PixelBand } from './components/PixelBand'
 import { PixelMarket } from './components/PixelMarket'
+import { Wordmark } from './components/Wordmark'
 import {
   IconAgent,
   IconArrow,
@@ -133,10 +133,7 @@ export function Landing() {
 
         <div className="hero-inner">
           <header className="hero-nav">
-            <span className="wordmark wordmark-invert">
-              <Mark />
-              <span>Convo</span>
-            </span>
+            <Wordmark invert />
             <nav className="hero-nav-actions">
               {session ? (
                 <Link className="btn btn-glass btn-sm" to="/dashboard">
@@ -341,7 +338,7 @@ export function Landing() {
       <footer className="landing-foot">
         <div className="foot-inner">
           <div className="foot-brand">
-            <span className="foot-wordmark">Convo</span>
+            <Wordmark size="lg" />
             <p className="t-sm t-secondary foot-line">
               One conversational storefront across every listed brand. Each brand is paid directly,
               and every money action lands in its own audit trail.

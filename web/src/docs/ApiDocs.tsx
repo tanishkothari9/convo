@@ -1,16 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Mark } from '../components/Mark'
-import { IconArrow, IconCheck, IconCopy, IconGate, IconLink } from '../components/icons'
-import { useAuth } from '../dashboard/auth'
-import { api } from '../lib/api'
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  IconArrow,
+  IconCheck,
+  IconCopy,
+  IconGate,
+  IconLink,
+} from "../components/icons";
+import { useAuth } from "../dashboard/auth";
+import { api } from "../lib/api";
 import {
   BASE_URL_PLACEHOLDER,
   ERRORS,
   KEY_PLACEHOLDER,
   SECTIONS,
   type Endpoint,
-} from './reference'
+} from "./reference";
+import { PixelHorizon } from "../components/PixelHorizon";
+import { Wordmark } from "../components/Wordmark";
 
 /**
  * The API reference.
@@ -21,58 +28,63 @@ import {
  * request against your own catalogue rather than a template to edit.
  */
 export function ApiDocs() {
-  const { session } = useAuth()
-  const [keyValue, setKeyValue] = useState<string | null>(null)
-  const [active, setActive] = useState(SECTIONS[0]!.endpoints[0]!.id)
+  const { session } = useAuth();
+  const [keyValue, setKeyValue] = useState<string | null>(null);
+  const [active, setActive] = useState(SECTIONS[0]!.endpoints[0]!.id);
 
-  const baseUrl = typeof window === 'undefined' ? '' : window.location.origin
+  const baseUrl = typeof window === "undefined" ? "" : window.location.origin;
 
   // Track which endpoint is in view so the sidebar says where you are.
   useEffect(() => {
-    const targets = document.querySelectorAll('[data-endpoint]')
+    const targets = document.querySelectorAll("[data-endpoint]");
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
           .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
-        if (visible) setActive((visible.target as HTMLElement).dataset.endpoint!)
+          .sort(
+            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+          )[0];
+        if (visible)
+          setActive((visible.target as HTMLElement).dataset.endpoint!);
       },
-      { rootMargin: '-80px 0px -70% 0px' },
-    )
-    targets.forEach((target) => observer.observe(target))
-    return () => observer.disconnect()
-  }, [])
+      { rootMargin: "-80px 0px -70% 0px" },
+    );
+    targets.forEach((target) => observer.observe(target));
+    return () => observer.disconnect();
+  }, []);
 
   const fill = useMemo(
     () => (text: string) =>
       text
         .replaceAll(BASE_URL_PLACEHOLDER, baseUrl)
-        .replaceAll(KEY_PLACEHOLDER, keyValue ?? 'cvo_live_your_key_here'),
+        .replaceAll(KEY_PLACEHOLDER, keyValue ?? "cvo_live_your_key_here"),
     [baseUrl, keyValue],
-  )
+  );
 
   async function mintKey() {
     try {
-      const result = await api.post<{ secret: string }>('/dashboard/api-keys', {
-        name: 'Created from the docs',
-      })
-      setKeyValue(result.secret)
+      const result = await api.post<{ secret: string }>("/dashboard/api-keys", {
+        name: "Created from the docs",
+      });
+      setKeyValue(result.secret);
     } catch {
-      setKeyValue(null)
+      setKeyValue(null);
     }
   }
 
   return (
     <div className="docs">
       <header className="docs-bar">
-        <Link to="/" className="wordmark wordmark-sm" aria-label="Convo home">
-          <Mark size={20} />
-          <span>Convo</span>
+        <Link to="/" aria-label="Convo home">
+          <Wordmark size="sm" />
         </Link>
         <span className="docs-bar-title">API reference</span>
         <div className="docs-bar-actions">
           {session ? (
-            <Link className="btn btn-secondary btn-sm" to="/dashboard/developers">
+            <Link
+              className="btn btn-secondary btn-sm"
+              to="/dashboard/developers"
+            >
               Manage keys
             </Link>
           ) : (
@@ -94,10 +106,12 @@ export function ApiDocs() {
               {section.endpoints.map((endpoint) => (
                 <a
                   key={endpoint.id}
-                  className={`docs-nav-link${active === endpoint.id ? ' is-active' : ''}`}
+                  className={`docs-nav-link${active === endpoint.id ? " is-active" : ""}`}
                   href={`#${endpoint.id}`}
                 >
-                  <span className={`docs-verb docs-verb-${endpoint.method.toLowerCase()}`}>
+                  <span
+                    className={`docs-verb docs-verb-${endpoint.method.toLowerCase()}`}
+                  >
                     {endpoint.method}
                   </span>
                   {endpoint.title}
@@ -117,8 +131,9 @@ export function ApiDocs() {
           <section id="start" className="docs-intro">
             <h1 className="docs-title">Convo API</h1>
             <p className="docs-lede">
-              Load your catalogue from whatever system already holds it, and read back what the
-              agent sold. REST over HTTPS, JSON in and out, one bearer key.
+              Load your catalogue from whatever system already holds it, and
+              read back what the agent sold. REST over HTTPS, JSON in and out,
+              one bearer key.
             </p>
 
             <div className="docs-key">
@@ -139,7 +154,10 @@ export function ApiDocs() {
               <div className="docs-key-body">
                 <p className="docs-key-label">Your API key</p>
                 <code className="docs-key-value">
-                  {keyValue ?? (session ? 'Create one and it fills in every example below' : 'Sign in to fill in the examples')}
+                  {keyValue ??
+                    (session
+                      ? "Create one and it fills in every example below"
+                      : "Sign in to fill in the examples")}
                 </code>
               </div>
               {session ? (
@@ -159,23 +177,26 @@ export function ApiDocs() {
 
             {keyValue && (
               <p className="docs-warn">
-                This is the only time this key is shown. Convo stores a digest of it, not the key —
-                if you lose it, create another.
+                This is the only time this key is shown. Convo stores a digest
+                of it, not the key — if you lose it, create another.
               </p>
             )}
 
             <h2 className="docs-h2">Authentication</h2>
             <p className="docs-p">
-              Send the key as a bearer token on every request. A key belongs to one brand and can
-              reach nothing outside it.
+              Send the key as a bearer token on every request. A key belongs to
+              one brand and can reach nothing outside it.
             </p>
-            <Code text={`Authorization: Bearer ${keyValue ?? 'cvo_live_your_key_here'}`} />
+            <Code
+              text={`Authorization: Bearer ${keyValue ?? "cvo_live_your_key_here"}`}
+            />
 
             <h2 className="docs-h2">Loading a catalogue</h2>
             <p className="docs-p">
-              One call. Address products by <code>external_id</code> — your own id — and the same
-              request can be run every night: it updates what changed and creates what is new,
-              rather than growing a second copy of your catalogue.
+              One call. Address products by <code>external_id</code> — your own
+              id — and the same request can be run every night: it updates what
+              changed and creates what is new, rather than growing a second copy
+              of your catalogue.
             </p>
             <Code text={fill(SECTIONS[0]!.endpoints[0]!.request!)} />
           </section>
@@ -187,7 +208,11 @@ export function ApiDocs() {
                 <p className="docs-p">{section.blurb}</p>
               </header>
               {section.endpoints.map((endpoint) => (
-                <EndpointBlock key={endpoint.id} endpoint={endpoint} fill={fill} />
+                <EndpointBlock
+                  key={endpoint.id}
+                  endpoint={endpoint}
+                  fill={fill}
+                />
               ))}
             </section>
           ))}
@@ -195,9 +220,10 @@ export function ApiDocs() {
           <section id="errors" className="docs-section">
             <h2 className="docs-h1">Errors</h2>
             <p className="docs-p">
-              Every failure returns a JSON body with a human <code>error</code> and a stable{' '}
-              <code>code</code> you can branch on. The message names the field and what it
-              expected, so a failing sync tells you what to change.
+              Every failure returns a JSON body with a human <code>error</code>{" "}
+              and a stable <code>code</code> you can branch on. The message
+              names the field and what it expected, so a failing sync tells you
+              what to change.
             </p>
             <div className="docs-table-wrap">
               <table className="docs-table">
@@ -226,9 +252,10 @@ export function ApiDocs() {
           <section id="limits" className="docs-section">
             <h2 className="docs-h1">Rate limits</h2>
             <p className="docs-p">
-              Limits are per key. Every response carries{' '}
-              <code>X-RateLimit-Remaining</code>; a 429 carries <code>Retry-After</code> in
-              seconds. A nightly sync will not come close to these.
+              Limits are per key. Every response carries{" "}
+              <code>X-RateLimit-Remaining</code>; a 429 carries{" "}
+              <code>Retry-After</code> in seconds. A nightly sync will not come
+              close to these.
             </p>
             <div className="docs-table-wrap">
               <table className="docs-table">
@@ -265,17 +292,32 @@ export function ApiDocs() {
           </footer>
         </main>
       </div>
+
+      {/* The same horizon the dashboard ends on. */}
+      <PixelHorizon />
     </div>
-  )
+  );
 }
 
-function EndpointBlock({ endpoint, fill }: { endpoint: Endpoint; fill: (t: string) => string }) {
+function EndpointBlock({
+  endpoint,
+  fill,
+}: {
+  endpoint: Endpoint;
+  fill: (t: string) => string;
+}) {
   return (
-    <article className="docs-endpoint" id={endpoint.id} data-endpoint={endpoint.id}>
+    <article
+      className="docs-endpoint"
+      id={endpoint.id}
+      data-endpoint={endpoint.id}
+    >
       <div className="docs-endpoint-head">
         <h3 className="docs-h2">{endpoint.title}</h3>
         <p className="docs-route">
-          <span className={`docs-verb docs-verb-${endpoint.method.toLowerCase()}`}>
+          <span
+            className={`docs-verb docs-verb-${endpoint.method.toLowerCase()}`}
+          >
             {endpoint.method}
           </span>
           <code>{endpoint.path}</code>
@@ -285,7 +327,9 @@ function EndpointBlock({ endpoint, fill }: { endpoint: Endpoint; fill: (t: strin
       <p className="docs-p">{endpoint.summary}</p>
       {endpoint.note && <p className="docs-note">{endpoint.note}</p>}
 
-      {endpoint.params && <FieldTable title="Query parameters" fields={endpoint.params} />}
+      {endpoint.params && (
+        <FieldTable title="Query parameters" fields={endpoint.params} />
+      )}
       {endpoint.body && <FieldTable title="Body" fields={endpoint.body} />}
 
       <div className="docs-panes">
@@ -301,11 +345,17 @@ function EndpointBlock({ endpoint, fill }: { endpoint: Endpoint; fill: (t: strin
         </div>
       </div>
     </article>
-  )
+  );
 }
 
-function FieldTable({ title, fields }: { title: string; fields: Endpoint['params'] }) {
-  if (!fields || fields.length === 0) return null
+function FieldTable({
+  title,
+  fields,
+}: {
+  title: string;
+  fields: Endpoint["params"];
+}) {
+  if (!fields || fields.length === 0) return null;
   return (
     <div className="docs-fields">
       <p className="docs-pane-label">{title}</p>
@@ -316,7 +366,9 @@ function FieldTable({ title, fields }: { title: string; fields: Endpoint['params
               <tr key={field.name}>
                 <td className="docs-field-name">
                   <code>{field.name}</code>
-                  {field.required && <span className="docs-required">required</span>}
+                  {field.required && (
+                    <span className="docs-required">required</span>
+                  )}
                 </td>
                 <td className="docs-field-type">{field.type}</td>
                 <td>{field.detail}</td>
@@ -326,7 +378,7 @@ function FieldTable({ title, fields }: { title: string; fields: Endpoint['params
         </table>
       </div>
     </div>
-  )
+  );
 }
 
 function Code({ text, language }: { text: string; language?: string }) {
@@ -337,27 +389,35 @@ function Code({ text, language }: { text: string; language?: string }) {
       </pre>
       <CopyButton text={text} label="Copy" subtle />
     </div>
-  )
+  );
 }
 
-function CopyButton({ text, label, subtle }: { text: string; label: string; subtle?: boolean }) {
-  const [copied, setCopied] = useState(false)
+function CopyButton({
+  text,
+  label,
+  subtle,
+}: {
+  text: string;
+  label: string;
+  subtle?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
   return (
     <button
-      className={subtle ? 'docs-copy' : 'btn btn-secondary btn-sm'}
+      className={subtle ? "docs-copy" : "btn btn-secondary btn-sm"}
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(text)
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1600)
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1600);
         } catch {
-          setCopied(false)
+          setCopied(false);
         }
       }}
-      aria-label={copied ? 'Copied' : label}
+      aria-label={copied ? "Copied" : label}
     >
       {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-      {subtle ? null : copied ? 'Copied' : label}
+      {subtle ? null : copied ? "Copied" : label}
     </button>
-  )
+  );
 }

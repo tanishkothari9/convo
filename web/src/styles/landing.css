@@ -104,9 +104,6 @@
   gap: var(--space-2);
 }
 
-.wordmark-invert {
-  color: #fff;
-}
 
 .hero-grid {
   display: grid;
@@ -325,15 +322,6 @@
   padding: var(--space-3) var(--space-4);
   background: var(--surface);
   box-shadow: inset 0 -1px 0 var(--line);
-}
-
-.demo-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  color: var(--ink);
 }
 
 .demo-cart {
@@ -738,6 +726,7 @@
   }
 }
 
+
 /*
  * The same key the buttons are made of, at card scale.
  *
@@ -773,6 +762,73 @@
       0 24px 28px rgba(23, 23, 23, 0.04);
   }
 
+}
+
+/*
+ * One column, and the cards stack as you scroll.
+ *
+ * Each card pins a little lower than the one before it, so the next slides up
+ * and covers all but a sliver of it. By the last one you are looking at a deck
+ * with four spines showing — the section reads as one object being assembled
+ * rather than as a list you are dragging past.
+ *
+ * Only here. On a wide screen these sit two-by-two and there is nothing to
+ * stack: a card cannot pin over a neighbour beside it, and forcing the layout
+ * to one column just to get the effect would trade a good desktop grid for a
+ * trick. The stacking exists where the column already does.
+ *
+ * It survives `.landing`'s `overflow-x: clip` because clip — unlike hidden —
+ * does not make a scroll container, so these still stick to the viewport. And
+ * it has to live *below* `.capability` rather than beside the one-column rule
+ * above: same specificity, so `position: relative` up there would win on source
+ * order and the whole thing would quietly not stick.
+ */
+@media (max-width: 44rem) {
+  /*
+   * Room to travel, at both ends.
+   *
+   * The gap is what gives each card a moment pinned on its own before the next
+   * one arrives; at the tighter grid spacing they are already touching and
+   * nothing ever reads as pinned. The bottom padding is the payoff: sticky
+   * releases the instant the grid's own box scrolls past, so without it the
+   * completed deck — four spines and a face — is assembled and gone in the same
+   * frame, and nobody sees the thing the whole effect was building towards.
+   */
+  .capability-grid {
+    gap: var(--space-6);
+    padding-bottom: 30vh;
+  }
+
+  .capability {
+    position: sticky;
+    top: var(--stack-top, 4.5rem);
+  }
+
+  .capability:nth-child(2) {
+    --stack-top: 5.5rem;
+  }
+
+  .capability:nth-child(3) {
+    --stack-top: 6.5rem;
+  }
+
+  .capability:nth-child(4) {
+    --stack-top: 7.5rem;
+  }
+
+  /* The last card carries the deck, so it gets the deeper shadow — the ones
+     underneath are half-covered and a full drop on each just muddies the pile. */
+  .capability:last-child {
+    box-shadow: var(--shadow-float);
+  }
+
+  /* Pinning is not motion in the vestibular sense, but content sliding over
+     content is exactly what somebody asking for less of it wants less of. */
+  @media (prefers-reduced-motion: reduce) {
+    .capability {
+      position: static;
+    }
+  }
 }
 
 .capability-icon {
@@ -1060,22 +1116,6 @@
 
 .foot-brand {
   max-width: 24rem;
-}
-
-/*
- * Set, not drawn.
- *
- * The mark has already appeared twice by the time anyone reaches the bottom of
- * this page, and a third is a logo asking to be noticed on the way out. The
- * name in the page's own face, a size up, does the job.
- */
-.foot-wordmark {
-  display: block;
-  font-size: var(--text-title);
-  line-height: 1.1;
-  letter-spacing: -0.014em;
-  font-weight: var(--weight-regular);
-  color: var(--ink);
 }
 
 .foot-line {
