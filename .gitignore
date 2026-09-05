@@ -14,3 +14,10 @@ coverage/
 
 # TypeScript incremental build state
 *.tsbuildinfo
+
+# Scratch from local agent-API testing: a session token and a signed mandate.
+.agent-token
+.agent-mandate
+
+# A competitor's source, downloaded for comparison. Not ours to publish.
+AgentPay-main.zip
