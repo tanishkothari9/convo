@@ -65,18 +65,18 @@ export function ApiDocs() {
   return (
     <div className="docs">
       <header className="docs-bar">
-        <Link to="/" className="wordmark wordmark-sm wordmark-invert" aria-label="Convo home">
+        <Link to="/" className="wordmark wordmark-sm" aria-label="Convo home">
           <Mark size={20} />
           <span>Convo</span>
         </Link>
         <span className="docs-bar-title">API reference</span>
         <div className="docs-bar-actions">
           {session ? (
-            <Link className="btn btn-glass btn-sm" to="/dashboard/developers">
+            <Link className="btn btn-secondary btn-sm" to="/dashboard/developers">
               Manage keys
             </Link>
           ) : (
-            <Link className="btn btn-glass btn-sm" to="/login">
+            <Link className="btn btn-secondary btn-sm" to="/login">
               Sign in
             </Link>
           )}

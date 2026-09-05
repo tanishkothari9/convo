@@ -26,7 +26,7 @@
   gap: var(--space-4);
   height: var(--header-height);
   padding: 0 var(--space-5);
-  background: rgba(4, 22, 15, 0.78);
+  background: var(--glass-light);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--line);
