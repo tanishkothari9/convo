@@ -1272,6 +1272,154 @@
   }
 }
 
+/* ── Agent mandate sheet ────────────────────────────────────────────────── */
+
+/*
+ * From the right, like the cart, because it is the shopper's own business —
+ * handing a budget to an agent is a thing you do with your money, not a thing
+ * the shop does to you.
+ */
+.agent-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.agent-sheet {
+  position: relative;
+  width: min(26rem, 100%);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-float);
+  animation: cart-in var(--dur-sheet) var(--ease-sheet);
+}
+
+.agent-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.agent-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agent-field input[type="number"] {
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-brands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.agent-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-input);
+  background: var(--surface-sunken);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.agent-brand:has(input:checked) {
+  background: var(--accent-tint);
+  color: var(--ink);
+}
+
+/* The budget falling is the whole point of watching it run. */
+.agent-budget-bar {
+  height: 0.375rem;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.agent-budget-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--dur-enter) var(--ease-out);
+}
+
+.agent-budget p {
+  margin-top: var(--space-2);
+}
+
+.agent-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agent-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--line);
+  background: var(--surface-sunken);
+  border-radius: 0 var(--radius-input) var(--radius-input) 0;
+  animation: rise var(--dur-enter) var(--ease-out) both;
+}
+
+.agent-steps li[data-tone="ok"] {
+  border-left-color: var(--accent);
+}
+
+/* A refusal is the interesting outcome here, so it is the one that is coloured. */
+.agent-steps li[data-tone="refused"] {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-sunken));
+}
+
+.agent-step-label {
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.agent-actions {
+  padding: var(--space-4);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+@media (max-width: 40rem) {
+  .agent-layer {
+    align-items: flex-end;
+  }
+
+  .agent-sheet {
+    width: 100%;
+    max-height: 90dvh;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  }
+}
+
 /* ── Cart sheet ─────────────────────────────────────────────────────────── */
 
 .cart-layer {

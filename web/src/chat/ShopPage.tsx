@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { IconCart, IconMenu, IconPlus } from "../components/icons";
+import { IconAgent, IconCart, IconMenu, IconPlus } from "../components/icons";
 import { Thinking } from "./Thinking";
 import { PixelStreet } from "../components/PixelStreet";
 import { Wordmark } from "../components/Wordmark";
 import { Composer } from "./Composer";
 import { CartSheet } from "./CartSheet";
+import { AgentSheet } from "./AgentSheet";
 import { ChatSheet } from "./ChatSheet";
 import { ProductCards } from "./cards/ProductCards";
 import { CartCard } from "./cards/CartCard";
@@ -71,6 +72,7 @@ export function ShopPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -423,6 +425,17 @@ export function ShopPage() {
               <IconPlus size={18} />
             </button>
 
+            {/* The shopper is the one who delegates a budget, so the way to
+                hand one to an agent belongs on the shopper's own screen. */}
+            <button
+              className="chat-head-btn"
+              onClick={() => setAgentOpen(true)}
+              aria-label="Let an agent shop for you"
+              title="Let an agent shop for you"
+            >
+              <IconAgent size={18} />
+            </button>
+
             <button
               className="cart-button"
               onClick={() => setCartOpen(true)}
@@ -514,6 +527,8 @@ export function ShopPage() {
         closed={shop.catalogSize === 0 && messages.length === 0}
         onSend={send}
       />
+
+      {agentOpen && <AgentSheet onClose={() => setAgentOpen(false)} />}
 
       {chatsOpen && (
         <ChatSheet
