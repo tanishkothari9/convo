@@ -47,13 +47,13 @@ const STEPS = [
   },
   {
     icon: IconLink,
-    label: 'Share one link',
-    body: 'Your own address, in your own voice. The page that opens carries your name and your colour, not ours.',
+    label: 'Turn on listing',
+    body: 'Your products join the shelf, named as yours on every card. Off by default, and off again the moment you say so.',
   },
   {
     icon: IconAgent,
     label: 'It sells',
-    body: 'Search, cart, checkout, payment — inside the conversation, with the ledger writing itself behind it.',
+    body: 'Search, cart, checkout, payment — inside the conversation. A cart spanning brands settles as one order each, paid to you directly.',
   },
 ]
 
@@ -94,19 +94,20 @@ export function Landing() {
             <div className="hero-copy">
               <span className="pill">
                 <span className="pill-dot" />
-                Conversational commerce, multi-tenant
+                One shop. Every brand.
               </span>
 
               <h1 className="hero-headline">
-                Your catalogue, as a conversation
+                Your catalogue, on a shelf
                 <br />
-                your customers can <em>buy</em> from.
+                customers can <em>talk</em> to.
               </h1>
 
               <p className="hero-lede">
-                Convo turns a product list into an AI storefront that searches, carries a cart, and
-                takes payment — in your brand&rsquo;s voice, on one shareable link. Every chargeable
-                figure is computed on our side, and every money action lands in an audit trail.
+                List your products and they join one conversational storefront that searches across
+                every brand, carries a single cart, and settles it as a separate order paid straight
+                to each shop. Every chargeable figure is computed on our side, and every money
+                action lands in your own audit trail.
               </p>
 
               <div className="hero-actions">
@@ -114,15 +115,15 @@ export function Landing() {
                   Add your brand
                   <IconArrow size={16} />
                 </Link>
-                <Link className="btn btn-glass btn-lg" to="/chat/smart-choice">
-                  Open a live storefront
+                <Link className="btn btn-glass btn-lg" to="/shop">
+                  Open the marketplace
                 </Link>
               </div>
 
               <dl className="hero-facts">
                 <div>
-                  <dt>Set-up</dt>
-                  <dd>One link</dd>
+                  <dt>Payouts</dt>
+                  <dd>Direct to you</dd>
                 </div>
                 <div>
                   <dt>Providers</dt>
@@ -251,14 +252,15 @@ export function Landing() {
         <div className="cta-inner">
           <h2 className="cta-title">Put your catalogue in a conversation.</h2>
           <p className="cta-lede">
-            Add products, share the link, and watch the ledger fill in. No card needed to try it.
+            Add products, turn on listing, and watch your ledger fill in. Customers pay you
+            directly. No card needed to try it.
           </p>
           <div className="hero-actions">
             <Link className="btn btn-primary btn-lg" to="/signup">
               Add your brand
               <IconArrow size={16} />
             </Link>
-            <Link className="btn btn-glass btn-lg" to="/chat/smart-choice">
+            <Link className="btn btn-glass btn-lg" to="/shop">
               See it working
             </Link>
           </div>

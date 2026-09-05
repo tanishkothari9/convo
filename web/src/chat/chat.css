@@ -8,10 +8,18 @@
  * saying, and it lets product cards read as part of that speech rather than as
  * attachments to a chat message.
  *
- * The whole page runs on --brand, which comes from the tenant record.
+ * The page runs on --brand, which is Convo's own green rather than any one
+ * shop's colour. The shelf holds many brands; painting the chrome in one of
+ * their palettes would be quietly picking a favourite, and would lurch every
+ * time the conversation moved from one label to another.
  */
 
 .chat {
+  --brand: #1b6b54;
+  --brand-hover: #175a47;
+  --brand-tint: #eef5f2;
+  --brand-ring: rgba(27, 107, 84, 0.3);
+  --brand-contrast: #ffffff;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -21,9 +29,9 @@
 }
 
 /*
- * The brand's colour as light rather than as paint: two soft sources at the
- * top corners, well under 10% so text contrast is untouched. It is what stops
- * the page reading as a white sheet with a coloured button on it.
+ * Colour as light rather than as paint: two soft sources at the top corners,
+ * well under 10% so text contrast is untouched. It is what stops the page
+ * reading as a white sheet with a coloured button on it.
  */
 .chat-ambient {
   position: absolute;
@@ -78,20 +86,6 @@
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
-}
-
-.chat-brand-badge {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.5rem;
-  background: linear-gradient(140deg, var(--brand), color-mix(in srgb, var(--brand) 66%, #000));
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--brand) 28%, transparent);
-  color: var(--brand-contrast);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  flex: none;
 }
 
 .chat-brand-name {
@@ -1499,4 +1493,116 @@
 
 .address-option-lines {
   line-height: 1.45;
+}
+
+/* ── Who sells what ─────────────────────────────────────────────────────────
+ *
+ * A marketplace has to answer "whose is this?" on every surface where a price
+ * appears, and answer it without shouting: the brand is set small, in the
+ * secondary colour, above the name. Read first when you are scanning a row of
+ * six from three shops; invisible once you have found the one you want.
+ */
+
+.pcard-brand,
+.cart-line-brand {
+  color: var(--text-muted);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  margin-bottom: 0.1rem;
+}
+
+.marquee-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.marquee-brand {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart-split {
+  margin-top: calc(var(--space-2) * -1 + 0.2rem);
+  padding-bottom: var(--space-2);
+}
+
+/* ── A checkout that spans brands ───────────────────────────────────────────
+ *
+ * The split is a fact about money, so it is stated in text before the total
+ * and drawn as structure after it: each brand gets its own block with its own
+ * subtotal, separated by a rule rather than a card, so the whole thing still
+ * reads as one order rather than as several cards that happen to be adjacent.
+ */
+
+.order-split-note {
+  color: var(--text-secondary);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--brand-tint);
+}
+
+.order-brand + .order-brand {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.order-brand-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.order-brand-name {
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+.order-brand-total {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* A paid brand recedes rather than disappearing: the customer still wants to
+   see what they bought, but their attention belongs on what is still owed. */
+.order-brand[data-state='paid'] .order-lines,
+.order-brand[data-state='paid'] .order-brand-total {
+  opacity: 0.55;
+}
+
+.order-brand-flag {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: var(--space-2);
+}
+
+.order-brand-paid {
+  color: var(--success-strong);
+}
+
+.order-brand-failed {
+  color: var(--danger);
+}
+
+.order-progress {
+  text-align: center;
+  margin-bottom: var(--space-2);
+}
+
+.confirm-remaining {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
 }

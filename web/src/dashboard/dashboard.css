@@ -358,12 +358,16 @@
   max-width: 38rem;
 }
 
-/* ── The chat link ──────────────────────────────────────────────────────── */
+/* ── Marketplace listing ───────────────────────────────────────────────── */
 
 /*
- * The one lit surface on the page. It carries the tenant's own colour, which
- * is the thing they came here to get and also the clearest way to explain that
- * their storefront is theirs and not ours.
+ * The one lit surface on the page, because being on the shelf is what the
+ * brand came here for.
+ *
+ * It is lit only when the brand is actually listed. An unlisted brand gets the
+ * same panel unlit — which is a truer picture of a catalogue nobody can reach
+ * than a cheerful green card with the switch turned off, and it means the
+ * dashboard's brightest thing is always something real.
  */
 .link-panel {
   position: relative;
@@ -427,6 +431,138 @@
   font-size: 0.875rem;
   letter-spacing: -0.012em;
   overflow-wrap: anywhere;
+}
+
+/* Unlisted: the same shape, none of the light. */
+.link-panel[data-live='false'] {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+.link-panel[data-live='false'] .link-panel-glow {
+  display: none;
+}
+
+.link-panel[data-live='false'] .link-panel-icon {
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.link-panel[data-live='false'] .link-panel-label {
+  color: var(--text-secondary);
+}
+
+.link-panel[data-live='false'] .link-panel-url {
+  color: var(--text-muted);
+}
+
+.link-panel-foot,
+.link-panel-blockers {
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid color-mix(in srgb, var(--brand) 14%, var(--line));
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.link-panel[data-live='false'] .link-panel-foot,
+.link-panel[data-live='false'] .link-panel-blockers {
+  border-top-color: var(--line);
+}
+
+/* What is missing, as a list of things to go and do — not as an error. */
+.link-panel-blockers {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.link-panel-blockers li {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.link-panel-blockers li::before {
+  content: '';
+  flex: none;
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-top: 0.45rem;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+}
+
+.link-panel-unlist {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+
+.link-panel-unlist:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.link-panel-unlist:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* ── Switches ───────────────────────────────────────────────────────────────
+ *
+ * A checkbox with its explanation beside it rather than under a label, because
+ * both of these settings change what customers can do and neither is
+ * self-evident from three words.
+ */
+
+.switch-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) 0;
+  cursor: pointer;
+}
+
+.switch-row + .switch-row {
+  border-top: 1px solid var(--line);
+}
+
+.switch {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.1rem;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.switch:disabled {
+  cursor: not-allowed;
+}
+
+.switch-text {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.switch-label {
+  font-weight: var(--weight-medium);
+}
+
+.switch-row:has(.switch:disabled) .switch-label {
+  color: var(--text-muted);
+}
+
+.field-hint-blocked {
+  color: var(--danger);
 }
 
 .link-panel-actions {

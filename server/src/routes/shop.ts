@@ -425,8 +425,27 @@ function showcase(catalog: (Product & { brandName: string })[]) {
     buckets.set(key, [...(buckets.get(key) ?? []), product])
   }
 
+  // Deal the buckets out one brand at a time, so the opening row is a fair
+  // sample of the shelf rather than everything from whoever has the most
+  // categories followed by everything from whoever has fewer.
+  const lanes = new Map<string, (typeof eligible)[]>()
+  for (const [key, bucket] of buckets) {
+    const brand = key.split(' ')[0]!
+    lanes.set(brand, [...(lanes.get(brand) ?? []), bucket])
+  }
+  const lists: (typeof eligible)[] = []
+  for (let round = 0; ; round += 1) {
+    let added = false
+    for (const lane of lanes.values()) {
+      const bucket = lane[round]
+      if (!bucket) continue
+      lists.push(bucket)
+      added = true
+    }
+    if (!added) break
+  }
+
   const spread: typeof eligible = []
-  const lists = [...buckets.values()]
   for (let round = 0; spread.length < 12; round += 1) {
     let added = false
     for (const bucket of lists) {

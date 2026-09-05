@@ -365,8 +365,22 @@ function present(
 
   const checkout = results.find((r) => r.name === 'checkout')
   if (checkout) {
+    /*
+     * A split checkout has to be announced, not discovered.
+     *
+     * The gate's own tool result already says how many orders were staged and
+     * why. This provider has no model to read that with, so it looks for the
+     * count directly — a customer about to see two charges on their statement
+     * should hear it from the assistant first, on every provider.
+     */
+    const split = /across (\d+) orders/.exec(checkout.content)
+    const count = Number(split?.[1] ?? 1)
     return {
-      text: 'Your order is ready. Check the total, then pay when you are.',
+      text:
+        count > 1
+          ? `That is ${count} separate orders, one per brand, each paid to that brand directly. ` +
+            'Check the totals, then pay when you are ready.'
+          : 'Your order is ready. Check the total, then pay when you are.',
       toolCalls: has('present_suggestions')
         ? [call('present_suggestions', { suggestions: ['Keep shopping'] })]
         : [],

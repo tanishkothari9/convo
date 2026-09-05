@@ -62,11 +62,11 @@ export interface Tenant {
   name: string
   slug: string
   description: string | null
-  assistantName: string
-  brandVoice: string
   currency: string
-  accentColor: string
-  llmProvider: string | null
+  /** False for a brand selling something that does not need delivering. */
+  requiresShipping: boolean
+  /** Opt-in. Nothing reaches the marketplace until the brand turns this on. */
+  isListed: boolean
 }
 
 export interface TenantUser {
@@ -145,7 +145,8 @@ export interface Order {
 
 export interface Overview {
   tenant: Tenant
-  chatUrl: string
+  shopUrl: string
+  listing: { listed: boolean; blockers: string[] }
   stats: {
     products: number
     outOfStock: number

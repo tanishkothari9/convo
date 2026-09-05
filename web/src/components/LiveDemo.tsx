@@ -23,9 +23,24 @@ type Frame =
   | { kind: 'total' }
 
 const PRODUCTS = [
-  { name: 'Sharara Set — Wine', price: '₹7,999', hue: 'linear-gradient(150deg,#6d213a,#a8425f)' },
-  { name: 'Kundan Choker Set', price: '₹3,299', hue: 'linear-gradient(150deg,#8a6a1f,#d4ac47)' },
-  { name: 'Juttis — Teal', price: '₹2,199', hue: 'linear-gradient(150deg,#155e63,#2a9d8f)' },
+  {
+    name: 'Sharara Set — Wine',
+    brand: 'Smart Choice',
+    price: '₹7,999',
+    hue: 'linear-gradient(150deg,#6d213a,#a8425f)',
+  },
+  {
+    name: 'Kundan Choker Set',
+    brand: 'Kalaa Studio',
+    price: '₹3,299',
+    hue: 'linear-gradient(150deg,#8a6a1f,#d4ac47)',
+  },
+  {
+    name: 'Juttis — Teal',
+    brand: 'Smart Choice',
+    price: '₹2,199',
+    hue: 'linear-gradient(150deg,#155e63,#2a9d8f)',
+  },
 ]
 
 const SCRIPT: Array<{ frame: Frame; hold: number }> = [
@@ -91,8 +106,8 @@ export function LiveDemo() {
     <div className="demo glass-dark">
       <div className="demo-bar">
         <span className="demo-brand">
-          <span className="demo-badge">S</span>
-          Smart Choice
+          <span className="demo-badge">C</span>
+          Convo
         </span>
         <span className="demo-cart">
           <IconCart size={15} />
@@ -121,6 +136,7 @@ export function LiveDemo() {
             {PRODUCTS.map((product, i) => (
               <div key={product.name} className="demo-card" style={{ animationDelay: `${i * 70}ms` }}>
                 <span className="demo-card-art" style={{ background: product.hue }} />
+                <span className="demo-card-brand">{product.brand}</span>
                 <span className="demo-card-name">{product.name}</span>
                 <span className="demo-card-price">{product.price}</span>
               </div>
@@ -132,7 +148,7 @@ export function LiveDemo() {
           <div className="demo-total">
             <span>
               <IconSpark size={14} />
-              Total computed on the server
+              Two brands, two orders, computed on the server
             </span>
             <strong>₹13,497</strong>
           </div>
@@ -147,7 +163,7 @@ export function LiveDemo() {
               <span className="demo-caret" />
             </>
           ) : (
-            <span className="demo-placeholder">Message Smart Choice</span>
+            <span className="demo-placeholder">Ask for something</span>
           )}
         </span>
         <span className="demo-send">

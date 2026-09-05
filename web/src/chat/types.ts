@@ -1,12 +1,23 @@
 import type { ShippingAddress } from './cards/AddressForm'
 
-export interface BrandInfo {
+/** The shop's front, as the opening screen needs it. */
+export interface ShopInfo {
+  shop: { name: string; currency: string }
+  brands: string[]
+  brandCount: number
+  catalogSize: number
+  categories: string[]
+  openers: string[]
+  showcase: ShowcaseItem[]
+}
+
+export interface ShowcaseItem {
+  id: string
   name: string
-  slug: string
-  description: string | null
-  assistantName: string
-  accentColor: string
-  currency: string
+  brand_name: string
+  price_display: string
+  image_url: string | null
+  in_stock: boolean
 }
 
 export interface Component {
@@ -27,6 +38,8 @@ export interface ChatMessage {
 
 export interface CartLine {
   product_id: string
+  tenant_id: string
+  brand_name: string
   name: string
   image_url: string | null
   quantity: number
@@ -43,11 +56,15 @@ export interface CartPayload {
   item_count: number
   subtotal_minor: number
   subtotal_display: string
+  /** The distinct brands in the cart, so the sheet can group and warn. */
+  brands: string[]
   lines: CartLine[]
 }
 
 export interface ProductCard {
   product_id: string
+  tenant_id: string
+  brand_name: string
   name: string
   description: string | null
   image_url: string | null
@@ -59,23 +76,37 @@ export interface ProductCard {
   reason: string | null
 }
 
-export interface OrderSummaryPayload {
-  order_id: string
-  status: string
+/**
+ * One checkout, which is one order per brand in the cart.
+ *
+ * A single-brand cart is the ordinary case and still produces exactly one
+ * entry in `orders`; the card renders that without any of the split framing.
+ */
+export interface CheckoutPayload {
+  checkout_id: string
   currency: string
   total_display: string
   item_count: number
   note: string | null
-  /** False for a brand selling something that needs no delivering. */
+  /** False when nothing in the cart needs delivering. */
   requires_address: boolean
   /**
-   * Already attached to the order, carried from the last one this customer
-   * placed. Present means the order is payable as it stands; null means the
-   * form has to be filled first.
+   * Already attached to the orders, carried from the last one this customer
+   * placed. Present means they are payable as they stand; null means the form
+   * has to be filled first. One address covers every brand in the checkout.
    */
   shipping_address: ShippingAddress | null
   /** Everywhere this customer has had something sent, most recent first. */
   saved_addresses: ShippingAddress[]
+  orders: CheckoutOrder[]
+}
+
+export interface CheckoutOrder {
+  order_id: string
+  brand_name: string
+  status: string
+  requires_address: boolean
+  total_display: string
   lines: Array<{
     product_id: string
     name: string
@@ -94,8 +125,26 @@ export interface OrderSummaryPayload {
   }
 }
 
+/** What the server says about a checkout when the card re-syncs. */
+export interface CheckoutState {
+  checkout_id: string
+  orders: Array<{
+    order_id: string
+    brand_name: string | null
+    status: string
+    total_display: string
+    failure_reason: string | null
+  }>
+  paid: number
+  remaining: number
+}
+
 export interface OrderConfirmationPayload {
   order_id: string
+  /** Whose receipt this is. With a split checkout there is one per brand. */
+  brand_name: string | null
+  orders_in_checkout: number
+  orders_remaining: number
   total_display: string
   payment_reference: string | null
   /** Null only for a brand that sells something needing no delivery. */

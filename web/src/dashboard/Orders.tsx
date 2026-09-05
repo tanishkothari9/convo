@@ -101,7 +101,7 @@ export function Orders() {
           </span>
           <p className="empty-title">No orders yet</p>
           <p className="empty-body">
-            When a customer checks out on your chat link, the order appears here with its items and
+            When a customer checks out on the marketplace, the order appears here with its items and
             the address to send it to.
           </p>
         </div>

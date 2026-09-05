@@ -46,6 +46,9 @@ export function ProductCards({
             </div>
 
             <div className="pcard-body">
+              {/* Whose it is, above the name: in a row of six from three
+                  shops, the brand is what the eye needs first. */}
+              <p className="pcard-brand t-xs">{item.brand_name}</p>
               <p className="pcard-name">{item.name}</p>
               <p className="pcard-price t-num">{item.price_display}</p>
               {item.reason && <p className="pcard-reason t-sm">{item.reason}</p>}

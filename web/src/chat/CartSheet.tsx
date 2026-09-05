@@ -59,6 +59,7 @@ export function CartSheet({
                       {line.image_url ? <img src={line.image_url} alt="" loading="lazy" /> : null}
                     </div>
                     <div className="cart-line-main">
+                      <p className="cart-line-brand t-xs">{line.brand_name}</p>
                       <p className="cart-line-name">{line.name}</p>
                       <p className="t-sm t-muted t-num">
                         {line.quantity} × {line.unit_price_display}
@@ -103,6 +104,8 @@ export function CartSheet({
               </button>
               <p className="t-xs t-muted cart-fineprint">
                 The total is calculated from live catalogue prices when you check out.
+                {cart.brands.length > 1 &&
+                  ` You are buying from ${cart.brands.length} brands, so that is ${cart.brands.length} separate orders, each paid to that brand.`}
               </p>
             </footer>
           </>

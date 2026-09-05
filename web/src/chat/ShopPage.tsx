@@ -1,32 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
-import { contrastOn, hexToRgb, shade } from '../lib/format'
 import { IconCart, IconSpark } from '../components/icons'
+import { Mark } from '../components/Mark'
 import { Thinking } from './Thinking'
-import { ProductMarquee, type MarqueeProduct } from './ProductMarquee'
+import { ProductMarquee } from './ProductMarquee'
 import { Composer } from './Composer'
 import { CartSheet } from './CartSheet'
 import { ProductCards } from './cards/ProductCards'
 import { CartCard } from './cards/CartCard'
-import { OrderConfirmationCard, OrderSummaryCard, PaymentFailedCard } from './cards/OrderCards'
+import { CheckoutCard, OrderConfirmationCard, PaymentFailedCard } from './cards/OrderCards'
 import type {
-  BrandInfo,
   CartPayload,
   ChatMessage,
+  CheckoutPayload,
   Component,
   OrderConfirmationPayload,
-  OrderSummaryPayload,
   ProductCard,
+  ShopInfo,
 } from './types'
-
-interface BrandResponse {
-  brand: BrandInfo
-  catalogSize: number
-  categories: string[]
-  openers: string[]
-  showcase: MarqueeProduct[]
-}
 
 interface HistoryResponse {
   conversationId: string
@@ -34,10 +25,9 @@ interface HistoryResponse {
   cart: CartPayload
 }
 
-export function ChatPage() {
-  const { slug = '' } = useParams()
-  const [brand, setBrand] = useState<BrandResponse | null>(null)
-  const [notFound, setNotFound] = useState(false)
+export function ShopPage() {
+  const [shop, setShop] = useState<ShopInfo | null>(null)
+  const [unreachable, setUnreachable] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [cart, setCart] = useState<CartPayload | null>(null)
   const [thinking, setThinking] = useState(false)
@@ -52,16 +42,16 @@ export function ChatPage() {
   useEffect(() => {
     let live = true
     api
-      .get<BrandResponse>(`/chat/${slug}`)
+      .get<ShopInfo>('/shop')
       .then((data) => {
         if (!live) return
-        setBrand(data)
-        document.title = `${data.brand.name}`
+        setShop(data)
+        document.title = 'Convo'
       })
-      .catch(() => live && setNotFound(true))
+      .catch(() => live && setUnreachable(true))
 
     api
-      .get<HistoryResponse>(`/chat/${slug}/history`)
+      .get<HistoryResponse>('/shop/history')
       .then((data) => {
         if (!live) return
         setMessages(
@@ -80,7 +70,7 @@ export function ChatPage() {
     return () => {
       live = false
     }
-  }, [slug])
+  }, [])
 
   // ── stay pinned to the newest message unless the customer scrolled up ─────
   const scrollToEnd = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -118,7 +108,7 @@ export function ChatPage() {
       setStatus(null)
 
       try {
-        const response = await fetch(`/api/chat/${slug}/message`, {
+        const response = await fetch('/api/shop/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
@@ -226,15 +216,15 @@ export function ChatPage() {
         refreshCart()
       }
     },
-    [slug, thinking],
+    [thinking],
   )
 
   const refreshCart = useCallback(() => {
     api
-      .get<{ cart: CartPayload }>(`/chat/${slug}/cart`)
+      .get<{ cart: CartPayload }>('/shop/cart')
       .then((r) => setCart(r.cart))
       .catch(() => undefined)
-  }, [slug])
+  }, [])
 
   /**
    * A payment finished in the panel. The server authored the confirmation —
@@ -258,49 +248,35 @@ export function ChatPage() {
     [refreshCart],
   )
 
-  // ── theme ─────────────────────────────────────────────────────────────────
-  const theme = useMemo(() => {
-    const accent = brand?.brand.accentColor ?? '#1B6B54'
-    return {
-      ['--brand']: accent,
-      ['--brand-hover']: shade(accent, 0.18),
-      ['--brand-tint']: shade(accent, 0.92, 'white'),
-      ['--brand-ring']: `rgba(${hexToRgb(accent)}, 0.3)`,
-      ['--brand-contrast']: contrastOn(accent),
-    } as React.CSSProperties
-  }, [brand])
-
-  if (notFound) {
+  if (unreachable) {
     return (
       <main className="chat-missing">
         <div>
-          <h1 className="t-title">No brand at this link</h1>
+          <h1 className="t-title">The shop is not answering</h1>
           <p className="t-secondary" style={{ marginTop: 'var(--space-2)' }}>
-            The address may have changed, or the brand may have taken it down.
+            Reload in a moment. Nothing in your cart has been lost.
           </p>
         </div>
       </main>
     )
   }
 
-  if (!brand || !ready) return <div className="chat-boot" aria-busy="true" />
+  if (!shop || !ready) return <div className="chat-boot" aria-busy="true" />
 
   const empty = messages.length === 0
   const lastChips = latestChips(messages)
 
   return (
-    <div className="chat" style={theme}>
-      {/* A soft field of the brand's own colour behind the conversation, so
-          the page belongs to the shop before a single word is read. */}
+    <div className="chat">
+      {/* A soft field of colour behind the conversation, so the page reads as
+          somewhere rather than as a blank form. */}
       <div className="chat-ambient" aria-hidden="true" />
 
       <header className="chat-head">
         <div className="chat-head-inner">
           <div className="chat-brand">
-            <span className="chat-brand-badge" aria-hidden="true">
-              {brand.brand.name.slice(0, 1)}
-            </span>
-            <span className="chat-brand-name">{brand.brand.name}</span>
+            <Mark size={22} />
+            <span className="chat-brand-name">Convo</span>
           </div>
 
           <button
@@ -320,24 +296,22 @@ export function ChatPage() {
         <div className="chat-column">
           {empty ? (
             <section className="chat-open">
-              <h1 className="chat-open-name">{brand.brand.name}</h1>
-              {brand.brand.description && (
-                <p className="chat-open-lede">{brand.brand.description}</p>
-              )}
+              <h1 className="chat-open-name">Ask for what you want</h1>
+              <p className="chat-open-lede">{lede(shop)}</p>
               <p className="chat-open-agent">
                 <span className="chat-open-agent-mark">
                   <IconSpark size={13} />
                 </span>
-                {brand.brand.assistantName}
+                {brandLine(shop.brands)}
               </p>
               <p className="chat-open-hint t-sm t-muted">
-                {brand.catalogSize > 0
-                  ? `${brand.brand.assistantName} can search the catalogue, keep a cart, and take you through checkout.`
-                  : `${brand.brand.name} has not put anything up for sale yet. Come back once they have.`}
+                {shop.catalogSize > 0
+                  ? 'One cart across every brand here. Each one is paid directly, so you will see a charge per brand.'
+                  : 'Nothing is on sale here yet. Come back once a brand has listed.'}
               </p>
-              {brand.catalogSize > 0 && (
+              {shop.catalogSize > 0 && (
                 <div className="chat-openers">
-                  {brand.openers.map((opener, index) => (
+                  {shop.openers.map((opener, index) => (
                     <button
                       key={opener}
                       className="chip"
@@ -353,7 +327,7 @@ export function ChatPage() {
               {/* The shop's own goods, before a word is typed. Tapping one
                   starts the conversation about that product. */}
               <ProductMarquee
-                products={brand.showcase ?? []}
+                products={shop.showcase ?? []}
                 onPick={(product) => send(`Tell me about the ${product.name}`)}
               />
             </section>
@@ -366,7 +340,6 @@ export function ChatPage() {
                   ) : (
                     <Reply
                       message={message}
-                      slug={slug}
                       disabled={thinking}
                       onAsk={send}
                       onPaymentSettled={settlePayment}
@@ -382,10 +355,9 @@ export function ChatPage() {
       </div>
 
       <Composer
-        brandName={brand.brand.name}
         chips={thinking ? [] : lastChips}
         busy={thinking}
-        closed={brand.catalogSize === 0 && messages.length === 0}
+        closed={shop.catalogSize === 0 && messages.length === 0}
         onSend={send}
       />
 
@@ -407,13 +379,11 @@ export function ChatPage() {
 /** One assistant turn: its text, then whatever components it produced. */
 function Reply({
   message,
-  slug,
   disabled,
   onAsk,
   onPaymentSettled,
 }: {
   message: ChatMessage
-  slug: string
   disabled: boolean
   onAsk(text: string): void
   onPaymentSettled(result: { paid: boolean; reason?: string; components?: Component[] }): void
@@ -434,7 +404,7 @@ function Reply({
         .filter((c) => c.component !== 'suggestions')
         .map((component, index) => (
           <div className="component" key={`${message.id}-${index}`}>
-            {renderComponent(component, slug, disabled, onAsk, onPaymentSettled)}
+            {renderComponent(component, disabled, onAsk, onPaymentSettled)}
           </div>
         ))}
     </>
@@ -443,7 +413,6 @@ function Reply({
 
 function renderComponent(
   component: Component,
-  slug: string,
   disabled: boolean,
   onAsk: (text: string) => void,
   onPaymentSettled: (result: {
@@ -471,11 +440,10 @@ function renderComponent(
           disabled={disabled}
         />
       )
-    case 'order_summary':
+    case 'checkout':
       return (
-        <OrderSummaryCard
-          payload={component.payload as unknown as OrderSummaryPayload}
-          slug={slug}
+        <CheckoutCard
+          payload={component.payload as unknown as CheckoutPayload}
           disabled={disabled}
           onSettled={onPaymentSettled}
         />
@@ -491,6 +459,26 @@ function renderComponent(
     default:
       return null
   }
+}
+
+/**
+ * The opening line, which has to say what this place is in one breath.
+ *
+ * It leads with the size of the shelf rather than the number of brands: a
+ * shopper cares that there is enough here to be worth asking, not about the
+ * platform's merchant count.
+ */
+function lede(shop: ShopInfo): string {
+  if (shop.catalogSize === 0) return 'No brands have listed here yet.'
+  const brands = shop.brandCount === 1 ? 'one brand' : `${shop.brandCount} brands`
+  return `${shop.catalogSize} pieces from ${brands}, searched by asking rather than by filtering.`
+}
+
+/** Who is on the shelf, named — up to the point where a list stops helping. */
+function brandLine(brands: string[]): string {
+  if (brands.length === 0) return 'Convo'
+  if (brands.length <= 3) return brands.join(' · ')
+  return `${brands.slice(0, 3).join(' · ')} and ${brands.length - 3} more`
 }
 
 /** The chips from the most recent turn, which are the ones still on offer. */

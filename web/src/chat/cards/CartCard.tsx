@@ -13,6 +13,7 @@ export function CartCard({ cart, onAsk, disabled }: { cart: CartPayload; onAsk(t
               {line.image_url ? <img src={line.image_url} alt="" loading="lazy" /> : null}
             </div>
             <div className="cart-line-main">
+              <p className="cart-line-brand t-xs">{line.brand_name}</p>
               <p className="cart-line-name">{line.name}</p>
               <p className="t-sm t-muted t-num">
                 {line.quantity} × {line.unit_price_display}
@@ -32,6 +33,12 @@ export function CartCard({ cart, onAsk, disabled }: { cart: CartPayload; onAsk(t
         <span className="t-sm t-secondary">Subtotal</span>
         <span className="t-num cart-total-value">{cart.subtotal_display}</span>
       </div>
+
+      {cart.brands.length > 1 && (
+        <p className="cart-split t-xs t-muted">
+          {cart.brands.length} brands, so checkout will be {cart.brands.length} separate orders.
+        </p>
+      )}
 
       <button
         className="btn btn-primary btn-block"

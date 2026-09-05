@@ -10,13 +10,11 @@ import { useEffect, useRef, useState } from 'react'
 import { IconSend } from '../components/icons'
 
 export function Composer({
-  brandName,
   chips,
   busy,
   closed,
   onSend,
 }: {
-  brandName: string
   chips: string[]
   busy: boolean
   /** The brand has no catalogue, so there is nothing to answer with. */
@@ -73,8 +71,8 @@ export function Composer({
           rows={1}
           value={value}
           disabled={closed}
-          placeholder={closed ? 'This shop is not open for messages yet' : `Message ${brandName}`}
-          aria-label={closed ? 'Messaging is closed' : `Message ${brandName}`}
+          placeholder={closed ? 'Nothing is listed here yet' : 'Ask for something'}
+          aria-label={closed ? 'Messaging is closed' : 'Ask for something'}
           maxLength={2000}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => {

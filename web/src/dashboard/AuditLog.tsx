@@ -79,7 +79,7 @@ export function AuditLog() {
         <div className="empty">
           <p className="empty-title">Nothing logged yet</p>
           <p className="empty-body">
-            The first cart lock, order, or payment attempt on your chat link will appear here with
+            The first cart lock, order, or payment attempt on the marketplace will appear here with
             its amount, its outcome, and the reason the agent gave.
           </p>
         </div>

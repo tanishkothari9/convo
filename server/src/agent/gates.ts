@@ -914,6 +914,9 @@ export async function gatedConfirmPayment(args: {
 function orderConfirmationComponent(
   orderId: string,
   order: {
+    tenantId: string
+    checkoutId: string
+    conversationId: string
     totalAmountMinor: number
     currency: string
     lineItems: OrderLineItem[]
@@ -921,11 +924,24 @@ function orderConfirmationComponent(
     shippingAddress: ShippingAddress | null
   },
 ) {
+  // A receipt that does not name the seller is not a receipt. With a split
+  // checkout the customer gets one of these per brand, and the name is the
+  // only thing telling them apart.
+  const brandName = tenants.byId(order.tenantId)?.name ?? null
+
+  // What is still owed elsewhere in the same checkout, so the card can say
+  // "one more to pay" rather than implying the whole cart is settled.
+  const siblings = orders.byCheckout(order.conversationId, order.checkoutId)
+  const unpaid = siblings.filter((sibling) => sibling.status !== 'paid')
+
   return {
     component: 'order_confirmation',
     payload: {
       order_id: orderId,
       status: 'paid',
+      brand_name: brandName,
+      orders_in_checkout: siblings.length,
+      orders_remaining: unpaid.length,
       total_minor: order.totalAmountMinor,
       total_display: formatMoney(order.totalAmountMinor, order.currency),
       currency: order.currency,

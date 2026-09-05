@@ -35,13 +35,11 @@ const STATES = [
  * arrive next to the input rather than after a round trip.
  */
 export function AddressForm({
-  slug,
   orderId,
   initial,
   onSaved,
   onCancel,
 }: {
-  slug: string
   orderId: string
   initial: ShippingAddress | null
   onSaved(address: ShippingAddress): void
@@ -71,7 +69,7 @@ export function AddressForm({
     setError(null)
     try {
       const result = await api.post<{ address: ShippingAddress }>(
-        `/chat/${slug}/orders/${orderId}/address`,
+        `/shop/orders/${orderId}/address`,
         form,
       )
       onSaved(result.address)
@@ -261,7 +259,6 @@ export function addressKey(address: ShippingAddress): string {
  * trusted for being on the list already.
  */
 export function AddressPicker({
-  slug,
   orderId,
   addresses,
   selected,
@@ -269,7 +266,6 @@ export function AddressPicker({
   onSelected,
   onAddNew,
 }: {
-  slug: string
   orderId: string
   addresses: ShippingAddress[]
   selected: ShippingAddress | null
@@ -288,7 +284,7 @@ export function AddressPicker({
     setError(null)
     try {
       const result = await api.post<{ address: ShippingAddress }>(
-        `/chat/${slug}/orders/${orderId}/address`,
+        `/shop/orders/${orderId}/address`,
         address,
       )
       onSelected(result.address)
@@ -357,10 +353,13 @@ export function AddressSummary({
   address,
   onEdit,
   editable,
+  note,
 }: {
   address: ShippingAddress
   onEdit(): void
   editable: boolean
+  /** Said once when a checkout spans brands: one address covers all of them. */
+  note?: string
 }) {
   return (
     <div className="address-saved">
@@ -375,6 +374,7 @@ export function AddressSummary({
           {[address.line1, address.line2, address.city, address.state].filter(Boolean).join(', ')}{' '}
           <span className="t-num">{address.postalCode}</span>
         </p>
+        {note && <p className="t-xs t-muted">{note}</p>}
       </div>
       {editable && (
         <button className="address-saved-edit t-sm" onClick={onEdit} type="button">

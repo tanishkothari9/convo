@@ -68,7 +68,8 @@ export function SignUp() {
             />
             {/* The link is the product; show it forming as they type. */}
             <p className="field-hint">
-              Your chat link will be <span className="slug-preview">/chat/{slugPreview(brandName)}</span>
+              Your brand will be identified as{' '}
+              <span className="slug-preview">{slugPreview(brandName)}</span>
             </p>
           </div>
 

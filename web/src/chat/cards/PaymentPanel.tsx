@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
-import type { OrderSummaryPayload } from '../types'
+import type { CheckoutOrder } from '../types'
 
 declare global {
   interface Window {
@@ -9,8 +9,7 @@ declare global {
 }
 
 interface Props {
-  payload: OrderSummaryPayload
-  slug: string
+  payload: CheckoutOrder
   onCancel(): void
   onResult(result: Record<string, unknown>): void
 }
@@ -26,7 +25,7 @@ interface Props {
  * fields, signed with the same HMAC construction — so the verification the
  * server runs afterwards is the production path either way.
  */
-export function PaymentPanel({ payload, slug, onCancel, onResult }: Props) {
+export function PaymentPanel({ payload, onCancel, onResult }: Props) {
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
   const live = !payload.payment.is_mock && Boolean(payload.payment.public_key)
@@ -55,7 +54,9 @@ export function PaymentPanel({ payload, slug, onCancel, onResult }: Props) {
         order_id: payload.payment.provider_order_id,
         amount: payload.payment.amount_minor,
         currency: payload.payment.currency,
-        name: payload.payment.provider_label,
+        // The brand's name, not Convo's: the customer is paying the shop
+        // that made the thing, and the panel should say so.
+        name: payload.brand_name,
         description: `Order ${payload.order_id}`,
         handler: (response: Record<string, unknown>) => onResult(response),
         modal: { ondismiss: onCancel },
@@ -74,7 +75,7 @@ export function PaymentPanel({ payload, slug, onCancel, onResult }: Props) {
     setFailed(null)
     try {
       const result = await api.post<{ ok: boolean; payload: Record<string, unknown> }>(
-        `/chat/${slug}/orders/${payload.order_id}/test-pay`,
+        `/shop/orders/${payload.order_id}/test-pay`,
         { outcome },
       )
       if (!result.ok) {
@@ -107,7 +108,9 @@ export function PaymentPanel({ payload, slug, onCancel, onResult }: Props) {
       <button className="pay-scrim" onClick={busy ? undefined : onCancel} aria-label="Cancel payment" tabIndex={-1} />
       <div className="pay-panel">
         <header className="pay-head">
-          <p className="t-sm t-muted">{payload.payment.provider_label} · test mode</p>
+          <p className="t-sm t-muted">
+            {payload.brand_name} · {payload.payment.provider_label} · test mode
+          </p>
           <p className="pay-amount t-num">{payload.total_display}</p>
           <p className="t-sm t-secondary">
             Order <span className="t-id">{payload.order_id}</span>

@@ -116,12 +116,26 @@ export class ConvoStorefront implements StorefrontBackend {
       return spread(inStockFirst, limit)
     }
 
-    // A search that matched several brands should not bury one of them under
-    // a run from another. Interleaving by brand keeps the top row honest
-    // about who carries what, without touching the ranking within a brand.
-    const ranked = scored.map(({ product }) => product)
-    if (filters.sort) return ranked.slice(0, limit)
-    return spread(ranked, limit)
+    /*
+     * A keyword search is ranked on relevance and nothing else.
+     *
+     * It is tempting to interleave brands here too, for fairness. It is the
+     * wrong instinct: it promotes a weak match from one shop over a strong
+     * match from another, and a shopper who asked for jhumkas would rather see
+     * six good jhumkas from one brand than three good ones padded with sarees.
+     * Fairness between brands belongs to the open browse, where there is no
+     * question being answered to get in the way of it.
+     *
+     * What the marketplace does need is a floor. With one brand's catalogue a
+     * weak match was at worst a near miss; across many it is noise from a shop
+     * the customer never asked about. Anything scoring well below the best
+     * match is dropped rather than used to fill the row.
+     */
+    const best = scored[0]?.score ?? 0
+    return scored
+      .filter(({ score }) => terms.length === 0 || score * 2.5 >= best)
+      .slice(0, limit)
+      .map(({ product }) => product)
   }
 
   async getProductDetails(session: StorefrontSession, productId: string): Promise<ListedProduct | null> {
@@ -266,7 +280,7 @@ function spread(products: ListedProduct[], limit: number): ListedProduct[] {
     if (bucket) bucket.push(product)
     else byCategory.set(key, [product])
   }
-  const buckets = [...byCategory.values()]
+  const buckets = alternateBrands([...byCategory.entries()])
   const out: ListedProduct[] = []
   for (let round = 0; out.length < limit; round += 1) {
     let added = false
@@ -280,6 +294,37 @@ function spread(products: ListedProduct[], limit: number): ListedProduct[] {
     if (!added) break
   }
   return out
+}
+
+/**
+ * Orders buckets so consecutive ones come from different brands.
+ *
+ * Without this, a brand carrying five categories fills the whole first row
+ * before a brand carrying two gets a look in — the round-robin was over
+ * buckets, and buckets clump by brand. Dealing them out one brand at a time
+ * makes the first row a fair sample of the shelf, which is the only reason
+ * the marketplace is worth opening.
+ */
+function alternateBrands(entries: [string, ListedProduct[]][]): ListedProduct[][] {
+  const byBrand = new Map<string, ListedProduct[][]>()
+  for (const [key, bucket] of entries) {
+    const brand = key.split('\u0000')[0]!
+    const existing = byBrand.get(brand)
+    if (existing) existing.push(bucket)
+    else byBrand.set(brand, [bucket])
+  }
+  const lanes = [...byBrand.values()]
+  const out: ListedProduct[][] = []
+  for (let round = 0; ; round += 1) {
+    let added = false
+    for (const lane of lanes) {
+      const bucket = lane[round]
+      if (!bucket) continue
+      out.push(bucket)
+      added = true
+    }
+    if (!added) return out
+  }
 }
 
 // ── relevance ───────────────────────────────────────────────────────────────

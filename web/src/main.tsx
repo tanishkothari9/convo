@@ -17,7 +17,7 @@ import { Providers } from './dashboard/Providers'
 import { AuditLog } from './dashboard/AuditLog'
 import { Orders } from './dashboard/Orders'
 import { Settings } from './dashboard/Settings'
-import { ChatPage } from './chat/ChatPage'
+import { ShopPage } from './chat/ShopPage'
 import { Landing } from './Landing'
 import { ApiDocs } from './docs/ApiDocs'
 import { Developers } from './dashboard/Developers'
@@ -30,7 +30,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route path="/chat/:slug" element={<ChatPage />} />
+          <Route path="/shop" element={<ShopPage />} />
           <Route path="/docs" element={<ApiDocs />} />
           <Route
             path="/dashboard"

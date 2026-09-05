@@ -22,6 +22,7 @@ export function Overview() {
   const [data, setData] = useState<OverviewData | null>(null)
   const [recent, setRecent] = useState<AuditEntry[]>([])
   const [copied, setCopied] = useState(false)
+  const [listing, setListing] = useState(false)
   const { toasts, show } = useToast()
 
   useEffect(() => {
@@ -34,15 +35,45 @@ export function Overview() {
 
   if (!data) return <div className="boot" aria-busy="true" />
 
-  const { tenant, chatUrl, stats, provider, model } = data
+  const { tenant, shopUrl, stats, provider, model } = data
+  const listed = data.listing.listed
+  const blockers = data.listing.blockers
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(chatUrl)
+      await navigator.clipboard.writeText(shopUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
       show('Could not copy the link. Select it and copy manually.', 'danger')
+    }
+  }
+
+  async function toggleListing() {
+    setListing(true)
+    try {
+      const response = await api.patch<{ tenant: typeof tenant }>('/dashboard/tenant', {
+        isListed: !listed,
+      })
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              tenant: response.tenant,
+              listing: { ...current.listing, listed: response.tenant.isListed },
+            }
+          : current,
+      )
+      show(
+        response.tenant.isListed
+          ? 'Your catalogue is on the marketplace.'
+          : 'Taken off the marketplace. Nothing else has changed.',
+        response.tenant.isListed ? 'ok' : undefined,
+      )
+    } catch (error) {
+      show(error instanceof Error ? error.message : 'That did not go through.', 'danger')
+    } finally {
+      setListing(false)
     }
   }
 
@@ -51,40 +82,84 @@ export function Overview() {
       <PageHead
         title={tenant.name}
         eyebrow={
-          <>
-            <span className="live-dot" />
-            Live storefront
-          </>
+          listed ? (
+            <>
+              <span className="live-dot" />
+              On the marketplace
+            </>
+          ) : (
+            'Not listed'
+          )
         }
-        lede="Everything a customer sees comes from what is set up here."
+        lede="Everything a shopper sees of your brand comes from what is set up here."
       />
 
       {/*
-        The link is the product, so it gets the one lit surface on the page —
-        the tenant's own colour, which is also how the theming explains itself
-        without a paragraph about it.
+        Being on the shelf is the thing this dashboard is for, so it gets the
+        one lit surface on the page. Dark when the brand is not listed: an
+        unlit panel is a truer picture of a catalogue nobody can reach than a
+        cheerful one with the switch turned off.
       */}
-      <section className="link-panel" style={{ ['--brand' as string]: tenant.accentColor }}>
+      <section className="link-panel" data-live={listed ? 'true' : 'false'}>
         <div className="link-panel-glow" aria-hidden="true" />
         <div className="link-panel-body">
           <span className="link-panel-icon">
             <IconLink size={18} />
           </span>
           <div className="link-panel-text">
-            <p className="link-panel-label">Your chat link</p>
-            <p className="link-panel-url">{chatUrl}</p>
+            <p className="link-panel-label">
+              {listed ? 'Listed on the Convo marketplace' : 'Not listed yet'}
+            </p>
+            <p className="link-panel-url">{shopUrl}</p>
           </div>
           <div className="link-panel-actions">
-            <button className="btn btn-secondary btn-sm" onClick={copyLink}>
-              {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-            <a className="btn btn-primary btn-sm" href={`/chat/${tenant.slug}`} target="_blank" rel="noreferrer">
-              Open
-              <IconExternal size={15} />
-            </a>
+            {listed && (
+              <button className="btn btn-secondary btn-sm" onClick={copyLink}>
+                {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            )}
+            {listed ? (
+              <a className="btn btn-primary btn-sm" href={shopUrl} target="_blank" rel="noreferrer">
+                Open
+                <IconExternal size={15} />
+              </a>
+            ) : (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={toggleListing}
+                disabled={listing || blockers.length > 0}
+                title={blockers[0]}
+              >
+                {listing ? 'Listing…' : 'List my catalogue'}
+              </button>
+            )}
           </div>
         </div>
+
+        {!listed && blockers.length > 0 && (
+          <ul className="link-panel-blockers">
+            {blockers.map((blocker) => (
+              <li key={blocker}>{blocker}</li>
+            ))}
+          </ul>
+        )}
+
+        {!listed && blockers.length === 0 && (
+          <p className="link-panel-foot">
+            Your products appear alongside other brands. Customers pay you directly, on your own
+            payment account — Convo never holds the money.
+          </p>
+        )}
+
+        {listed && (
+          <p className="link-panel-foot">
+            Customers pay you directly, on your own payment account.{' '}
+            <button className="link-panel-unlist" onClick={toggleListing} disabled={listing}>
+              {listing ? 'Removing…' : 'Take my catalogue off the marketplace'}
+            </button>
+          </p>
+        )}
       </section>
 
       <section className="stat-grid">
@@ -100,7 +175,12 @@ export function Overview() {
                 : 'all in stock'
           }
         />
-        <Stat label="Conversations" value={stats.conversations} icon={<IconSpark size={16} />} />
+        <Stat
+          label="Shoppers reached"
+          value={stats.conversations}
+          icon={<IconSpark size={16} />}
+          note={listed ? undefined : 'not listed'}
+        />
         <Stat label="Paid orders" value={stats.orders} icon={<IconCheck size={16} />} />
         <Stat
           label="Taken"
@@ -146,16 +226,17 @@ export function Overview() {
             to="/dashboard/provider"
             action={provider?.providerType === 'razorpay' ? 'Manage' : 'Connect'}
           />
+          {/* The model is Convo's choice now, not the brand's, so this row
+              states a fact rather than pointing at a setting that no longer
+              exists on the settings page. */}
           <SetupRow
             done
-            title={`Agent running on ${modelLabel(model.active)}`}
+            title={`Convo's agent runs on ${modelLabel(model.active)}`}
             body={
               model.active === 'scripted'
-                ? 'Convo answers without calling out to anyone. Add an API key and switch to Claude or GPT in Settings — the skills, the gates, and the audit trail are the same either way.'
-                : `Model calls go to ${modelLabel(model.active)}. The skills, the gates, and the audit trail are the same on every provider.`
+                ? 'One assistant serves every brand here, so the model is Convo\u2019s choice rather than yours. It answers without calling out to anyone; the skills, the gates, and your audit trail are the same whichever model is behind it.'
+                : `One assistant serves every brand here, so the model is Convo\u2019s choice rather than yours. Calls go to ${modelLabel(model.active)}; the skills, the gates, and your audit trail are the same whichever model is behind it.`
             }
-            to="/dashboard/settings"
-            action="Change"
           />
         </ul>
       </section>
@@ -176,11 +257,11 @@ export function Overview() {
             </span>
             <p className="empty-title">Nothing has happened yet</p>
             <p className="empty-body">
-              Open your chat link and buy something. Every cart lock, order, and payment lands here
+              Open the marketplace and buy something. Every cart lock, order, and payment lands here
               with its amount and outcome.
             </p>
-            <a className="btn btn-secondary" href={`/chat/${tenant.slug}`} target="_blank" rel="noreferrer">
-              Open the storefront
+            <a className="btn btn-secondary" href={shopUrl} target="_blank" rel="noreferrer">
+              Open the marketplace
               <IconExternal size={15} />
             </a>
           </div>
@@ -251,8 +332,9 @@ function SetupRow({
   done: boolean
   title: string
   body: string
-  to: string
-  action: string
+  /** Omitted for a row that only reports; not everything here is a task. */
+  to?: string
+  action?: string
 }) {
   return (
     <li className="setup-row" data-done={done}>
@@ -263,9 +345,11 @@ function SetupRow({
         <p className="setup-title">{title}</p>
         <p className="t-sm t-secondary">{body}</p>
       </div>
-      <Link className="btn btn-secondary btn-sm" to={to}>
-        {action}
-      </Link>
+      {to && action && (
+        <Link className="btn btn-secondary btn-sm" to={to}>
+          {action}
+        </Link>
+      )}
     </li>
   )
 }

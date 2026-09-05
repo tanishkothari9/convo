@@ -390,6 +390,14 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
+/* Whose it is, above the name — the same order the real cards use. */
+.demo-card-brand {
+  font-size: 0.5625rem;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
 .demo-card-name {
   font-size: 0.6875rem;
   line-height: 1.3;

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 export interface MarqueeProduct {
   id: string
   name: string
+  brand_name: string
   price_display: string
   image_url: string | null
   in_stock: boolean
@@ -110,14 +111,17 @@ function MarqueeCard({
       onClick={() => onPick(product)}
       aria-hidden={duplicate ? true : undefined}
       tabIndex={duplicate ? -1 : undefined}
-      title={`${product.name} · ${product.price_display}`}
+      title={`${product.name} · ${product.brand_name} · ${product.price_display}`}
     >
       <span className="marquee-art">
         {product.image_url ? <img src={product.image_url} alt="" loading="lazy" /> : null}
       </span>
       <span className="marquee-meta">
         <span className="marquee-name">{product.name}</span>
-        <span className="marquee-price t-num">{product.price_display}</span>
+        <span className="marquee-meta">
+          <span className="marquee-brand">{product.brand_name}</span>
+          <span className="marquee-price t-num">{product.price_display}</span>
+        </span>
       </span>
     </button>
   )
