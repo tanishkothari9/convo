@@ -10,7 +10,7 @@
  * with a brand: a shopper does not know which brand an order belongs to, and a
  * cart spanning two brands produces two orders they are equally entitled to.
  */
-import { Router, type Request, type Response } from 'express'
+import { Router, type Request, type Response } from "express";
 import {
   audit,
   carts,
@@ -19,82 +19,187 @@ import {
   orders,
   products,
   tenants,
-} from '../db/repo.js'
-import { badRequest, notFound, requireString, route } from '../lib/http.js'
-import { limiters } from '../lib/ratelimit.js'
-import { RateLimitError } from '../lib/security.js'
-import { token } from '../lib/ids.js'
-import { formatMoney } from '../lib/money.js'
-import { env } from '../env.js'
-import { log } from '../lib/logger.js'
-import { runTurn, type TurnEvent } from '../agent/loop.js'
-import { ensureSession, priceCart } from '../agent/storefront.js'
-import { cartPayload, gatedConfirmPayment } from '../agent/gates.js'
-import { mockRazorpay } from '../commerce/razorpay/mock.js'
-import { signManualPayment } from '../commerce/manual.js'
-import { resolveProvider } from '../commerce/registry.js'
-import { AddressError, readAddress } from '../domain/address.js'
-import type { Order, Product } from '../domain/types.js'
+} from "../db/repo.js";
+import { badRequest, notFound, requireString, route } from "../lib/http.js";
+import { limiters } from "../lib/ratelimit.js";
+import { RateLimitError } from "../lib/security.js";
+import { token } from "../lib/ids.js";
+import { formatMoney } from "../lib/money.js";
+import { env } from "../env.js";
+import { log } from "../lib/logger.js";
+import { runTurn, type TurnEvent } from "../agent/loop.js";
+import { ensureSession, priceCart } from "../agent/storefront.js";
+import { cartPayload, gatedConfirmPayment } from "../agent/gates.js";
+import { mockRazorpay } from "../commerce/razorpay/mock.js";
+import { signManualPayment } from "../commerce/manual.js";
+import { resolveProvider } from "../commerce/registry.js";
+import { AddressError, readAddress } from "../domain/address.js";
+import type { Order, Product } from "../domain/types.js";
 
-export const shopRoutes = Router()
+export const shopRoutes = Router();
 
-const CUSTOMER_COOKIE = 'convo_customer'
+const CUSTOMER_COOKIE = "convo_customer";
 
 /** The shop's settlement currency. One marketplace, one currency, for now. */
-const CURRENCY = 'INR'
+const CURRENCY = "INR";
 
 /** The customer's session id, minted on first contact. */
 function customerSession(req: Request, res: Response): string {
-  const existing = req.cookies?.[CUSTOMER_COOKIE]
-  if (typeof existing === 'string' && existing.length >= 20) return existing
-  const fresh = token()
+  const existing = req.cookies?.[CUSTOMER_COOKIE];
+  if (typeof existing === "string" && existing.length >= 20) return existing;
+  const fresh = token();
   res.cookie(CUSTOMER_COOKIE, fresh, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: "lax",
     secure: env.isProduction,
     maxAge: 30 * 86_400_000,
-    path: '/',
-  })
-  return fresh
+    path: "/",
+  });
+  return fresh;
 }
 
-/** An order in this customer's own conversation, or a 404. */
-function ownOrder(conversationId: string, orderId: string): Order {
-  const order = orders.forCustomer(conversationId, orderId)
-  if (!order) throw notFound('No such order.')
-  return order
+/**
+ * The session for a request, in the chat it names.
+ *
+ * The conversation id is the only thing a client sends that points at stored
+ * data, so it is proven against the cookie here rather than trusted. Unknown or
+ * someone else's is a 404, not a silent fallback to a different chat — writing
+ * a shopper's message into a thread they did not name would be worse than an
+ * error. An archived chat still resolves: a second tab open on one the shopper
+ * just tidied away should keep working rather than break.
+ */
+function shopperSession(req: Request, res: Response, conversationId?: unknown) {
+  const customerSessionId = customerSession(req, res);
+  if (typeof conversationId !== "string" || conversationId === "") {
+    return ensureSession(customerSessionId, CURRENCY);
+  }
+  const conversation = conversations.owned(customerSessionId, conversationId);
+  if (!conversation) throw notFound("No such chat.");
+  conversations.touch(conversation.id);
+  return ensureSession(customerSessionId, CURRENCY, conversation.id);
+}
+
+/** What the chat list shows for one thread. */
+function chatSummary(conversation: {
+  id: string;
+  title: string | null;
+  startedAt: string;
+  lastActiveAt: string;
+}) {
+  return {
+    id: conversation.id,
+    title: conversation.title,
+    started_at: conversation.startedAt,
+    last_active_at: conversation.lastActiveAt,
+  };
+}
+
+/**
+ * The provider's reason for a decline, if the page sent one.
+ *
+ * Bounded on the way in: this is text from the customer's browser that will be
+ * written into a brand's ledger, so it is length-capped and stripped of control
+ * characters, and it never becomes anything but a string in a detail field.
+ */
+function declineReason(body: unknown): string | null {
+  const value = (body as Record<string, unknown> | null)?.declineReason;
+  if (typeof value !== "string") return null;
+  const clean = value.replace(/[\u0000-\u001f\u007f]/g, " ").trim();
+  if (clean === "") return null;
+  return clean.length > 200 ? `${clean.slice(0, 199)}…` : clean;
+}
+
+/** An order belonging to this shopper — from any of their chats — or a 404. */
+function ownOrder(customerSessionId: string, orderId: string): Order {
+  const order = orders.forCustomer(customerSessionId, orderId);
+  if (!order) throw notFound("No such order.");
+  return order;
 }
 
 /** The shop's front: what is on the shelf and who is selling it. */
 shopRoutes.get(
-  '/shop',
+  "/shop",
   route(async (_req, res) => {
-    const catalog = products.listedAcrossBrands()
-    const brands = [...new Set(catalog.map((p) => p.brandName))]
+    const catalog = products.listedAcrossBrands();
+    const brands = [...new Set(catalog.map((p) => p.brandName))];
     res.json({
-      shop: { name: 'Convo', currency: CURRENCY },
+      shop: { name: "Convo", currency: CURRENCY },
       brands,
       brandCount: brands.length,
       catalogSize: catalog.length,
-      categories: [...new Set(catalog.map((p) => p.category).filter(Boolean))].slice(0, 8),
+      categories: [
+        ...new Set(catalog.map((p) => p.category).filter(Boolean)),
+      ].slice(0, 8),
       openers: openers(catalog.length, brands.length),
       showcase: showcase(catalog),
-    })
+    });
   }),
-)
+);
+
+/** Every chat this shopper has open, most recently used first. */
+shopRoutes.get(
+  "/shop/conversations",
+  route(async (req, res) => {
+    const customerSessionId = customerSession(req, res);
+    res.json({
+      conversations: conversations.list(customerSessionId).map(chatSummary),
+    });
+  }),
+);
+
+/**
+ * A new chat.
+ *
+ * Only the transcript is new. The cart and the orders belong to the shopper and
+ * carry straight over — starting a fresh chat is not a way to lose your basket.
+ * What does not carry over is provenance: the new thread has been shown nothing,
+ * so the agent has to find a product again before it can put it in the cart.
+ */
+shopRoutes.post(
+  "/shop/conversations",
+  route(async (req, res) => {
+    const customerSessionId = customerSession(req, res);
+    const conversation = conversations.create(customerSessionId);
+    res.status(201).json(chatSummary(conversation));
+  }),
+);
+
+/**
+ * Hide a chat.
+ *
+ * Archived, never deleted. Orders record the conversation they were placed in,
+ * and the audit trail reads through it — a paid order must not become
+ * unexplainable because somebody tidied their sidebar.
+ */
+shopRoutes.delete(
+  "/shop/conversations/:conversationId",
+  route(async (req, res) => {
+    const customerSessionId = customerSession(req, res);
+    if (!conversations.archive(customerSessionId, req.params.conversationId!)) {
+      throw notFound("No such chat.");
+    }
+    // Never leave the shopper with nothing to type into.
+    const remaining = conversations.list(customerSessionId);
+    const next = remaining[0] ?? conversations.create(customerSessionId);
+    res.json({
+      conversations: (remaining.length ? remaining : [next]).map(chatSummary),
+    });
+  }),
+);
 
 /** The transcript so far, so a reload keeps the conversation. */
 shopRoutes.get(
-  '/shop/history',
+  "/shop/history",
   route(async (req, res) => {
-    const customerSessionId = customerSession(req, res)
-    const conversation = conversations.ensure(customerSessionId)
-    const session = ensureSession(customerSessionId, CURRENCY)
-    const cart = carts.ensureOpen(conversation.id)
+    const session = shopperSession(req, res, req.query.conversationId);
+    const cart = carts.ensureOpen(session.customerSessionId);
 
     res.json({
-      conversationId: conversation.id,
-      messages: messageStore.list(conversation.id).map((message) => ({
+      conversationId: session.conversationId,
+      conversations: conversations
+        .list(session.customerSessionId)
+        .map(chatSummary),
+      messages: messageStore.list(session.conversationId).map((message) => ({
         id: message.id,
         role: message.role,
         content: message.content,
@@ -102,16 +207,23 @@ shopRoutes.get(
         createdAt: message.createdAt,
       })),
       cart: cartPayload(priceCart(session, cart.id)),
-    })
+    });
   }),
-)
+);
 
 /** One turn, streamed as server-sent events. */
 shopRoutes.post(
-  '/shop/message',
+  "/shop/message",
   route(async (req, res) => {
-    const message = requireString(req.body, 'message', 2000)
-    const customerSessionId = customerSession(req, res)
+    const message = requireString(req.body, "message", 2000);
+    // Resolved before the stream opens, so an unknown chat is still a clean
+    // 404 rather than an error event inside a 200.
+    const session = shopperSession(
+      req,
+      res,
+      (req.body as Record<string, unknown>)?.conversationId,
+    );
+    const customerSessionId = session.customerSessionId;
 
     /*
      * Every request here runs a model turn, so this is the endpoint that costs
@@ -119,58 +231,62 @@ shopRoutes.post(
      * customers can share an address behind carrier NAT, and throttling them
      * as one would break the product for a whole city.
      */
-    const budget = limiters.chat.take(customerSessionId)
+    const budget = limiters.chat.take(customerSessionId);
     if (!budget.allowed) {
-      res.setHeader('Retry-After', String(budget.retryAfter))
-      throw new RateLimitError(budget.retryAfter)
+      res.setHeader("Retry-After", String(budget.retryAfter));
+      throw new RateLimitError(budget.retryAfter);
     }
 
     res.writeHead(200, {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    })
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
 
     const send = (event: TurnEvent) => {
-      res.write(`data: ${JSON.stringify(event)}\n\n`)
-    }
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
 
     // The client going away, not the request body finishing. `req`'s close
     // fires as soon as the body is fully received, which is immediately.
-    const abort = new AbortController()
-    res.on('close', () => abort.abort())
+    const abort = new AbortController();
+    res.on("close", () => abort.abort());
 
     try {
       for await (const event of runTurn({
         customerSessionId,
+        conversationId: session.conversationId,
         message,
         currency: CURRENCY,
         signal: abort.signal,
       })) {
-        if (abort.signal.aborted) break
-        send(event)
+        if (abort.signal.aborted) break;
+        send(event);
       }
     } catch (error) {
-      log.error('chat stream failed', {
-        message: error instanceof Error ? error.message : 'unknown',
-      })
-      send({ type: 'error', message: 'Something went wrong. Try again in a moment.' })
+      log.error("chat stream failed", {
+        message: error instanceof Error ? error.message : "unknown",
+      });
+      send({
+        type: "error",
+        message: "Something went wrong. Try again in a moment.",
+      });
     } finally {
-      res.end()
+      res.end();
     }
   }),
-)
+);
 
 /** The cart, for the panel the chat page keeps in sync. */
 shopRoutes.get(
-  '/shop/cart',
+  "/shop/cart",
   route(async (req, res) => {
-    const session = ensureSession(customerSession(req, res), CURRENCY)
-    const cart = carts.ensureOpen(session.conversationId)
-    res.json({ cart: cartPayload(priceCart(session, cart.id)) })
+    const session = ensureSession(customerSession(req, res), CURRENCY);
+    const cart = carts.ensureOpen(session.customerSessionId);
+    res.json({ cart: cartPayload(priceCart(session, cart.id)) });
   }),
-)
+);
 
 // ── payment ─────────────────────────────────────────────────────────────────
 
@@ -182,30 +298,34 @@ shopRoutes.get(
  * status the client reports.
  */
 shopRoutes.post(
-  '/shop/orders/:orderId/confirm',
+  "/shop/orders/:orderId/confirm",
   route(async (req, res) => {
-    const session = ensureSession(customerSession(req, res), CURRENCY)
-    const orderId = req.params.orderId!
+    const session = ensureSession(customerSession(req, res), CURRENCY);
+    const orderId = req.params.orderId!;
 
     const outcome = await gatedConfirmPayment({
       session,
       orderId,
       payload: (req.body ?? {}) as Record<string, unknown>,
-      reasoning: 'customer completed the provider checkout',
-    })
+      reasoning: "customer completed the provider checkout",
+    });
 
-    const order = orders.forCustomer(session.conversationId, orderId)
+    const order = orders.forCustomer(session.customerSessionId, orderId);
     res.json({
-      status: order?.status ?? 'failed',
+      status: order?.status ?? "failed",
       failureReason: order?.failureReason ?? null,
       components: outcome.components,
       // What is still owed in the same checkout, so a split card can move
       // straight on to the next brand without a round trip.
-      checkout: order ? checkoutState(session.conversationId, order.checkoutId) : null,
-      cart: cartPayload(priceCart(session, carts.ensureOpen(session.conversationId).id)),
-    })
+      checkout: order
+        ? checkoutState(session.customerSessionId, order.checkoutId)
+        : null,
+      cart: cartPayload(
+        priceCart(session, carts.ensureOpen(session.customerSessionId).id),
+      ),
+    });
   }),
-)
+);
 
 /**
  * Where the order is going.
@@ -220,37 +340,53 @@ shopRoutes.post(
  * address would be a worse bug than the one the form exists to prevent.
  */
 shopRoutes.post(
-  '/shop/orders/:orderId/address',
+  "/shop/orders/:orderId/address",
   route(async (req, res) => {
-    const session = ensureSession(customerSession(req, res), CURRENCY)
-    const order = ownOrder(session.conversationId, req.params.orderId!)
+    const session = ensureSession(customerSession(req, res), CURRENCY);
+    const order = ownOrder(session.customerSessionId, req.params.orderId!);
 
-    if (order.status === 'paid') {
-      throw badRequest('This order is already paid; its address cannot be changed.', 'already_paid')
+    if (order.status === "paid") {
+      throw badRequest(
+        "This order is already paid; its address cannot be changed.",
+        "already_paid",
+      );
     }
-    if (order.status === 'cancelled') {
-      throw badRequest('This order was replaced by a newer one.', 'order_cancelled')
+    if (order.status === "cancelled") {
+      throw badRequest(
+        "This order was replaced by a newer one.",
+        "order_cancelled",
+      );
     }
 
-    let address
+    let address;
     try {
-      address = readAddress(req.body)
+      address = readAddress(req.body);
     } catch (error) {
       if (error instanceof AddressError) {
-        res.status(400).json({ error: error.message, code: 'invalid_address', field: error.field })
-        return
+        res.status(400).json({
+          error: error.message,
+          code: "invalid_address",
+          field: error.field,
+        });
+        return;
       }
-      throw error
+      throw error;
     }
 
-    for (const sibling of orders.byCheckout(session.conversationId, order.checkoutId)) {
-      if (sibling.status === 'paid' || sibling.status === 'cancelled') continue
-      if (!tenants.byId(sibling.tenantId)?.requiresShipping) continue
-      orders.setShippingAddress(sibling.tenantId, sibling.id, address)
+    for (const sibling of orders.byCheckout(
+      session.customerSessionId,
+      order.checkoutId,
+    )) {
+      if (sibling.status === "paid" || sibling.status === "cancelled") continue;
+      if (!tenants.byId(sibling.tenantId)?.requiresShipping) continue;
+      orders.setShippingAddress(sibling.tenantId, sibling.id, address);
     }
-    res.json({ address, checkout: checkoutState(session.conversationId, order.checkoutId) })
+    res.json({
+      address,
+      checkout: checkoutState(session.customerSessionId, order.checkoutId),
+    });
   }),
-)
+);
 
 /**
  * The customer cancelled at the payment panel. Nothing was charged.
@@ -260,41 +396,77 @@ shopRoutes.post(
  * asked for.
  */
 shopRoutes.post(
-  '/shop/orders/:orderId/cancel',
+  "/shop/orders/:orderId/cancel",
   route(async (req, res) => {
-    const session = ensureSession(customerSession(req, res), CURRENCY)
-    const order = ownOrder(session.conversationId, req.params.orderId!)
-    const siblings = orders.byCheckout(session.conversationId, order.checkoutId)
+    const session = ensureSession(customerSession(req, res), CURRENCY);
+    const order = ownOrder(session.customerSessionId, req.params.orderId!);
+    const siblings = orders.byCheckout(
+      session.customerSessionId,
+      order.checkoutId,
+    );
+
+    /*
+     * Why a declined card arrives at the endpoint called "cancel".
+     *
+     * Razorpay's widget reports a decline through a `payment.failed` event and
+     * then closes, which is indistinguishable from the customer walking away
+     * unless the page says which happened. It does now, and the difference has
+     * to survive into the ledger: a brand reading its audit trail cannot tell a
+     * failing card from a change of mind if both say "closed the panel", and
+     * those two facts call for completely different responses.
+     *
+     * The text is the provider's own, relayed by the customer's browser, so it
+     * is recorded as reported rather than as verified — nothing on this side
+     * has confirmed it. Only the order actually being paid carries it; the
+     * siblings were cancelled alongside and nobody declined those.
+     */
+    const declined = declineReason(req.body);
 
     for (const sibling of siblings) {
-      if (sibling.status !== 'awaiting_payment' && sibling.status !== 'created') continue
-      orders.setStatus(sibling.tenantId, sibling.id, 'cancelled', {
-        failureReason: 'The customer closed the payment panel.',
-      })
+      if (sibling.status !== "awaiting_payment" && sibling.status !== "created")
+        continue;
+      const isDeclined = declined !== null && sibling.id === order.id;
+      orders.setStatus(sibling.tenantId, sibling.id, "cancelled", {
+        failureReason: isDeclined
+          ? `Declined at the payment panel: ${declined}`
+          : "The customer closed the payment panel.",
+      });
       audit.record({
         tenantId: sibling.tenantId,
         conversationId: session.conversationId,
         cartId: sibling.cartId,
         orderId: sibling.id,
-        actionType: 'payment.failed',
+        actionType: "payment.failed",
         amountMinor: sibling.totalAmountMinor,
         currency: sibling.currency,
-        outcome: 'failed',
-        reasoning: 'customer cancelled at the payment panel',
-        detail: { provider: sibling.providerType, reason: 'cancelled by customer' },
-      })
+        outcome: "failed",
+        reasoning: isDeclined
+          ? "the payment provider declined it at the panel"
+          : "customer cancelled at the payment panel",
+        detail: isDeclined
+          ? {
+              provider: sibling.providerType,
+              reason: "declined by the payment provider",
+              provider_reason: declined,
+              reported_by: "checkout_widget",
+            }
+          : {
+              provider: sibling.providerType,
+              reason: "cancelled by customer",
+            },
+      });
     }
 
     // Hand the cart back only if nothing in this checkout was paid for.
-    if (!siblings.some((sibling) => sibling.status === 'paid')) {
-      carts.setStatus(order.cartId, 'open')
+    if (!siblings.some((sibling) => sibling.status === "paid")) {
+      carts.setStatus(order.cartId, "open");
     }
     res.json({
-      status: 'cancelled',
-      checkout: checkoutState(session.conversationId, order.checkoutId),
-    })
+      status: "cancelled",
+      checkout: checkoutState(session.customerSessionId, order.checkoutId),
+    });
   }),
-)
+);
 
 /**
  * Convo's own test checkout panel.
@@ -305,20 +477,24 @@ shopRoutes.post(
  * verification the server then runs is the production path.
  */
 shopRoutes.post(
-  '/shop/orders/:orderId/test-pay',
+  "/shop/orders/:orderId/test-pay",
   route(async (req, res) => {
-    const session = ensureSession(customerSession(req, res), CURRENCY)
-    const order = ownOrder(session.conversationId, req.params.orderId!)
-    if (!order.providerOrderId) throw badRequest('That order has no payment to complete.')
+    const session = ensureSession(customerSession(req, res), CURRENCY);
+    const order = ownOrder(session.customerSessionId, req.params.orderId!);
+    if (!order.providerOrderId)
+      throw badRequest("That order has no payment to complete.");
 
-    const outcome = req.body?.outcome === 'failure' ? 'failure' : 'success'
-    const { providerType } = resolveProvider(order.tenantId)
+    const outcome = req.body?.outcome === "failure" ? "failure" : "success";
+    const { providerType } = resolveProvider(order.tenantId);
 
-    if (providerType === 'razorpay') {
-      const settled = mockRazorpay.settle(order.providerOrderId, outcome)
-      if ('failure' in settled) {
-        res.json({ ok: false, payload: { razorpay_order_id: order.providerOrderId } })
-        return
+    if (providerType === "razorpay") {
+      const settled = mockRazorpay.settle(order.providerOrderId, outcome);
+      if ("failure" in settled) {
+        res.json({
+          ok: false,
+          payload: { razorpay_order_id: order.providerOrderId },
+        });
+        return;
       }
       res.json({
         ok: true,
@@ -327,15 +503,15 @@ shopRoutes.post(
           razorpay_payment_id: settled.paymentId,
           razorpay_signature: settled.signature,
         },
-      })
-      return
+      });
+      return;
     }
 
-    if (outcome === 'failure') {
-      res.json({ ok: false, payload: { order_id: order.providerOrderId } })
-      return
+    if (outcome === "failure") {
+      res.json({ ok: false, payload: { order_id: order.providerOrderId } });
+      return;
     }
-    const paymentId = `cvpay_${token().slice(0, 20)}`
+    const paymentId = `cvpay_${token().slice(0, 20)}`;
     res.json({
       ok: true,
       payload: {
@@ -343,16 +519,16 @@ shopRoutes.post(
         payment_id: paymentId,
         signature: signManualPayment(order.providerOrderId, paymentId),
       },
-    })
+    });
   }),
-)
+);
 
 /** One order, for the confirmation card after a reload. */
 shopRoutes.get(
-  '/shop/orders/:orderId',
+  "/shop/orders/:orderId",
   route(async (req, res) => {
-    const session = ensureSession(customerSession(req, res), CURRENCY)
-    const order = ownOrder(session.conversationId, req.params.orderId!)
+    const session = ensureSession(customerSession(req, res), CURRENCY);
+    const order = ownOrder(session.customerSessionId, req.params.orderId!);
     res.json({
       order: {
         id: order.id,
@@ -363,9 +539,9 @@ shopRoutes.get(
         shippingAddress: order.shippingAddress,
         lines: order.lineItems,
       },
-    })
+    });
   }),
-)
+);
 
 /**
  * Every order in one checkout.
@@ -374,17 +550,20 @@ shopRoutes.get(
  * further up the transcript cannot charge for something already settled.
  */
 shopRoutes.get(
-  '/shop/checkouts/:checkoutId',
+  "/shop/checkouts/:checkoutId",
   route(async (req, res) => {
-    const session = ensureSession(customerSession(req, res), CURRENCY)
-    const state = checkoutState(session.conversationId, req.params.checkoutId!)
-    if (state.orders.length === 0) throw notFound('No such checkout.')
-    res.json(state)
+    const session = ensureSession(customerSession(req, res), CURRENCY);
+    const state = checkoutState(
+      session.customerSessionId,
+      req.params.checkoutId!,
+    );
+    if (state.orders.length === 0) throw notFound("No such checkout.");
+    res.json(state);
   }),
-)
+);
 
-function checkoutState(conversationId: string, checkoutId: string) {
-  const group = orders.byCheckout(conversationId, checkoutId)
+function checkoutState(customerSessionId: string, checkoutId: string) {
+  const group = orders.byCheckout(customerSessionId, checkoutId);
   return {
     checkout_id: checkoutId,
     orders: group.map((order) => ({
@@ -395,17 +574,20 @@ function checkoutState(conversationId: string, checkoutId: string) {
       failure_reason: order.failureReason,
       shipping_address: order.shippingAddress,
     })),
-    paid: group.filter((order) => order.status === 'paid').length,
+    paid: group.filter((order) => order.status === "paid").length,
     remaining: group.filter(
-      (order) => order.status === 'awaiting_payment' || order.status === 'created',
+      (order) =>
+        order.status === "awaiting_payment" || order.status === "created",
     ).length,
-  }
+  };
 }
 
 function openers(catalogSize: number, brandCount: number): string[] {
-  if (catalogSize === 0) return ['What can I buy here?']
-  const base = ['Show me what you have', 'Something under ₹5,000']
-  return brandCount > 1 ? [...base, 'Which brands are here?'] : [...base, 'What is popular right now']
+  if (catalogSize === 0) return ["What can I buy here?"];
+  const base = ["Show me what you have", "Something under ₹5,000"];
+  return brandCount > 1
+    ? [...base, "Which brands are here?"]
+    : [...base, "What is popular right now"];
 }
 
 /**
@@ -417,45 +599,45 @@ function openers(catalogSize: number, brandCount: number): string[] {
  * from whoever happened to upload last.
  */
 function showcase(catalog: (Product & { brandName: string })[]) {
-  const eligible = catalog.filter((p) => p.images.length > 0 && p.stock > 0)
+  const eligible = catalog.filter((p) => p.images.length > 0 && p.stock > 0);
 
-  const buckets = new Map<string, typeof eligible>()
+  const buckets = new Map<string, typeof eligible>();
   for (const product of eligible) {
-    const key = `${product.tenantId} ${product.category ?? ''}`
-    buckets.set(key, [...(buckets.get(key) ?? []), product])
+    const key = `${product.tenantId} ${product.category ?? ""}`;
+    buckets.set(key, [...(buckets.get(key) ?? []), product]);
   }
 
   // Deal the buckets out one brand at a time, so the opening row is a fair
   // sample of the shelf rather than everything from whoever has the most
   // categories followed by everything from whoever has fewer.
-  const lanes = new Map<string, (typeof eligible)[]>()
+  const lanes = new Map<string, (typeof eligible)[]>();
   for (const [key, bucket] of buckets) {
-    const brand = key.split(' ')[0]!
-    lanes.set(brand, [...(lanes.get(brand) ?? []), bucket])
+    const brand = key.split(" ")[0]!;
+    lanes.set(brand, [...(lanes.get(brand) ?? []), bucket]);
   }
-  const lists: (typeof eligible)[] = []
+  const lists: (typeof eligible)[] = [];
   for (let round = 0; ; round += 1) {
-    let added = false
+    let added = false;
     for (const lane of lanes.values()) {
-      const bucket = lane[round]
-      if (!bucket) continue
-      lists.push(bucket)
-      added = true
+      const bucket = lane[round];
+      if (!bucket) continue;
+      lists.push(bucket);
+      added = true;
     }
-    if (!added) break
+    if (!added) break;
   }
 
-  const spread: typeof eligible = []
+  const spread: typeof eligible = [];
   for (let round = 0; spread.length < 12; round += 1) {
-    let added = false
+    let added = false;
     for (const bucket of lists) {
-      const product = bucket[round]
-      if (!product) continue
-      spread.push(product)
-      added = true
-      if (spread.length === 12) break
+      const product = bucket[round];
+      if (!product) continue;
+      spread.push(product);
+      added = true;
+      if (spread.length === 12) break;
     }
-    if (!added) break
+    if (!added) break;
   }
 
   return spread.map((product) => ({
@@ -465,5 +647,5 @@ function showcase(catalog: (Product & { brandName: string })[]) {
     price_display: formatMoney(product.priceMinor, CURRENCY),
     image_url: product.images[0] ?? null,
     in_stock: product.stock > 0,
-  }))
+  }));
 }

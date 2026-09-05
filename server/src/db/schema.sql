@@ -111,12 +111,22 @@ CREATE INDEX IF NOT EXISTS idx_products_tenant_active ON products(tenant_id, is_
 -- read another brand's catalogue, orders or ledger. What is shared is the
 -- shopper's conversation, which belongs to the platform.
 
+-- A shopper has many of these. customer_session_id was UNIQUE when a shopper
+-- got exactly one conversation that ran forever; it is only an index now.
 CREATE TABLE IF NOT EXISTS conversations (
   id                  TEXT PRIMARY KEY,
-  customer_session_id TEXT NOT NULL UNIQUE,
+  customer_session_id TEXT NOT NULL,
+  -- What the shopper sees in the chat list. Taken from their first message.
+  title               TEXT,
   started_at          TEXT NOT NULL,
-  last_active_at      TEXT NOT NULL
+  last_active_at      TEXT NOT NULL,
+  -- Hidden from the list, never removed. Orders point at the conversation they
+  -- were placed in, and a paid order must not disappear because somebody
+  -- tidied their sidebar.
+  archived_at         TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_conversations_customer
+  ON conversations(customer_session_id, last_active_at DESC);
 
 CREATE TABLE IF NOT EXISTS messages (
   id                TEXT PRIMARY KEY,
@@ -144,16 +154,21 @@ CREATE TABLE IF NOT EXISTS seen_products (
 
 -- ── Cart and orders ─────────────────────────────────────────────────────────
 
--- One cart per conversation, holding goods from any number of brands.
+-- One cart per shopper, holding goods from any number of brands.
+--
+-- Per shopper, not per conversation. The chat is where the shopping gets talked
+-- about; the basket belongs to the person, and follows them into whatever chat
+-- they open next. Keyed the other way, opening a new chat would quietly abandon
+-- whatever was in the old one, which is not a thing shops do.
 CREATE TABLE IF NOT EXISTS carts (
-  id                TEXT PRIMARY KEY,
-  conversation_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  id                  TEXT PRIMARY KEY,
+  customer_session_id TEXT NOT NULL,
   -- 'open' | 'locked' | 'converted' | 'abandoned'
-  status            TEXT NOT NULL DEFAULT 'open',
-  created_at        TEXT NOT NULL,
-  updated_at        TEXT NOT NULL
+  status              TEXT NOT NULL DEFAULT 'open',
+  created_at          TEXT NOT NULL,
+  updated_at          TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_carts_conversation ON carts(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_carts_customer ON carts(customer_session_id, status);
 
 CREATE TABLE IF NOT EXISTS cart_items (
   id                TEXT PRIMARY KEY,
