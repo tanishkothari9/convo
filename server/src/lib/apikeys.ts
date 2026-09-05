@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 /**
  * Public API keys.
@@ -13,38 +13,38 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
  * characters it costs.
  */
 
-export const KEY_PREFIX = 'cvo'
+export const KEY_PREFIX = "cvo";
 
 export interface MintedKey {
   /** The only time the full key exists. Hand it to the merchant and forget it. */
-  secret: string
-  hash: string
+  secret: string;
+  hash: string;
   /** Kept in clear so a merchant can identify the key in a list. */
-  prefix: string
+  prefix: string;
 }
 
 export function mintApiKey(live = true): MintedKey {
-  const body = randomBytes(24).toString('base64url')
-  const secret = `${KEY_PREFIX}_${live ? 'live' : 'test'}_${body}`
-  return { secret, hash: hashApiKey(secret), prefix: secret.slice(0, 16) }
+  const body = randomBytes(24).toString("base64url");
+  const secret = `${KEY_PREFIX}_${live ? "live" : "test"}_${body}`;
+  return { secret, hash: hashApiKey(secret), prefix: secret.slice(0, 16) };
 }
 
 export function hashApiKey(secret: string): string {
-  return createHash('sha256').update(secret).digest('hex')
+  return createHash("sha256").update(secret).digest("hex");
 }
 
 /** Compares two digests without leaking their difference through timing. */
 export function digestsMatch(a: string, b: string): boolean {
-  const left = Buffer.from(a, 'hex')
-  const right = Buffer.from(b, 'hex')
-  if (left.length !== right.length || left.length === 0) return false
-  return timingSafeEqual(left, right)
+  const left = Buffer.from(a, "hex");
+  const right = Buffer.from(b, "hex");
+  if (left.length !== right.length || left.length === 0) return false;
+  return timingSafeEqual(left, right);
 }
 
 /** Pulls the key out of an Authorization header, tolerating a bare key. */
 export function readBearer(header: string | undefined): string | null {
-  if (!header) return null
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim())
-  const candidate = (match?.[1] ?? header).trim()
-  return candidate.startsWith(`${KEY_PREFIX}_`) ? candidate : null
+  if (!header) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  const candidate = (match?.[1] ?? header).trim();
+  return candidate.startsWith(`${KEY_PREFIX}_`) ? candidate : null;
 }

@@ -11,10 +11,10 @@
  * and the money rules are stated as facts about what the server does, not
  * requests.
  */
-import type { PricedCart } from '../domain/types.js'
-import { formatMoney } from '../lib/money.js'
-import { STOREFRONT_FENCE } from './fencing.js'
-import { skillIndexBlock } from './skills.js'
+import type { PricedCart } from "../domain/types.js";
+import { formatMoney } from "../lib/money.js";
+import { STOREFRONT_FENCE } from "./fencing.js";
+import { skillIndexBlock } from "./skills.js";
 
 export function buildStaticSystem(): string {
   return `You are Convo, a shop assistant. You sell for a number of independent brands at once, and the customer is browsing all of them together. Answer with short text plus the components your presentation tools render. Your voice is warm, plain and unhurried — a good salesperson on the floor, not a brochure.
@@ -84,19 +84,19 @@ ${skillIndexBlock()}
 - Do not ask for, accept, or repeat a card number, UPI PIN, CVV, OTP, or password. Payment happens in the provider's own panel and never in this chat. If a customer types one, tell them not to and do not repeat it back.
 - On professional questions (medical, legal, financial) and safety-critical work, help with choosing the product and say the rest belongs to a qualified professional.
 - When only part of a request is outside what you can do, do the part you can and say in a few words which part you are leaving aside.
-- When the customer appears to be in crisis or at risk of harm, set shopping aside, respond with care, and point them to appropriate help.`
+- When the customer appears to be in crisis or at risk of harm, set shopping aside, respond with care, and point them to appropriate help.`;
 }
 
 /** The per-request half, appended after the cache breakpoint and fenced. */
 export function buildDynamicContext(args: {
-  cart: PricedCart
-  currency: string
-  catalogSize: number
-  categories: string[]
-  brands: string[]
-  now?: Date
+  cart: PricedCart;
+  currency: string;
+  catalogSize: number;
+  categories: string[];
+  brands: string[];
+  now?: Date;
 }): string {
-  const { cart, catalogSize, categories, brands } = args
+  const { cart, catalogSize, categories, brands } = args;
   const payload: Record<string, unknown> = {
     shop: { currency: args.currency },
     // Listed in the merchants' own order, not ranked. The agent is told who is
@@ -123,7 +123,11 @@ export function buildDynamicContext(args: {
         in_stock: line.inStock,
       })),
     },
-    local_time: (args.now ?? new Date()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-  }
-  return '\n\n# Session context\n\n' + STOREFRONT_FENCE.fencePayload(payload, 6000)
+    local_time: (args.now ?? new Date()).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+    }),
+  };
+  return (
+    "\n\n# Session context\n\n" + STOREFRONT_FENCE.fencePayload(payload, 6000)
+  );
 }

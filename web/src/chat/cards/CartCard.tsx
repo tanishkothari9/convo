@@ -1,8 +1,16 @@
-import type { CartPayload } from '../types'
+import type { CartPayload } from "../types";
 
 /** The cart as an inline card, when the agent chose to show it in the reply. */
-export function CartCard({ cart, onAsk, disabled }: { cart: CartPayload; onAsk(text: string): void; disabled: boolean }) {
-  if (cart.lines.length === 0) return null
+export function CartCard({
+  cart,
+  onAsk,
+  disabled,
+}: {
+  cart: CartPayload;
+  onAsk(text: string): void;
+  disabled: boolean;
+}) {
+  if (cart.lines.length === 0) return null;
 
   return (
     <div className="cart-card">
@@ -10,7 +18,9 @@ export function CartCard({ cart, onAsk, disabled }: { cart: CartPayload; onAsk(t
         {cart.lines.map((line) => (
           <li key={line.product_id} className="cart-line">
             <div className="cart-thumb">
-              {line.image_url ? <img src={line.image_url} alt="" loading="lazy" /> : null}
+              {line.image_url ? (
+                <img src={line.image_url} alt="" loading="lazy" />
+              ) : null}
             </div>
             <div className="cart-line-main">
               <p className="cart-line-brand t-xs">{line.brand_name}</p>
@@ -19,7 +29,9 @@ export function CartCard({ cart, onAsk, disabled }: { cart: CartPayload; onAsk(t
                 {line.quantity} × {line.unit_price_display}
                 {!line.in_stock && (
                   <span className="cart-line-flag">
-                    {line.available_stock === 0 ? ' · out of stock' : ` · only ${line.available_stock} left`}
+                    {line.available_stock === 0
+                      ? " · out of stock"
+                      : ` · only ${line.available_stock} left`}
                   </span>
                 )}
               </p>
@@ -36,17 +48,18 @@ export function CartCard({ cart, onAsk, disabled }: { cart: CartPayload; onAsk(t
 
       {cart.brands.length > 1 && (
         <p className="cart-split t-xs t-muted">
-          {cart.brands.length} brands, so checkout will be {cart.brands.length} separate orders.
+          {cart.brands.length} brands, so checkout will be {cart.brands.length}{" "}
+          separate orders.
         </p>
       )}
 
       <button
         className="btn btn-primary btn-block"
         disabled={disabled}
-        onClick={() => onAsk('Check out')}
+        onClick={() => onAsk("Check out")}
       >
         Check out
       </button>
     </div>
-  )
+  );
 }

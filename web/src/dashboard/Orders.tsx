@@ -1,34 +1,34 @@
-import { useEffect, useMemo, useState } from 'react'
-import { api, type Order } from '../lib/api'
-import { money, when } from '../lib/format'
-import { Toaster, useToast } from '../components/Toast'
-import { IconCheck, IconCopy, IconReceipt } from '../components/icons'
-import { PageHead } from './Layout'
+import { useEffect, useMemo, useState } from "react";
+import { api, type Order } from "../lib/api";
+import { money, when } from "../lib/format";
+import { Toaster, useToast } from "../components/Toast";
+import { IconCheck, IconCopy, IconReceipt } from "../components/icons";
+import { PageHead } from "./Layout";
 
 const FILTERS = [
-  { key: 'all', label: 'Everything' },
-  { key: 'paid', label: 'Paid' },
-  { key: 'awaiting_payment', label: 'Awaiting payment' },
-  { key: 'failed', label: 'Failed' },
-] as const
+  { key: "all", label: "Everything" },
+  { key: "paid", label: "Paid" },
+  { key: "awaiting_payment", label: "Awaiting payment" },
+  { key: "failed", label: "Failed" },
+] as const;
 
 const STATUS_TONE: Record<string, string> = {
-  paid: 'badge-ok',
-  awaiting_payment: 'badge-warn',
-  created: 'badge-warn',
-  failed: 'badge-danger',
-  cancelled: 'badge',
-  refunded: 'badge',
-}
+  paid: "badge-ok",
+  awaiting_payment: "badge-warn",
+  created: "badge-warn",
+  failed: "badge-danger",
+  cancelled: "badge",
+  refunded: "badge",
+};
 
 const STATUS_LABEL: Record<string, string> = {
-  paid: 'Paid',
-  awaiting_payment: 'Awaiting payment',
-  created: 'Started',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
-  refunded: 'Refunded',
-}
+  paid: "Paid",
+  awaiting_payment: "Awaiting payment",
+  created: "Started",
+  failed: "Failed",
+  cancelled: "Cancelled",
+  refunded: "Refunded",
+};
 
 /**
  * What was sold, and where it goes.
@@ -38,30 +38,33 @@ const STATUS_LABEL: Record<string, string> = {
  * than a technical detail buried behind an id.
  */
 export function Orders() {
-  const [orders, setOrders] = useState<Order[] | null>(null)
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>('all')
-  const [open, setOpen] = useState<string | null>(null)
-  const [copied, setCopied] = useState<string | null>(null)
-  const { toasts, show } = useToast()
+  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
+  const [open, setOpen] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const { toasts, show } = useToast();
 
   useEffect(() => {
     api
-      .get<{ orders: Order[] }>('/dashboard/orders')
+      .get<{ orders: Order[] }>("/dashboard/orders")
       .then((r) => setOrders(r.orders))
-      .catch(() => setOrders([]))
-  }, [])
+      .catch(() => setOrders([]));
+  }, []);
 
   const visible = useMemo(
-    () => (orders ?? []).filter((order) => filter === 'all' || order.status === filter),
+    () =>
+      (orders ?? []).filter(
+        (order) => filter === "all" || order.status === filter,
+      ),
     [orders, filter],
-  )
+  );
 
-  const paid = (orders ?? []).filter((order) => order.status === 'paid')
-  const toShip = paid.filter((order) => order.shippingAddress)
+  const paid = (orders ?? []).filter((order) => order.status === "paid");
+  const toShip = paid.filter((order) => order.shippingAddress);
 
   async function copyAddress(order: Order) {
-    const address = order.shippingAddress
-    if (!address) return
+    const address = order.shippingAddress;
+    if (!address) return;
     const block = [
       address.name,
       `+91 ${address.phone}`,
@@ -71,17 +74,20 @@ export function Orders() {
       address.country,
     ]
       .filter(Boolean)
-      .join('\n')
+      .join("\n");
     try {
-      await navigator.clipboard.writeText(block)
-      setCopied(order.id)
-      setTimeout(() => setCopied(null), 1800)
+      await navigator.clipboard.writeText(block);
+      setCopied(order.id);
+      setTimeout(() => setCopied(null), 1800);
     } catch {
-      show('Could not copy. Select the address and copy it manually.', 'danger')
+      show(
+        "Could not copy. Select the address and copy it manually.",
+        "danger",
+      );
     }
   }
 
-  if (!orders) return <div className="boot" aria-busy="true" />
+  if (!orders) return <div className="boot" aria-busy="true" />;
 
   return (
     <>
@@ -89,8 +95,8 @@ export function Orders() {
         title="Orders"
         lede={
           paid.length === 0
-            ? 'Everything the agent has sold, and where each one goes.'
-            : `${toShip.length} paid ${toShip.length === 1 ? 'order' : 'orders'} to send out.`
+            ? "Everything the agent has sold, and where each one goes."
+            : `${toShip.length} paid ${toShip.length === 1 ? "order" : "orders"} to send out.`
         }
       />
 
@@ -101,17 +107,21 @@ export function Orders() {
           </span>
           <p className="empty-title">No orders yet</p>
           <p className="empty-body">
-            When a customer checks out on the marketplace, the order appears here with its items and
-            the address to send it to.
+            When a customer checks out on the marketplace, the order appears
+            here with its items and the address to send it to.
           </p>
         </div>
       ) : (
         <>
-          <div className="filter-row" role="group" aria-label="Filter by status">
+          <div
+            className="filter-row"
+            role="group"
+            aria-label="Filter by status"
+          >
             {FILTERS.map((option) => (
               <button
                 key={option.key}
-                className={`chip${filter === option.key ? ' is-selected' : ''}`}
+                className={`chip${filter === option.key ? " is-selected" : ""}`}
                 onClick={() => setFilter(option.key)}
                 aria-pressed={filter === option.key}
               >
@@ -121,30 +131,40 @@ export function Orders() {
           </div>
 
           {visible.length === 0 ? (
-            <p className="t-secondary" style={{ padding: 'var(--space-6) 0' }}>
-              Nothing {FILTERS.find((f) => f.key === filter)?.label.toLowerCase()}.
+            <p className="t-secondary" style={{ padding: "var(--space-6) 0" }}>
+              Nothing{" "}
+              {FILTERS.find((f) => f.key === filter)?.label.toLowerCase()}.
             </p>
           ) : (
             <ul className="order-list">
               {visible.map((order) => {
-                const expanded = open === order.id
+                const expanded = open === order.id;
                 return (
-                  <li key={order.id} className="order-item" data-expanded={expanded}>
+                  <li
+                    key={order.id}
+                    className="order-item"
+                    data-expanded={expanded}
+                  >
                     <button
                       className="order-summary-row"
                       onClick={() => setOpen(expanded ? null : order.id)}
                       aria-expanded={expanded}
                     >
-                      <span className={`badge badge-dot ${STATUS_TONE[order.status] ?? 'badge'}`}>
+                      <span
+                        className={`badge badge-dot ${STATUS_TONE[order.status] ?? "badge"}`}
+                      >
                         {STATUS_LABEL[order.status] ?? order.status}
                       </span>
                       <span className="order-item-name">
-                        {order.lineItems.map((line) => line.name).join(', ') || '—'}
+                        {order.lineItems.map((line) => line.name).join(", ") ||
+                          "—"}
                       </span>
                       <span className="order-item-total t-num">
                         {money(order.totalAmountMinor, order.currency)}
                       </span>
-                      <span className="order-item-when t-sm t-muted">{when(order.createdAt)}</span>
+                      <span className="order-item-when t-sm t-muted">
+                        {when(order.createdAt)}
+                      </span>
                     </button>
 
                     {expanded && (
@@ -157,7 +177,10 @@ export function Orders() {
                                 <span>
                                   {line.name}
                                   {line.quantity > 1 && (
-                                    <span className="t-muted t-num"> × {line.quantity}</span>
+                                    <span className="t-muted t-num">
+                                      {" "}
+                                      × {line.quantity}
+                                    </span>
                                   )}
                                 </span>
                                 <span className="t-num">
@@ -175,7 +198,9 @@ export function Orders() {
                               <address className="order-address">
                                 {order.shippingAddress.name}
                                 <br />
-                                <span className="t-num">+91 {order.shippingAddress.phone}</span>
+                                <span className="t-num">
+                                  +91 {order.shippingAddress.phone}
+                                </span>
                                 <br />
                                 {order.shippingAddress.line1}
                                 <br />
@@ -185,21 +210,30 @@ export function Orders() {
                                     <br />
                                   </>
                                 )}
-                                {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
-                                <span className="t-num">{order.shippingAddress.postalCode}</span>
+                                {order.shippingAddress.city},{" "}
+                                {order.shippingAddress.state}{" "}
+                                <span className="t-num">
+                                  {order.shippingAddress.postalCode}
+                                </span>
                               </address>
                               <button
                                 className="btn btn-secondary btn-sm"
                                 onClick={() => copyAddress(order)}
                               >
-                                {copied === order.id ? <IconCheck size={14} /> : <IconCopy size={14} />}
-                                {copied === order.id ? 'Copied' : 'Copy address'}
+                                {copied === order.id ? (
+                                  <IconCheck size={14} />
+                                ) : (
+                                  <IconCopy size={14} />
+                                )}
+                                {copied === order.id
+                                  ? "Copied"
+                                  : "Copy address"}
                               </button>
                             </>
                           ) : (
                             <p className="t-sm t-secondary">
-                              Not given. The customer left before finishing checkout, so nothing was
-                              charged.
+                              Not given. The customer left before finishing
+                              checkout, so nothing was charged.
                             </p>
                           )}
                         </div>
@@ -214,24 +248,30 @@ export function Orders() {
                             {order.providerPaymentId && (
                               <div>
                                 <dt className="t-sm t-muted">Payment</dt>
-                                <dd className="t-id">{order.providerPaymentId}</dd>
+                                <dd className="t-id">
+                                  {order.providerPaymentId}
+                                </dd>
                               </div>
                             )}
                             <div>
                               <dt className="t-sm t-muted">Placed</dt>
                               <dd className="t-sm t-num">
-                                {new Date(order.createdAt).toLocaleString('en-IN')}
+                                {new Date(order.createdAt).toLocaleString(
+                                  "en-IN",
+                                )}
                               </dd>
                             </div>
                           </dl>
                           {order.failureReason && (
-                            <p className="notice notice-danger">{order.failureReason}</p>
+                            <p className="notice notice-danger">
+                              {order.failureReason}
+                            </p>
                           )}
                         </div>
                       </div>
                     )}
                   </li>
-                )
+                );
               })}
             </ul>
           )}
@@ -240,5 +280,5 @@ export function Orders() {
 
       <Toaster toasts={toasts} />
     </>
-  )
+  );
 }

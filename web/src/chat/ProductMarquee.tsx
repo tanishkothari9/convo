@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from "react";
 
 export interface MarqueeProduct {
-  id: string
-  name: string
-  brand_name: string
-  price_display: string
-  image_url: string | null
-  in_stock: boolean
+  id: string;
+  name: string;
+  brand_name: string;
+  price_display: string;
+  image_url: string | null;
+  in_stock: boolean;
 }
 
 /**
@@ -33,41 +33,44 @@ export function ProductMarquee({
   products,
   onPick,
 }: {
-  products: MarqueeProduct[]
-  onPick(product: MarqueeProduct): void
+  products: MarqueeProduct[];
+  onPick(product: MarqueeProduct): void;
 }) {
-  const [still, setStill] = useState(false)
-  const container = useRef<HTMLDivElement>(null)
+  const [still, setStill] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const sync = () => setStill(motion.matches)
-    sync()
-    motion.addEventListener('change', sync)
-    return () => motion.removeEventListener('change', sync)
-  }, [])
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setStill(motion.matches);
+    sync();
+    motion.addEventListener("change", sync);
+    return () => motion.removeEventListener("change", sync);
+  }, []);
 
   // A tab in the background should not be animating; it costs battery and
   // buys nothing, since nobody is looking at it.
   useEffect(() => {
-    const node = container.current
-    if (!node) return
+    const node = container.current;
+    if (!node) return;
     const sync = () => {
-      node.dataset.paused = document.hidden ? 'true' : 'false'
-    }
-    document.addEventListener('visibilitychange', sync)
-    sync()
-    return () => document.removeEventListener('visibilitychange', sync)
-  }, [])
+      node.dataset.paused = document.hidden ? "true" : "false";
+    };
+    document.addEventListener("visibilitychange", sync);
+    sync();
+    return () => document.removeEventListener("visibilitychange", sync);
+  }, []);
 
-  if (products.length === 0) return null
+  if (products.length === 0) return null;
 
   // Still: the real list once, scrolled by hand. Moving: twice, so -50% lands
   // exactly one copy along and the loop closes on itself.
-  const rail = still ? products : [...products, ...products]
+  const rail = still ? products : [...products, ...products];
 
   return (
-    <div className={still ? 'marquee marquee-still' : 'marquee'} ref={container}>
+    <div
+      className={still ? "marquee marquee-still" : "marquee"}
+      ref={container}
+    >
       <div className="marquee-row">
         <div className="marquee-track">
           {rail.map((product, index) => (
@@ -81,7 +84,7 @@ export function ProductMarquee({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function MarqueeCard({
@@ -89,10 +92,10 @@ function MarqueeCard({
   onPick,
   duplicate,
 }: {
-  product: MarqueeProduct
-  onPick(product: MarqueeProduct): void
+  product: MarqueeProduct;
+  onPick(product: MarqueeProduct): void;
   /** The second copy exists to close the loop; screen readers skip it. */
-  duplicate?: boolean
+  duplicate?: boolean;
 }) {
   return (
     <button
@@ -121,5 +124,5 @@ function MarqueeCard({
         <span className="marquee-price t-num">{product.price_display}</span>
       </span>
     </button>
-  )
+  );
 }

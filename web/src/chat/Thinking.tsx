@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from "react";
 
 /**
  * The moment between sending and receiving.
@@ -18,24 +18,24 @@ import { useEffect, useRef, useState } from 'react'
  */
 export function Thinking({ status }: { status: string | null }) {
   // Keep the outgoing status mounted for the length of the cross-fade.
-  const [shown, setShown] = useState<string | null>(status)
-  const [fading, setFading] = useState(false)
-  const previous = useRef(status)
+  const [shown, setShown] = useState<string | null>(status);
+  const [fading, setFading] = useState(false);
+  const previous = useRef(status);
 
   useEffect(() => {
-    if (status === previous.current) return
-    previous.current = status
+    if (status === previous.current) return;
+    previous.current = status;
     if (shown === null) {
-      setShown(status)
-      return
+      setShown(status);
+      return;
     }
-    setFading(true)
+    setFading(true);
     const timer = setTimeout(() => {
-      setShown(status)
-      setFading(false)
-    }, 130)
-    return () => clearTimeout(timer)
-  }, [status, shown])
+      setShown(status);
+      setFading(false);
+    }, 130);
+    return () => clearTimeout(timer);
+  }, [status, shown]);
 
   return (
     <div className="thinking" role="status" aria-live="polite">
@@ -52,7 +52,7 @@ export function Thinking({ status }: { status: string | null }) {
           {shown}
         </span>
       )}
-      <span className="visually-hidden">{shown ?? 'Thinking'}</span>
+      <span className="visually-hidden">{shown ?? "Thinking"}</span>
     </div>
-  )
+  );
 }

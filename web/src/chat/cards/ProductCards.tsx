@@ -1,5 +1,5 @@
-import { IconPlus } from '../../components/icons'
-import type { ProductCard } from '../types'
+import { IconPlus } from "../../components/icons";
+import type { ProductCard } from "../types";
 
 /**
  * Product cards.
@@ -16,11 +16,11 @@ export function ProductCards({
   onAsk,
   disabled,
 }: {
-  title: string | null
-  layout: string
-  items: ProductCard[]
-  onAsk(text: string): void
-  disabled: boolean
+  title: string | null;
+  layout: string;
+  items: ProductCard[];
+  onAsk(text: string): void;
+  disabled: boolean;
 }) {
   return (
     <div className="cards">
@@ -51,9 +51,13 @@ export function ProductCards({
               <p className="pcard-brand t-xs">{item.brand_name}</p>
               <p className="pcard-name">{item.name}</p>
               <p className="pcard-price t-num">{item.price_display}</p>
-              {item.reason && <p className="pcard-reason t-sm">{item.reason}</p>}
+              {item.reason && (
+                <p className="pcard-reason t-sm">{item.reason}</p>
+              )}
               {!item.reason && item.description && (
-                <p className="pcard-reason t-sm t-secondary">{truncate(item.description, 92)}</p>
+                <p className="pcard-reason t-sm t-secondary">
+                  {truncate(item.description, 92)}
+                </p>
               )}
             </div>
 
@@ -63,15 +67,15 @@ export function ProductCards({
               onClick={() => onAsk(`Add "${item.name}" to my cart`)}
             >
               {item.in_stock && <IconPlus size={14} />}
-              {item.in_stock ? 'Add to cart' : 'Sold out'}
+              {item.in_stock ? "Add to cart" : "Sold out"}
             </button>
           </article>
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 function truncate(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }

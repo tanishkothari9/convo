@@ -10,40 +10,44 @@
  * This is why the chat page can render trustworthy cards: no price, stock
  * level, or product name on screen ever came from the model's text.
  */
-import { products, provenance } from '../db/repo.js'
-import type { UiComponent } from '../domain/types.js'
-import { formatMoney } from '../lib/money.js'
-import { sanitizeLabel, sanitizeSuggestionChips } from './fencing.js'
-import { failed, ok, type ToolOutcome } from './outcome.js'
-import { priceCart, type StorefrontSession } from './storefront.js'
-import { cartComponent } from './gates.js'
+import { products, provenance } from "../db/repo.js";
+import type { UiComponent } from "../domain/types.js";
+import { formatMoney } from "../lib/money.js";
+import { sanitizeLabel, sanitizeSuggestionChips } from "./fencing.js";
+import { failed, ok, type ToolOutcome } from "./outcome.js";
+import { priceCart, type StorefrontSession } from "./storefront.js";
+import { cartComponent } from "./gates.js";
 
 export function presentProducts(
   session: StorefrontSession,
   input: Record<string, unknown>,
 ): ToolOutcome {
-  const picks = Array.isArray(input.picks) ? input.picks : []
+  const picks = Array.isArray(input.picks) ? input.picks : [];
   if (picks.length === 0) {
-    return failed('present_products needs at least one pick.')
+    return failed("present_products needs at least one pick.");
   }
 
-  const seen = provenance.seenIds(session.conversationId)
-  const wanted: Array<{ productId: string; reason: string | null }> = []
-  const dropped: string[] = []
+  const seen = provenance.seenIds(session.conversationId);
+  const wanted: Array<{ productId: string; reason: string | null }> = [];
+  const dropped: string[] = [];
 
   for (const raw of picks.slice(0, 12)) {
-    const pick = raw as { product_id?: unknown; reason?: unknown }
-    const productId = typeof pick.product_id === 'string' ? pick.product_id : ''
-    if (productId === '') continue
+    const pick = raw as { product_id?: unknown; reason?: unknown };
+    const productId =
+      typeof pick.product_id === "string" ? pick.product_id : "";
+    if (productId === "") continue;
     if (!seen.has(productId)) {
-      dropped.push(productId)
-      continue
+      dropped.push(productId);
+      continue;
     }
-    if (wanted.some((entry) => entry.productId === productId)) continue
+    if (wanted.some((entry) => entry.productId === productId)) continue;
     wanted.push({
       productId,
-      reason: typeof pick.reason === 'string' ? sanitizeLabel(pick.reason, 140) : null,
-    })
+      reason:
+        typeof pick.reason === "string"
+          ? sanitizeLabel(pick.reason, 140)
+          : null,
+    });
   }
 
   // Read one at a time: picks in one turn can span brands, and a product
@@ -53,16 +57,16 @@ export function presentProducts(
       .map((entry) => products.listedById(entry.productId))
       .filter((product) => product !== undefined)
       .map((product) => [product.id, product] as const),
-  )
+  );
 
   const cards = wanted
     .filter((entry) => {
-      if (records.has(entry.productId)) return true
-      dropped.push(entry.productId)
-      return false
+      if (records.has(entry.productId)) return true;
+      dropped.push(entry.productId);
+      return false;
     })
     .map((entry) => {
-      const product = records.get(entry.productId)!
+      const product = records.get(entry.productId)!;
       return {
         product_id: product.id,
         // Who sells it, on every card. In a marketplace this is not a detail:
@@ -81,69 +85,94 @@ export function presentProducts(
         in_stock: product.stock > 0,
         stock: product.stock,
         reason: entry.reason,
-      }
-    })
+      };
+    });
 
   if (cards.length === 0) {
     return failed(
       dropped.length > 0
-        ? `None of those product ids can be shown: ${dropped.join(', ')} were not returned by a tool this conversation. Search first, then present ids from the results.`
-        : 'present_products had nothing to show.',
-    )
+        ? `None of those product ids can be shown: ${dropped.join(", ")} were not returned by a tool this conversation. Search first, then present ids from the results.`
+        : "present_products had nothing to show.",
+    );
   }
 
   const note =
     dropped.length > 0
-      ? ` Dropped ${dropped.join(', ')}: not returned by a tool this conversation.`
-      : ''
+      ? ` Dropped ${dropped.join(", ")}: not returned by a tool this conversation.`
+      : "";
 
-  return ok(`Showed ${cards.length} product card${cards.length === 1 ? '' : 's'}.${note}`, [
-    {
-      component: 'products',
-      payload: {
-        title: typeof input.title === 'string' ? sanitizeLabel(input.title, 80) : null,
-        layout: ['carousel', 'grid', 'list'].includes(String(input.layout))
-          ? String(input.layout)
-          : 'carousel',
-        items: cards,
-      },
-    },
-  ])
-}
-
-export function presentCart(session: StorefrontSession, cartId: string): ToolOutcome {
-  const priced = priceCart(session, cartId)
   return ok(
-    priced.lines.length === 0 ? 'Showed the cart; it is empty.' : `Showed the cart (${priced.itemCount} items).`,
-    [cartComponent(priced, 'cart')],
-  )
+    `Showed ${cards.length} product card${cards.length === 1 ? "" : "s"}.${note}`,
+    [
+      {
+        component: "products",
+        payload: {
+          title:
+            typeof input.title === "string"
+              ? sanitizeLabel(input.title, 80)
+              : null,
+          layout: ["carousel", "grid", "list"].includes(String(input.layout))
+            ? String(input.layout)
+            : "carousel",
+          items: cards,
+        },
+      },
+    ],
+  );
 }
 
-export function presentSuggestions(input: Record<string, unknown>): ToolOutcome {
-  const raw = Array.isArray(input.suggestions) ? input.suggestions : []
-  const chips = sanitizeSuggestionChips(raw.filter((c): c is string => typeof c === 'string'))
+export function presentCart(
+  session: StorefrontSession,
+  cartId: string,
+): ToolOutcome {
+  const priced = priceCart(session, cartId);
+  return ok(
+    priced.lines.length === 0
+      ? "Showed the cart; it is empty."
+      : `Showed the cart (${priced.itemCount} items).`,
+    [cartComponent(priced, "cart")],
+  );
+}
+
+export function presentSuggestions(
+  input: Record<string, unknown>,
+): ToolOutcome {
+  const raw = Array.isArray(input.suggestions) ? input.suggestions : [];
+  const chips = sanitizeSuggestionChips(
+    raw.filter((c): c is string => typeof c === "string"),
+  );
   if (chips.length === 0) {
     return failed(
-      'Every suggestion was empty after sanitizing — send 1-4 short, plain-text suggestions.',
-    )
+      "Every suggestion was empty after sanitizing — send 1-4 short, plain-text suggestions.",
+    );
   }
-  return ok(`Showed ${chips.length} suggestion chip${chips.length === 1 ? '' : 's'}.`, [
-    { component: 'suggestions', payload: { suggestions: chips } },
-  ])
+  return ok(
+    `Showed ${chips.length} suggestion chip${chips.length === 1 ? "" : "s"}.`,
+    [{ component: "suggestions", payload: { suggestions: chips } }],
+  );
 }
 
 /** Strips components that carry nothing renderable. */
 export function pruneComponents(components: UiComponent[]): UiComponent[] {
   return components.filter((component) => {
-    if (component.component === 'cart' || component.component === 'cart_state') {
-      return Array.isArray(component.payload.lines)
+    if (
+      component.component === "cart" ||
+      component.component === "cart_state"
+    ) {
+      return Array.isArray(component.payload.lines);
     }
-    if (component.component === 'products') {
-      return Array.isArray(component.payload.items) && component.payload.items.length > 0
+    if (component.component === "products") {
+      return (
+        Array.isArray(component.payload.items) &&
+        component.payload.items.length > 0
+      );
     }
-    if (component.component === 'suggestions') {
-      return Array.isArray(component.payload.suggestions) && component.payload.suggestions.length > 0
+    if (component.component === "suggestions") {
+      return (
+        Array.isArray(component.payload.suggestions) &&
+        component.payload.suggestions.length > 0
+      );
     }
-    return true
-  })
+    return true;
+  });
 }

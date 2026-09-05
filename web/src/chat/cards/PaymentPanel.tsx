@@ -1,36 +1,36 @@
-import { useEffect, useState } from 'react'
-import { api } from '../../lib/api'
-import type { CheckoutOrder } from '../types'
+import { useEffect, useRef, useState } from "react";
+import { api } from "../../lib/api";
+import type { CheckoutOrder } from "../types";
 
 interface RazorpayInstance {
-  open(): void
-  close(): void
+  open(): void;
+  close(): void;
   /** Razorpay reports a declined payment here; there is no other route to it. */
-  on(event: string, handler: (payload: RazorpayFailure) => void): void
+  on(event: string, handler: (payload: RazorpayFailure) => void): void;
 }
 
 interface RazorpayFailure {
   error?: {
-    description?: string
-    reason?: string
-    step?: string
-    source?: string
-    metadata?: { order_id?: string; payment_id?: string }
-  }
+    description?: string;
+    reason?: string;
+    step?: string;
+    source?: string;
+    metadata?: { order_id?: string; payment_id?: string };
+  };
 }
 
 declare global {
   interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => RazorpayInstance
+    Razorpay?: new (options: Record<string, unknown>) => RazorpayInstance;
   }
 }
 
 interface Props {
-  payload: CheckoutOrder
+  payload: CheckoutOrder;
   /** Who is paying, so Razorpay can pre-fill and offer the right methods. */
-  customer?: { name: string; phone: string } | null
-  onCancel(): void
-  onResult(result: Record<string, unknown>): void
+  customer?: { name: string; phone: string } | null;
+  onCancel(declineReason?: string): void;
+  onResult(result: Record<string, unknown>): void;
 }
 
 /**
@@ -45,28 +45,32 @@ interface Props {
  * server runs afterwards is the production path either way.
  */
 export function PaymentPanel({ payload, customer, onCancel, onResult }: Props) {
-  const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState<string | null>(null)
-  const live = !payload.payment.is_mock && Boolean(payload.payment.public_key)
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  /** The provider's reason, when there was one, for the trip back to the server. */
+  const declined = useRef<string | null>(null);
+  const live = !payload.payment.is_mock && Boolean(payload.payment.public_key);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busy) onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [busy, onCancel])
+      if (event.key === "Escape" && !busy) onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [busy, onCancel]);
 
   // Live Razorpay: open the hosted widget rather than Convo's panel.
   useEffect(() => {
-    if (!live) return
-    let cancelled = false
+    if (!live) return;
+    let cancelled = false;
 
     async function open() {
-      await loadRazorpayScript()
+      await loadRazorpayScript();
       if (cancelled || !window.Razorpay) {
-        setFailed('The payment window could not be opened. Try again in a moment.')
-        return
+        setFailed(
+          "The payment window could not be opened. Try again in a moment.",
+        );
+        return;
       }
       /*
        * A payment that failed is not a payment that was cancelled.
@@ -78,7 +82,7 @@ export function PaymentPanel({ payload, customer, onCancel, onResult }: Props) {
        * customer was told nothing about why. `dismissed` below keeps the
        * dismissal from overwriting a reason we already have.
        */
-      let dismissed = false
+      let dismissed = false;
 
       const checkout = new window.Razorpay({
         key: payload.payment.public_key,
@@ -97,55 +101,62 @@ export function PaymentPanel({ payload, customer, onCancel, onResult }: Props) {
          * make the customer type them again.
          */
         ...(customer
-          ? { prefill: { name: customer.name, contact: `+91${customer.phone}` } }
+          ? {
+              prefill: { name: customer.name, contact: `+91${customer.phone}` },
+            }
           : {}),
-        theme: { color: '#1b6b54' },
+        theme: { color: "#1b6b54" },
         handler: (response: Record<string, unknown>) => onResult(response),
         modal: {
           ondismiss: () => {
-            if (dismissed) return
-            dismissed = true
-            onCancel()
+            if (dismissed) return;
+            dismissed = true;
+            onCancel();
           },
         },
-      })
+      });
 
-      checkout.on('payment.failed', (event) => {
-        dismissed = true
-        const error = event?.error
+      checkout.on("payment.failed", (event) => {
+        dismissed = true;
+        const error = event?.error;
+        // Kept for the Close button below, which is what tells the server. The
+        // provider's own words go with it, so the brand's audit trail records a
+        // decline rather than a shrug.
+        declined.current =
+          error?.description ?? "The payment provider declined it.";
         setFailed(
           error?.description ||
-            'The payment did not go through. Nothing has been charged; try another method.',
-        )
-        checkout.close()
-      })
+            "The payment did not go through. Nothing has been charged; try another method.",
+        );
+        checkout.close();
+      });
 
-      checkout.open()
+      checkout.open();
     }
 
-    void open()
+    void open();
     return () => {
-      cancelled = true
-    }
-  }, [live, payload, customer, onResult, onCancel])
+      cancelled = true;
+    };
+  }, [live, payload, customer, onResult, onCancel]);
 
-  async function settle(outcome: 'success' | 'failure') {
-    setBusy(true)
-    setFailed(null)
+  async function settle(outcome: "success" | "failure") {
+    setBusy(true);
+    setFailed(null);
     try {
-      const result = await api.post<{ ok: boolean; payload: Record<string, unknown> }>(
-        `/shop/orders/${payload.order_id}/test-pay`,
-        { outcome },
-      )
+      const result = await api.post<{
+        ok: boolean;
+        payload: Record<string, unknown>;
+      }>(`/shop/orders/${payload.order_id}/test-pay`, { outcome });
       if (!result.ok) {
         // The provider declined. The server still has to say so, not this page.
-        onResult({ ...result.payload, declined: true })
-        return
+        onResult({ ...result.payload, declined: true });
+        return;
       }
-      onResult(result.payload)
+      onResult(result.payload);
     } catch {
-      setBusy(false)
-      setFailed('Could not reach the payment provider. Try again.')
+      setBusy(false);
+      setFailed("Could not reach the payment provider. Try again.");
     }
   }
 
@@ -154,17 +165,30 @@ export function PaymentPanel({ payload, customer, onCancel, onResult }: Props) {
       <div className="pay-layer">
         <div className="pay-panel">
           <p className="notice notice-danger">{failed}</p>
-          <button className="btn btn-secondary btn-block" onClick={onCancel}>
+          <button
+            className="btn btn-secondary btn-block"
+            onClick={() => onCancel(declined.current ?? undefined)}
+          >
             Close
           </button>
         </div>
       </div>
-    ) : null
+    ) : null;
   }
 
   return (
-    <div className="pay-layer" role="dialog" aria-modal="true" aria-label="Payment">
-      <button className="pay-scrim" onClick={busy ? undefined : onCancel} aria-label="Cancel payment" tabIndex={-1} />
+    <div
+      className="pay-layer"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Payment"
+    >
+      <button
+        className="pay-scrim"
+        onClick={busy ? undefined : () => onCancel()}
+        aria-label="Cancel payment"
+        tabIndex={-1}
+      />
       <div className="pay-panel">
         <header className="pay-head">
           <p className="t-sm t-muted">
@@ -177,40 +201,53 @@ export function PaymentPanel({ payload, customer, onCancel, onResult }: Props) {
         </header>
 
         <p className="notice">
-          No money moves here. Convo signs the result the way a live provider does, and the server
-          verifies that signature before the order is marked paid.
+          No money moves here. Convo signs the result the way a live provider
+          does, and the server verifies that signature before the order is
+          marked paid.
         </p>
 
         {failed && <p className="notice notice-danger">{failed}</p>}
 
         <div className="pay-actions">
-          <button className="btn btn-primary btn-lg btn-block" onClick={() => settle('success')} disabled={busy}>
+          <button
+            className="btn btn-primary btn-lg btn-block"
+            onClick={() => settle("success")}
+            disabled={busy}
+          >
             {busy && <span className="spinner" />}
             Pay {payload.total_display}
           </button>
-          <button className="btn btn-secondary btn-block" onClick={() => settle('failure')} disabled={busy}>
+          <button
+            className="btn btn-secondary btn-block"
+            onClick={() => settle("failure")}
+            disabled={busy}
+          >
             Simulate a declined payment
           </button>
-          <button className="btn btn-ghost btn-block" onClick={onCancel} disabled={busy}>
+          <button
+            className="btn btn-ghost btn-block"
+            onClick={() => onCancel()}
+            disabled={busy}
+          >
             Cancel
           </button>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-let scriptPromise: Promise<void> | null = null
+let scriptPromise: Promise<void> | null = null;
 
 function loadRazorpayScript(): Promise<void> {
-  if (window.Razorpay) return Promise.resolve()
-  if (scriptPromise) return scriptPromise
+  if (window.Razorpay) return Promise.resolve();
+  if (scriptPromise) return scriptPromise;
   scriptPromise = new Promise<void>((resolve) => {
-    const script = document.createElement('script')
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-    script.onload = () => resolve()
-    script.onerror = () => resolve()
-    document.head.appendChild(script)
-  })
-  return scriptPromise
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve();
+    script.onerror = () => resolve();
+    document.head.appendChild(script);
+  });
+  return scriptPromise;
 }
