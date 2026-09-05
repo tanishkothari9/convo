@@ -11,7 +11,10 @@ selling brand can read.
 Convo is multi-tenant, and the tenancy boundary is the brand, not the shopper.
 A brand sees only its own catalogue, orders and ledger; the conversation and
 its cart belong to the platform, because a shopper is not talking to any one
-brand. **Smart Choice** (ethnic wear) and **Kalaa Studio** (jewellery) are the
+brand. A shopper holds as many chats as they like — those share one cart and one
+set of orders, because the basket belongs to the person, not to the thread it
+was filled in. What does not carry across is provenance: a new chat has been
+shown nothing, so the agent has to find a product again before it can add it. **Smart Choice** (ethnic wear) and **Kalaa Studio** (jewellery) are the
 seeded demo tenants — rows in the `tenants` table, not the product.
 
 ## Run it
@@ -46,7 +49,7 @@ Other scripts: `npm run typecheck`, `npm test`, `npm run build`.
 server/                     Node + TypeScript, Express, node:sqlite
   src/agent/                the shopping agent — skills, gates, tools, prompt, loop
   src/models/               the ModelProvider abstraction: Claude, GPT, scripted
-  src/commerce/             the CommerceProviderAdapter: Razorpay, manual
+  src/commerce/             the CommerceProviderAdapter: Razorpay, Shopify, Frappe, manual
   src/db/                   schema, repositories, seed
   src/routes/               the public shop (SSE), dashboard API, public /v1 API
 web/                        React + Vite
@@ -213,6 +216,28 @@ and signature verification as `HMAC-SHA256(order_id + "|" + payment_id)` keyed
 with the account secret, compared in constant time. Amounts are in the smallest
 currency sub-unit on both sides, so nothing is converted.
 
+**Frappe / ERPNext** is catalogue-only, and the one provider that syncs live.
+It reads three doctypes and joins them here, since Frappe's REST API has no
+join: `Item` for what a thing is, `Item Price` for what it sells at in the
+merchant's named price list, and `Bin` for what is actually in the one warehouse
+they ship from. Stock is that warehouse's `actual_qty`, not the sum across all
+of them — ERPNext counts goods in transit, in a rejected bin and at another
+branch as stock, and none of that can be posted to a customer. An item with no
+row in the named price list is skipped rather than imported at zero.
+
+Pulling nightly gives a number that is right at 3am and wrong by lunchtime, so
+Frappe's own webhooks carry the rest: a `Stock Ledger Entry` reaches the shelf in
+seconds. A stock hook may only change the stock number — faking one must not be
+a way to change a price. Webhooks are best-effort, so **Sync catalogue** is the
+repair, and a scheduled reconcile is the honest completion of it.
+
+Because the merchant's ERP is on a host only they know, the hostname is genuine
+user input and Convo's server is what calls it. So the name is resolved and the
+resulting address vetted — loopback, private, link-local and the cloud metadata
+address all refused — and redirects are followed by hand so every hop is
+re-checked ([`safefetch.ts`](server/src/lib/safefetch.ts)). A public host is
+free to redirect to `127.0.0.1`.
+
 **Manual** is the brand's own Convo catalogue, with a self-contained test
 processor for checkout. It signs and verifies with the same construction a live
 processor uses — so the verification path a manual tenant exercises is the same
@@ -298,7 +323,7 @@ have arrived.
 npm test
 ```
 
-66 tests over the rules that must hold whichever model is running: fencing
+76 tests over the rules that must hold whichever model is running: fencing
 against forged turn markers and fence escapes, signature verification against
 tampering and cross-order replay, the tool surface, and the money path against
 a real database — the total recomputed after a price move, an item selling out
@@ -311,7 +336,15 @@ owed and the cart open, and a half-paid checkout is never handed back as a live
 cart. The security suite asserts both halves of the new boundary — brands still
 cannot read each other's orders or ledgers, an unlisted brand never reaches the
 shelf, and one shopper cannot read another's orders, addresses or provenance
-even though the cart is now a platform-level object.
+even though the cart is now a platform-level object. With several chats to a
+shopper it also asserts the other half: an order placed in one chat is reachable
+from the rest of theirs, archiving a chat hides it without touching the orders
+placed in it, and nobody can open or archive a chat that is not theirs.
+
+The Frappe suite covers the parts that would be quiet if they broke: the address
+guard against loopback, private, link-local and metadata addresses in both
+notations, a signed webhook accepted and a wrong signature refused, and a stock
+hook proving it can move stock but not price.
 
 ## Security
 
