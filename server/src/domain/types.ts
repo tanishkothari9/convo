@@ -187,6 +187,8 @@ export interface Order {
   conversationId: string;
   /** Groups the orders staged together by one checkout across brands. */
   checkoutId: string;
+  /** The signed mandate that authorised this, when an agent bought. */
+  mandateId: string | null;
   totalAmountMinor: number;
   currency: string;
   status: OrderStatus;

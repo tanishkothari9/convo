@@ -32,6 +32,7 @@ import {
 } from "../db/repo.js";
 import { transaction } from "../db/index.js";
 import { settleOrder } from "./settle.js";
+import { checkMandate, mandateId, type OpenMandate } from "./mandate.js";
 import { id } from "../lib/ids.js";
 import type {
   Order,
@@ -372,6 +373,15 @@ export async function gatedCheckout(args: {
   /** The model's own words for why it is checking out, recorded in the audit log. */
   reasoning?: string | null;
   note?: string | null;
+  /**
+   * A signed mandate, when an agent is buying rather than a person.
+   *
+   * It goes through the same checkout as everyone else on purpose. A parallel
+   * agent path would be a second money path, and the second one is always the
+   * one that drifts. The mandate is an extra gate on the way through, not a way
+   * around the ones already here.
+   */
+  mandate?: { token: string; payload: OpenMandate } | null;
 }): Promise<ToolOutcome> {
   const { session, config } = args;
 
@@ -539,6 +549,59 @@ export async function gatedCheckout(args: {
       ? orders.lastShippingAddress(session.customerSessionId)
       : null;
 
+    /*
+     * The mandate, checked against Convo's own figures.
+     *
+     * This sits after pricing and before a single order is staged, so what it
+     * checks is the per-brand totals the server computed — never anything the
+     * agent said. Each brand is tested against the allowlist separately: a cart
+     * spanning an authorised brand and an unauthorised one fails on the second
+     * rather than passing because most of it was fine. And the budget is tested
+     * against the whole cart, because checking it per brand would let an agent
+     * spend the same allowance once at every merchant.
+     */
+    let mandateRef: string | null = null;
+    if (args.mandate) {
+      mandateRef = mandateId(args.mandate.token);
+      const verdict = checkMandate({
+        mandate: args.mandate.payload,
+        perBrandMinor: groups.map((group) => ({
+          tenantId: group.tenantId,
+          amountMinor: group.amountMinor,
+        })),
+        currency: priced.currency,
+        spentMinor: orders.spentUnderMandate(mandateRef),
+      });
+
+      if (!verdict.passed) {
+        for (const group of groups) {
+          audit.record({
+            tenantId: group.tenantId,
+            conversationId: session.conversationId,
+            cartId: cart.id,
+            orderId: null,
+            actionType: "checkout.blocked",
+            amountMinor: verdict.totalMinor,
+            currency: priced.currency,
+            outcome: "blocked",
+            reasoning: args.reasoning ?? null,
+            detail: {
+              gate: "mandate",
+              mandate_id: mandateRef,
+              agent: args.mandate.payload.agent,
+              violations: verdict.violations,
+            },
+          });
+        }
+        return held(
+          "mandate",
+          `This purchase is outside what the mandate authorises: ${verdict.violations
+            .map((violation) => violation.reason)
+            .join(", ")}. Nothing has been charged.`,
+        );
+      }
+    }
+
     const checkoutId = id("cko");
 
     // The cart is locked and the orders recorded before any provider is called,
@@ -595,6 +658,7 @@ export async function gatedCheckout(args: {
           providerOrderId: null,
           lineItems: group.lineItems,
           status: "created",
+          mandateId: mandateRef,
         });
         if (carriedAddress && group.requiresShipping) {
           orders.setShippingAddress(group.tenantId, order.id, carriedAddress);

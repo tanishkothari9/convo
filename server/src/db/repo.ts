@@ -85,6 +85,7 @@ function toOrder(r: Record<string, unknown>): Order {
     cartId: String(r.cart_id),
     conversationId: String(r.conversation_id),
     checkoutId: String(r.checkout_id),
+    mandateId: r.mandate_id == null ? null : String(r.mandate_id),
     totalAmountMinor: Number(r.total_amount_minor),
     currency: String(r.currency),
     status: String(r.status) as OrderStatus,
@@ -1162,20 +1163,23 @@ export const orders = {
     providerOrderId: string | null;
     lineItems: OrderLineItem[];
     status?: OrderStatus;
+    /** The signed mandate that authorised this, when an agent bought. */
+    mandateId?: string | null;
   }): Order {
     const now = nowIso();
     const orderId = id("ord");
     run(
       `INSERT INTO orders
-         (id, tenant_id, cart_id, conversation_id, checkout_id, total_amount_minor, currency,
-          status, provider_type, provider_order_id, line_items, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, tenant_id, cart_id, conversation_id, checkout_id, mandate_id, total_amount_minor,
+          currency, status, provider_type, provider_order_id, line_items, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         input.tenantId,
         input.cartId,
         input.conversationId,
         input.checkoutId,
+        input.mandateId ?? null,
         input.totalAmountMinor,
         input.currency,
         input.status ?? "awaiting_payment",
@@ -1236,6 +1240,24 @@ export const orders = {
       "SELECT * FROM orders WHERE checkout_id = ? ORDER BY created_at, rowid",
       [checkoutId],
     ).map(toOrder);
+  },
+
+  /**
+   * What has already been committed under one mandate.
+   *
+   * Cancelled and failed orders are excluded — money that was never taken must
+   * not permanently consume someone's budget. Everything else counts, including
+   * orders still awaiting payment: an agent that staged three checkouts and paid
+   * none of them has still spoken for that money, and letting it stage a fourth
+   * would be a way to exceed the budget by never settling.
+   */
+  spentUnderMandate(mandateId: string): number {
+    const row = get<{ total: number | null }>(
+      `SELECT SUM(total_amount_minor) AS total FROM orders
+        WHERE mandate_id = ? AND status NOT IN ('cancelled', 'failed')`,
+      [mandateId],
+    );
+    return Number(row?.total ?? 0);
   },
 
   /** Every order staged by one checkout, in a stable order. */

@@ -10,6 +10,7 @@ import { catalogRoutes } from "./routes/catalog.js";
 import { providerRoutes } from "./routes/providers.js";
 import { shopRoutes } from "./routes/shop.js";
 import { apiRoutes } from "./routes/api.js";
+import { agentRoutes } from "./routes/agent.js";
 import { modelProvider } from "./models/index.js";
 import { limiters } from "./lib/ratelimit.js";
 import { clientIp, rateLimit, securityHeaders } from "./lib/security.js";
@@ -54,6 +55,17 @@ app.get("/api/health", (_req, res) => {
 // path that public requests also travel through.
 // The public REST API is versioned and authenticated by key, so it sits
 // outside /api where the cookie-authenticated surfaces live.
+/*
+ * The buyer's side, for an agent rather than a person.
+ *
+ * Before the merchant API, not after: `/v1` is guarded by the merchant key
+ * middleware, so mounting these later meant every agent call was answered with
+ * "provide your API key" for a surface that does not use one. An agent
+ * authenticates with the session token its mandate was issued against, and the
+ * mandate's own signature is what authorises a purchase.
+ */
+app.use(agentRoutes);
+
 app.use("/v1", apiRoutes);
 /*
  * Unauthenticated by design: the signature is the credential.

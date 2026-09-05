@@ -107,6 +107,13 @@ export function db(): DatabaseSync {
     handle.exec("PRAGMA foreign_keys = ON");
   }
 
+  // Orders gained the mandate that authorised them; existing rows have none.
+  try {
+    handle.exec("ALTER TABLE orders ADD COLUMN mandate_id TEXT");
+  } catch {
+    // Already there. SQLite has no IF NOT EXISTS for ADD COLUMN.
+  }
+
   // The schema is idempotent apart from ALTER TABLE, which SQLite has no
   // IF NOT EXISTS for. Those statements are split out and allowed to fail on
   // an already-migrated database; anything else failing is a real error.

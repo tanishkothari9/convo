@@ -195,6 +195,10 @@ CREATE TABLE IF NOT EXISTS orders (
   conversation_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   -- Groups the orders staged together by one checkout.
   checkout_id       TEXT NOT NULL,
+  -- Which signed mandate authorised this, when an agent bought rather than a
+  -- person. Null for an ordinary checkout. Spend is tallied against it, so a
+  -- budget depletes across checkouts instead of resetting every time.
+  mandate_id        TEXT,
   -- Authoritative amount for this brand's share, recomputed server-side.
   total_amount_minor INTEGER NOT NULL,
   currency          TEXT NOT NULL DEFAULT 'INR',
