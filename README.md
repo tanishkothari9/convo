@@ -29,34 +29,197 @@ npm run seed     # creates two demo brands, listed, with their catalogues
 npm run dev      # API on :8787, web on :5173
 ```
 
-| | |
-|---|---|
-| Shop | <http://localhost:5173/shop> |
-| Dashboard | <http://localhost:5173/login> |
+|              |                                                                    |
+| ------------ | ------------------------------------------------------------------ |
+| Shop         | <http://localhost:5173/shop>                                       |
+| Dashboard    | <http://localhost:5173/login>                                      |
 | Demo sign-in | `owner@smartchoice.demo` or `owner@kalaa.demo` / `convo-demo-2026` |
 
-Try: *"show me sarees for a wedding"* → *"add the first one"* → *"and some
-oxidised silver jhumkas"* → *"check out"*. The cart now spans both brands, so
+Try: _"show me sarees for a wedding"_ → _"add the first one"_ → _"and some
+oxidised silver jhumkas"_ → _"check out"_. The cart now spans both brands, so
 checkout stages two orders and the card pays them one at a time, naming the
 brand each time. Then open **Audit trail** in either dashboard: each brand sees
 its own half and nothing of the other's.
 
 Other scripts: `npm run typecheck`, `npm test`, `npm run build`.
 
+## How it is put together
+
+Two kinds of buyer, four sources of catalogue, and exactly one path that money
+travels down.
+
+```mermaid
+flowchart TB
+    subgraph who[" Who is buying "]
+        direction LR
+        person["A person<br/>chatting"]
+        aiagent["An AI agent<br/>with a signed mandate"]
+    end
+
+    subgraph surface[" Surface "]
+        direction LR
+        shop["/api/shop<br/><i>streamed conversation</i>"]
+        agentapi["/v1/agent<br/><i>JSON</i>"]
+    end
+
+    subgraph brain[" The model, and what it may ask for "]
+        direction LR
+        loop["Turn loop"]
+        tools["8 tools<br/><i>none of them pay</i>"]
+        model{{"Claude · GPT · scripted"}}
+    end
+
+    gates["<b>The gates</b> — code, not prompt<br/>provenance · stock · quantity · amount · address · mandate"]
+
+    subgraph settlement[" Money "]
+        direction LR
+        checkout["Split checkout<br/><i>one order per brand</i>"]
+        settle["<b>settleOrder</b><br/><i>the only way an order becomes paid</i>"]
+    end
+
+    subgraph sources[" Where the catalogue comes from "]
+        direction LR
+        frappe["Frappe / ERPNext<br/><i>sync + live webhook</i>"]
+        shopify["Shopify"]
+        typed["Typed in · /v1 API"]
+    end
+
+    person --> shop
+    aiagent --> agentapi
+    shop --> loop
+    loop <--> model
+    loop --> tools
+    tools --> gates
+    agentapi --> gates
+
+    gates -->|refused| ledger
+    gates -->|allowed| checkout
+    checkout --> settle
+    settle --> ledger[("Audit trail<br/><i>append-only</i>")]
+
+    sources --> catalogue[("Catalogue")]
+    catalogue --> gates
+
+    rzp["Razorpay"] -.->|webhook| settle
+    checkout --> rzp
+    shop -.->|signed result| settle
+
+    style gates fill:#1b6b54,color:#fff
+    style settle fill:#1b6b54,color:#fff
+    style ledger fill:#e8dcc4,color:#171717
+    style catalogue fill:#e8dcc4,color:#171717
+```
+
+Three things that diagram is making a point of:
+
+- **Both buyers land on the same gates.** The agent API is thin wiring; it does
+  not have a checkout of its own. A second money path is the one that drifts.
+- **Nothing reaches a payment provider without passing the gates**, and nothing
+  becomes _paid_ except through `settleOrder` — whether the news arrives from a
+  browser or from Razorpay's webhook.
+- **The model sits to one side of the money.** It chooses what to look up and
+  what to say. It never computes a total, and the tool that marks an order paid
+  is not in its tool list.
+
+### The split checkout
+
+The part with no equivalent in a single-merchant design: one cart, two brands,
+two payment accounts, one mandate covering both.
+
+```mermaid
+sequenceDiagram
+    participant A as AI agent
+    participant C as Convo
+    participant K as Kalaa Studio<br/>Razorpay account
+    participant S as Smart Choice<br/>Razorpay account
+
+    A->>C: checkout, with a signed mandate
+    Note over C: verify ES256 signature<br/>reject if edited or expired
+    Note over C: price the cart from live<br/>catalogue rows — not from the agent
+    Note over C: each brand against the allowlist,<br/>the whole cart against the budget
+    C->>K: create order ₹3,450
+    C->>S: create order ₹3,698
+    Note over C: any failure here unwinds<br/>both — never half a purchase
+    C-->>A: 2 orders, awaiting payment
+    K-->>C: webhook: payment captured
+    Note over C: settleOrder — amount checked<br/>against what Convo priced
+    C-->>A: order paid
+```
+
 ## What it is made of
 
 ```
 server/                     Node + TypeScript, Express, node:sqlite
-  src/agent/                the shopping agent — skills, gates, tools, prompt, loop
-  src/models/               the ModelProvider abstraction: Claude, GPT, scripted
-  src/commerce/             the CommerceProviderAdapter: Razorpay, Shopify, Frappe, manual
+  src/agent/
+    loop.ts                 the turn loop; streams text, tools and components
+    tools.ts                the tool contracts the model is given
+    gates.ts                provenance, stock, quantity, amount, address, mandate
+    settle.ts               the one place an order becomes paid
+    mandate.ts              ES256 mandates: sign, verify, check constraints
+    storefront.ts           the catalogue the agent is allowed to see
+    fencing.ts              sanitising third-party text before the model reads it
+  src/models/               ModelProvider: Claude, GPT, scripted
+  src/commerce/             CommerceProviderAdapter: Razorpay, Shopify, Frappe, manual
+  src/lib/safefetch.ts      the SSRF boundary for merchant-supplied hosts
   src/db/                   schema, repositories, seed
-  src/routes/               the public shop (SSE), dashboard API, public /v1 API
+  src/routes/
+    shop.ts                 the conversation (SSE)
+    agent.ts                the buyer's side, for an agent
+    webhooks.ts             Razorpay settlement, Frappe stock
+    api.ts                  the merchant /v1 API
 web/                        React + Vite
-  src/styles/tokens.css     the design tokens both surfaces share
-  src/dashboard/            brand dashboard
   src/chat/                 the public shop
+  src/dashboard/            brand dashboard
+  src/styles/tokens.css     the design tokens both surfaces share
 ```
+
+## Technical overview
+
+|               |                                                                                                |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| **Runtime**   | Node 24, TypeScript strict, no build step on the server (`tsx`)                                |
+| **HTTP**      | Express 5                                                                                      |
+| **Storage**   | `node:sqlite` — no database server to run                                                      |
+| **Model**     | pluggable: Claude (Messages API), GPT (Chat Completions), or a deterministic scripted provider |
+| **Payments**  | Razorpay test-mode APIs, plus a self-contained test processor                                  |
+| **Catalogue** | typed in, `/v1` REST, Shopify Admin API, or Frappe/ERPNext                                     |
+| **Front end** | React 19 + Vite, no component library                                                          |
+| **Tests**     | 91, `node --test`, against a real SQLite file                                                  |
+
+**Money is computed, never quoted.** The `checkout` tool takes no amount — its
+only parameter is a reason string. Totals are recomputed per brand from live
+catalogue rows at the moment of payment, and a provider that acknowledges a
+different figure is refused. `confirm_payment` is not in the tool list at all;
+it runs server-side after a signature verifies.
+
+**Six gates, in code rather than in the prompt.** _Provenance_ — a cart write
+only accepts a product the agent actually looked up this conversation.
+_Quantity_ — capped in the tool schema, so a confused model cannot exceed it.
+_Stock_ — re-checked at the moment of charge, not when the item went in.
+_Amount_ — the provider's figure must match Convo's. _Address_ — an order that
+needs delivering cannot be paid without one. _Mandate_ — for an agent buyer,
+the basket must fall inside what a human signed for.
+
+**Two independent bounds on an agent purchase.** The mandate says what the agent
+may spend. The server says what the basket costs. Neither is derived from the
+other, and the agent controls neither.
+
+**Multi-tenancy is per brand, not per shopper.** A brand sees only its own
+catalogue, orders and ledger, and its provider credentials are encrypted at rest
+with AES-256-GCM under a key that never leaves the server. The conversation and
+the cart are platform-level, because a shopper talking to one agent about four
+brands is not any one brand's customer.
+
+**One settlement path.** A browser handing back a signed Razorpay result and
+Razorpay's own webhook both call `settleOrder`, which is idempotent by the
+order's status — they race routinely, and the second one through must be a
+no-op rather than a second stock reservation.
+
+**Merchant-supplied hosts are treated as hostile.** Shopify is pinned to a
+`.myshopify.com` label. A self-hosted ERPNext can be anywhere, so its hostname is
+resolved and the resulting address vetted — loopback, private, link-local and the
+cloud metadata address refused — with redirects followed by hand so every hop is
+re-checked.
 
 ## Buying, when the buyer is an agent
 
@@ -86,7 +249,7 @@ to that brand's own account, under one mandate.
 
 **A mandate is not a price.** It says what an agent may spend; it never says
 what the basket costs. That figure is still recomputed from live catalogue rows
-by the same code a human's checkout uses — the mandate gate lives *inside*
+by the same code a human's checkout uses — the mandate gate lives _inside_
 [`gatedCheckout`](server/src/agent/gates.ts), not beside it, because a parallel
 agent checkout would be a second money path and the second one always drifts.
 
@@ -96,7 +259,7 @@ that stages three checkouts and settles none has still spoken for that money.
 
 In the demo Convo holds both halves of the signing key, generated at boot. In
 production the private half belongs to the person delegating and would never
-reach the server — that is a shortcut in *who holds the key*, not in the
+reach the server — that is a shortcut in _who holds the key_, not in the
 verification, which is the real path either way.
 
 ## The three ideas
@@ -107,17 +270,17 @@ The agent is adapted from [`anthropics/commerce-agents`](https://github.com/anth
 (Apache-2.0), ported from Python to TypeScript. What came from the blueprint,
 and where it lives here:
 
-| From the blueprint | In Convo |
-|---|---|
-| `commerce_common/fencing.py` — sanitizing and fencing third-party text | [`server/src/agent/fencing.ts`](server/src/agent/fencing.ts), a direct port: invisible characters, forged turn markers, transcript markup, and the fence label itself are all removed to a fixpoint |
-| `shopping_agent/backend.py` — the `StorefrontBackend` interface | [`server/src/agent/storefront.ts`](server/src/agent/storefront.ts) |
-| `shopping_agent/gates.py` — cart provenance and quantity caps | [`server/src/agent/gates.ts`](server/src/agent/gates.ts) |
-| `shopping_agent/tools/registry.py` — typed tool contracts and the `status` line | [`server/src/agent/tools.ts`](server/src/agent/tools.ts) |
-| `commerce_common/presentation.py` — validate, then join every fact from server records | [`server/src/agent/presentation.ts`](server/src/agent/presentation.ts) |
-| `commerce_common/execution.py` — one executor, the failure ladder, `status` splitting | [`server/src/agent/executor.ts`](server/src/agent/executor.ts) |
-| `commerce_common/skills.py` and `shopping-agent/skills/` | [`server/src/agent/skills.ts`](server/src/agent/skills.ts), [`server/src/agent/skills/`](server/src/agent/skills/) |
-| `shopping_agent/prompt.py` — a cached static half, a fenced dynamic half | [`server/src/agent/prompt.ts`](server/src/agent/prompt.ts) |
-| the Messages-API turn loop | [`server/src/agent/loop.ts`](server/src/agent/loop.ts) |
+| From the blueprint                                                                     | In Convo                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `commerce_common/fencing.py` — sanitizing and fencing third-party text                 | [`server/src/agent/fencing.ts`](server/src/agent/fencing.ts), a direct port: invisible characters, forged turn markers, transcript markup, and the fence label itself are all removed to a fixpoint |
+| `shopping_agent/backend.py` — the `StorefrontBackend` interface                        | [`server/src/agent/storefront.ts`](server/src/agent/storefront.ts)                                                                                                                                  |
+| `shopping_agent/gates.py` — cart provenance and quantity caps                          | [`server/src/agent/gates.ts`](server/src/agent/gates.ts)                                                                                                                                            |
+| `shopping_agent/tools/registry.py` — typed tool contracts and the `status` line        | [`server/src/agent/tools.ts`](server/src/agent/tools.ts)                                                                                                                                            |
+| `commerce_common/presentation.py` — validate, then join every fact from server records | [`server/src/agent/presentation.ts`](server/src/agent/presentation.ts)                                                                                                                              |
+| `commerce_common/execution.py` — one executor, the failure ladder, `status` splitting  | [`server/src/agent/executor.ts`](server/src/agent/executor.ts)                                                                                                                                      |
+| `commerce_common/skills.py` and `shopping-agent/skills/`                               | [`server/src/agent/skills.ts`](server/src/agent/skills.ts), [`server/src/agent/skills/`](server/src/agent/skills/)                                                                                  |
+| `shopping_agent/prompt.py` — a cached static half, a fenced dynamic half               | [`server/src/agent/prompt.ts`](server/src/agent/prompt.ts)                                                                                                                                          |
+| the Messages-API turn loop                                                             | [`server/src/agent/loop.ts`](server/src/agent/loop.ts)                                                                                                                                              |
 
 One agent with modular skills, not a router over subagents: a shopping
 conversation is one continuous state, and splitting it loses that state and
@@ -161,7 +324,7 @@ Set `LLM_PROVIDER` (and the matching key) to switch. A provider configured
 without a key falls back to `scripted` and says so in the logs.
 
 What the model buys you is chaining. On `scripted`, one message is one intent —
-*"find me blue kurtis under 2000, add one to my cart and check out"* matches
+_"find me blue kurtis under 2000, add one to my cart and check out"_ matches
 "check out", finds an empty cart and stops. On `openai` / `gpt-5.6-luna` the
 same sentence runs search → add → checkout in a single turn. What it does not
 buy you is payment: `checkout` takes no amount and there is no tool that moves
@@ -208,13 +371,13 @@ curl -X POST https://your-convo-host/v1/products/bulk \
       ] }'
 ```
 
-| | |
-|---|---|
-| `POST /v1/products/bulk` | Upsert up to 500 by your own `external_id` |
-| `GET/POST/PATCH/DELETE /v1/products` | One product at a time |
-| `GET /v1/orders` | What the agent sold |
-| `GET /v1/audit` | The ledger, for reconciliation |
-| `GET /v1/me` | Which brand a key belongs to |
+|                                      |                                            |
+| ------------------------------------ | ------------------------------------------ |
+| `POST /v1/products/bulk`             | Upsert up to 500 by your own `external_id` |
+| `GET/POST/PATCH/DELETE /v1/products` | One product at a time                      |
+| `GET /v1/orders`                     | What the agent sold                        |
+| `GET /v1/audit`                      | The ledger, for reconciliation             |
+| `GET /v1/me`                         | Which brand a key belongs to               |
 
 Bulk upsert is addressed by **your** id, so last night's sync is safe to re-run:
 it updates what changed and creates what is new instead of growing a second
@@ -232,9 +395,9 @@ A provider implements three methods
 ([`CommerceProviderAdapter`](server/src/commerce/adapter.ts)):
 
 ```ts
-fetchCatalog(credentials)                  // → CatalogItem[]
-createPaymentOrder(credentials, request)   // → PaymentOrderHandle
-verifyPayment(credentials, payload)        // → PaymentResult
+fetchCatalog(credentials); // → CatalogItem[]
+createPaymentOrder(credentials, request); // → PaymentOrderHandle
+verifyPayment(credentials, payload); // → PaymentResult
 ```
 
 Adding Shopify, WooCommerce, or a generic REST catalogue is those three
