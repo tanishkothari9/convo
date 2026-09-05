@@ -33,6 +33,27 @@ export interface StorefrontSession {
   currency: string;
 }
 
+/**
+ * Does this brand name match what the shopper called it?
+ *
+ * Compared with the spaces and punctuation stripped from both sides, because
+ * people write "Smartchoice" for "Smart Choice" and a plain `includes` says no
+ * to that. The failure was not a wrong result, which would have been obvious:
+ * the filter matched nothing, the model searched again without it, and the
+ * basket came back full of the brand the shopper had just excluded.
+ *
+ * Matched in both directions so "Kalaa" finds "Kalaa Studio" and "Kalaa Studio
+ * jewellery" finds it too.
+ */
+export function brandMatches(brandName: string, wanted: string): boolean {
+  const flatten = (value: string) =>
+    value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const a = flatten(brandName);
+  const b = flatten(wanted);
+  if (a === "" || b === "") return false;
+  return a.includes(b) || b.includes(a);
+}
+
 /** A catalogue row with the name of the brand that sells it. */
 export type ListedProduct = Product & { brandName: string };
 
@@ -108,10 +129,7 @@ export class ConvoStorefront implements StorefrontBackend {
       ) {
         return false;
       }
-      if (
-        filters.brand &&
-        !product.brandName.toLowerCase().includes(filters.brand.toLowerCase())
-      ) {
+      if (filters.brand && !brandMatches(product.brandName, filters.brand)) {
         return false;
       }
       if (

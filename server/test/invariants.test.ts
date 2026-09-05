@@ -276,3 +276,24 @@ test("unparseable tool arguments become no arguments rather than throwing", () =
   assert.deepEqual(parseToolInput("[1,2]"), {});
   assert.deepEqual(parseToolInput('{"a":1}'), { a: 1 });
 });
+
+/*
+ * A shopper who names a brand has excluded the others, and that has to survive
+ * how they spell it. When "Smartchoice" failed to match "Smart Choice" the
+ * filter matched nothing, the model searched again unfiltered, and the basket
+ * came back with the brand the shopper had just ruled out.
+ */
+test("a brand filter matches however the shopper spells it", async () => {
+  const { brandMatches } = await import("../src/agent/storefront.js");
+
+  assert.equal(brandMatches("Smart Choice", "Smartchoice"), true);
+  assert.equal(brandMatches("Smart Choice", "smart choice"), true);
+  assert.equal(brandMatches("Smart Choice", "SMARTCHOICE"), true);
+  assert.equal(brandMatches("Kalaa Studio", "Kalaa"), true);
+  assert.equal(brandMatches("Kalaa Studio", "kalaa-studio"), true);
+
+  // It still has to separate the two brands, or it is not a filter.
+  assert.equal(brandMatches("Smart Choice", "Kalaa Studio"), false);
+  assert.equal(brandMatches("Kalaa Studio", "Smart Choice"), false);
+  assert.equal(brandMatches("Smart Choice", ""), false);
+});
