@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ApiError } from '../lib/api'
 import { Mark } from '../components/Mark'
 import { ShaderField } from '../components/ShaderField'
-import { useDarkSurface } from '../lib/useDarkSurface'
 import { useAuth } from './auth'
 
 const DEMO_BRANDS = [
@@ -13,7 +12,6 @@ const DEMO_BRANDS = [
 
 export function SignIn() {
   const { session, signIn, loading } = useAuth()
-  useDarkSurface()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

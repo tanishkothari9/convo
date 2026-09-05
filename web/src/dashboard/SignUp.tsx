@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ApiError } from '../lib/api'
 import { Mark } from '../components/Mark'
 import { ShaderField } from '../components/ShaderField'
-import { useDarkSurface } from '../lib/useDarkSurface'
 import { useAuth } from './auth'
 
 function slugPreview(name: string): string {
@@ -17,7 +16,6 @@ function slugPreview(name: string): string {
 
 export function SignUp() {
   const { session, signUp, loading } = useAuth()
-  useDarkSurface()
   const navigate = useNavigate()
   const [brandName, setBrandName] = useState('')
   const [email, setEmail] = useState('')

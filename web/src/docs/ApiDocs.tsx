@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Mark } from '../components/Mark'
 import { IconArrow, IconCheck, IconCopy, IconGate, IconLink } from '../components/icons'
-import { useDarkSurface } from '../lib/useDarkSurface'
 import { useAuth } from '../dashboard/auth'
 import { api } from '../lib/api'
 import {
@@ -22,7 +21,6 @@ import {
  * request against your own catalogue rather than a template to edit.
  */
 export function ApiDocs() {
-  useDarkSurface()
   const { session } = useAuth()
   const [keyValue, setKeyValue] = useState<string | null>(null)
   const [active, setActive] = useState(SECTIONS[0]!.endpoints[0]!.id)

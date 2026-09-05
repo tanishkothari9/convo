@@ -13,7 +13,6 @@ import {
   IconProvider,
   IconRupee,
 } from './components/icons'
-import { useDarkSurface } from './lib/useDarkSurface'
 import { useAuth } from './dashboard/auth'
 
 const CAPABILITIES = [
@@ -59,11 +58,10 @@ const STEPS = [
 
 export function Landing() {
   const { session } = useAuth()
-  useDarkSurface()
 
   return (
     <main className="landing">
-      <section className="hero">
+      <section className="hero hero-dark">
         <ShaderField />
 
         <div className="hero-inner">

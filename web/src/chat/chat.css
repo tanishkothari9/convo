@@ -174,10 +174,10 @@
 }
 
 .chat-open-name {
-  font-size: clamp(1.75rem, 6vw, 2.375rem);
+  font-size: clamp(1.75rem, 6vw, 2.625rem);
   line-height: 1.08;
-  letter-spacing: -0.024em;
-  font-weight: var(--weight-semibold);
+  letter-spacing: -0.012em;
+  font-weight: var(--weight-regular);
   animation: rise var(--dur-enter) var(--ease-out) both;
 }
 
@@ -918,7 +918,7 @@
 .pay-amount {
   font-size: var(--text-display);
   line-height: 1.1;
-  letter-spacing: -0.024em;
+  letter-spacing: -0.012em;
   font-weight: var(--weight-semibold);
   margin: var(--space-1) 0;
 }

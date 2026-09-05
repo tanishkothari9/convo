@@ -17,13 +17,6 @@ html {
   text-size-adjust: 100%;
 }
 
-/* Set by the pages that paint their own dark field; see lib/useDarkSurface.ts. */
-html[data-surface='dark'],
-html[data-surface='dark'] body {
-  background: #04160f;
-  color-scheme: dark;
-}
-
 body {
   font-family: var(--font);
   font-size: var(--text-base);
@@ -83,25 +76,43 @@ a:hover {
 
 /* ── Type scale ─────────────────────────────────────────────────────────── */
 
+/* Set at 400. At 44px a regular weight has all the presence it needs, and the
+   restraint is what the rest of the page is measured against. */
 .t-display {
   font-size: var(--text-display);
   line-height: var(--text-display-lh);
   letter-spacing: var(--text-display-ls);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-regular);
 }
 
 .t-title {
   font-size: var(--text-title);
   line-height: var(--text-title-lh);
   letter-spacing: var(--text-title-ls);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-regular);
 }
 
 .t-heading {
   font-size: var(--text-heading);
   line-height: var(--text-heading-lh);
   letter-spacing: var(--text-heading-ls);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-strong);
+}
+
+/*
+ * The eyebrow.
+ *
+ * Mono, small, tracked out, upper — the one place capitals are a style rather
+ * than spelling. It names a region without competing with the heading under
+ * it, and it reads as an index entry rather than as a second, smaller title.
+ */
+.t-eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--text-eyebrow-ls);
+  text-transform: uppercase;
+  font-weight: var(--weight-regular);
+  color: var(--ink-muted);
 }
 
 .t-lg {
@@ -136,12 +147,12 @@ a:hover {
   font-feature-settings: 'tnum' 1;
 }
 
-/* Identifiers people compare character by character. Not a label style. */
+/* Identifiers people compare character by character. */
 .t-id {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   letter-spacing: -0.01em;
-  color: var(--ink-secondary);
+  color: var(--ink-muted);
 }
 
 /* ── Utility ────────────────────────────────────────────────────────────── */
@@ -181,20 +192,15 @@ a:hover {
 /* ── Gradient and material utilities ─────────────────────────────────────── */
 
 /*
- * Text filled with the brand gradient. Falls back to a solid colour wherever
- * background-clip:text is not honoured, so the word is never invisible.
+ * One word of a headline in the accent.
+ *
+ * It used to be a gradient fill. Flat now, and only ever the word the sentence
+ * actually turns on — the server *decides*, the model is *swappable*. Colouring
+ * a word for emphasis alone is the tell of a page that could not find a better
+ * way to be interesting.
  */
 .t-gradient {
-  color: var(--green-600);
-}
-
-@supports (-webkit-background-clip: text) or (background-clip: text) {
-  .t-gradient {
-    background: var(--grad-brand);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
+  color: var(--accent);
 }
 
 /* A surface that reads as glass: blur, a translucent fill, and a lit top edge. */

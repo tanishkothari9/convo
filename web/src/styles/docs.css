@@ -1,31 +1,18 @@
 /*
  * The API reference.
  *
- * Dark, like Convo's other own-brand surfaces, because a developer reading this
- * is usually reading it beside an editor. Two columns: a sticky index that says
- * where you are, and a single reading measure for the prose with the examples
- * allowed to run wider.
+ * On the same warm ground as everything else. It used to be dark, on the
+ * argument that a developer reads it beside an editor — but a developer
+ * arriving from the dashboard should not feel they have left the product, and
+ * the code blocks carry their own contrast without the whole page going with
+ * them. Two columns: a sticky index that says where you are, and a single
+ * reading measure for the prose with the examples allowed to run wider.
  */
 
 .docs {
   min-height: 100dvh;
-  background: var(--green-950);
-  color: rgba(255, 255, 255, 0.86);
-
-  --canvas: #04160f;
-  --surface: rgba(255, 255, 255, 0.045);
-  --surface-sunken: rgba(255, 255, 255, 0.03);
-  --surface-hover: rgba(255, 255, 255, 0.08);
-  --ink: #ffffff;
-  --ink-secondary: rgba(255, 255, 255, 0.7);
-  --ink-muted: rgba(255, 255, 255, 0.46);
-  --line: rgba(255, 255, 255, 0.1);
-  --line-strong: rgba(255, 255, 255, 0.2);
-  --brand: var(--green-400);
-  --brand-hover: var(--cyan-400);
-  --brand-contrast: #04160f;
-  --accent: var(--green-400);
-  --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  background: var(--canvas);
+  color: var(--ink);
 }
 
 /* ── Bar ────────────────────────────────────────────────────────────────── */
@@ -42,14 +29,14 @@
   background: rgba(4, 22, 15, 0.78);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 
 .docs-bar-title {
   font-size: var(--text-sm);
   color: var(--ink-muted);
   padding-left: var(--space-4);
-  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 1px solid var(--line);
 }
 
 .docs-bar-actions {
@@ -105,13 +92,13 @@
 }
 
 .docs-nav-link:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .docs-nav-link.is-active {
-  background: rgba(47, 176, 138, 0.14);
-  color: #fff;
+  background: var(--accent-tint);
+  color: var(--ink);
 }
 
 /* The verb is the fastest way to scan an index of endpoints, so it is coloured
@@ -128,21 +115,24 @@
   text-align: center;
 }
 
+/* Darkened for a light ground. These were pastels chosen to glow on a near-
+   black page; the same hues at full depth read as ink with a tint behind it,
+   which is what a label on paper should look like. */
 .docs-verb-get {
-  color: #7fd8ff;
-  background: rgba(127, 216, 255, 0.14);
+  color: #1d5a86;
+  background: rgba(29, 90, 134, 0.1);
 }
 .docs-verb-post {
-  color: #6ee7b7;
-  background: rgba(110, 231, 183, 0.14);
+  color: #14603f;
+  background: rgba(20, 96, 63, 0.1);
 }
 .docs-verb-patch {
-  color: #fcd34d;
-  background: rgba(252, 211, 77, 0.14);
+  color: #7a5211;
+  background: rgba(122, 82, 17, 0.11);
 }
 .docs-verb-delete {
-  color: #fca5a5;
-  background: rgba(252, 165, 165, 0.14);
+  color: #94342a;
+  background: rgba(148, 52, 42, 0.1);
 }
 
 /* ── Prose ──────────────────────────────────────────────────────────────── */
@@ -154,9 +144,9 @@
 .docs-title {
   font-size: clamp(1.875rem, 4vw, 2.5rem);
   line-height: 1.08;
-  letter-spacing: -0.026em;
-  font-weight: var(--weight-semibold);
-  color: #fff;
+  letter-spacing: -0.012em;
+  font-weight: var(--weight-regular);
+  color: var(--ink);
 }
 
 .docs-lede {
@@ -171,8 +161,8 @@
   font-size: var(--text-title);
   line-height: var(--text-title-lh);
   letter-spacing: var(--text-title-ls);
-  font-weight: var(--weight-semibold);
-  color: #fff;
+  font-weight: var(--weight-strong);
+  color: var(--ink);
 }
 
 .docs-h2 {
@@ -180,8 +170,8 @@
   font-size: var(--text-heading);
   line-height: var(--text-heading-lh);
   letter-spacing: var(--text-heading-ls);
-  font-weight: var(--weight-semibold);
-  color: #fff;
+  font-weight: var(--weight-strong);
+  color: var(--ink);
 }
 
 .docs-endpoint .docs-h2 {
@@ -201,8 +191,8 @@
   font-size: 0.8125rem;
   padding: 0.0625rem 0.25rem;
   border-radius: 0.25rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: #d8fff2;
+  background: var(--surface-sunken);
+  color: var(--ink);
 }
 
 .docs-note {
@@ -210,8 +200,8 @@
   max-width: 44rem;
   padding: var(--space-3) var(--space-4);
   border-radius: 0.625rem;
-  border-left: 2px solid var(--cyan-400);
-  background: rgba(47, 176, 138, 0.08);
+  border-left: 2px solid var(--accent);
+  background: var(--accent-tint);
   font-size: var(--text-sm);
   line-height: 1.55;
   color: var(--ink-secondary);
@@ -231,7 +221,7 @@
 .docs-section {
   margin-top: var(--space-8);
   padding-top: var(--space-6);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--line);
 }
 
 .docs-section-head {
@@ -247,8 +237,8 @@
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-card);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .docs-key-icon {
@@ -258,8 +248,8 @@
   height: 2rem;
   flex: none;
   border-radius: 0.5rem;
-  color: var(--cyan-400);
-  background: rgba(47, 176, 138, 0.14);
+  color: var(--accent);
+  background: var(--accent-tint);
 }
 
 .docs-key-body {
@@ -277,7 +267,7 @@
   display: block;
   font-family: var(--font-mono);
   font-size: 0.8125rem;
-  color: #d8fff2;
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 
@@ -295,7 +285,7 @@
   gap: var(--space-4);
   flex-wrap: wrap;
   padding-bottom: var(--space-3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 
 .docs-route {
@@ -324,7 +314,7 @@
 .docs-table-wrap {
   overflow-x: auto;
   border-radius: 0.625rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--line);
 }
 
 .docs-table {
@@ -339,14 +329,14 @@
   font-weight: var(--weight-medium);
   color: var(--ink-muted);
   padding: var(--space-2) var(--space-3);
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
 
 .docs-table td {
   padding: var(--space-3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line);
   color: var(--ink-secondary);
   vertical-align: top;
 }
@@ -369,9 +359,10 @@
 .docs-required {
   display: inline-block;
   margin-left: var(--space-2);
+  font-family: var(--font-mono);
   font-size: 0.625rem;
   letter-spacing: 0.03em;
-  color: #fca5a5;
+  color: var(--danger);
 }
 
 /* ── Code ───────────────────────────────────────────────────────────────── */
@@ -388,11 +379,15 @@
   }
 }
 
+/*
+ * The one dark object left in the product, and it earns it: this is a terminal
+ * paste, and a developer scanning for the line they need is helped by the
+ * contrast. It sits on the bone page as an inset panel rather than a section.
+ */
 .docs-code {
   position: relative;
-  border-radius: 0.625rem;
-  background: #020d09;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-card);
+  background: #14181a;
   overflow: hidden;
 }
 
@@ -421,22 +416,22 @@
   height: 1.875rem;
   border-radius: 0.4375rem;
   color: var(--ink-muted);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface);
+  border: 1px solid var(--line);
   transition:
     color var(--dur-quick) ease,
     background-color var(--dur-quick) ease;
 }
 
 .docs-copy:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+  background: var(--surface-hover);
 }
 
 .docs-foot {
   margin-top: var(--space-8);
   padding-top: var(--space-5);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--line);
 }
 
 @media (max-width: 62rem) {
@@ -452,7 +447,7 @@
     flex-wrap: wrap;
     gap: var(--space-2);
     padding-bottom: var(--space-4);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--line);
   }
 
   .docs-nav-group {
