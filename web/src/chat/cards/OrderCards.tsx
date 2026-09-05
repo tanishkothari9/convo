@@ -352,7 +352,15 @@ export function CheckoutCard({
         </div>
       )}
 
-      {paying && <PaymentPanel payload={paying} onCancel={cancel} onResult={confirm} />}
+      {paying && (
+        <PaymentPanel
+          payload={paying}
+          /* Already collected on this card, so Razorpay gets it too. */
+          customer={address ? { name: address.name, phone: address.phone } : null}
+          onCancel={cancel}
+          onResult={confirm}
+        />
+      )}
     </div>
   )
 }

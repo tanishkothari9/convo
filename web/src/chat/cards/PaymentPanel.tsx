@@ -2,14 +2,33 @@ import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import type { CheckoutOrder } from '../types'
 
+interface RazorpayInstance {
+  open(): void
+  close(): void
+  /** Razorpay reports a declined payment here; there is no other route to it. */
+  on(event: string, handler: (payload: RazorpayFailure) => void): void
+}
+
+interface RazorpayFailure {
+  error?: {
+    description?: string
+    reason?: string
+    step?: string
+    source?: string
+    metadata?: { order_id?: string; payment_id?: string }
+  }
+}
+
 declare global {
   interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open(): void; close(): void }
+    Razorpay?: new (options: Record<string, unknown>) => RazorpayInstance
   }
 }
 
 interface Props {
   payload: CheckoutOrder
+  /** Who is paying, so Razorpay can pre-fill and offer the right methods. */
+  customer?: { name: string; phone: string } | null
   onCancel(): void
   onResult(result: Record<string, unknown>): void
 }
@@ -25,7 +44,7 @@ interface Props {
  * fields, signed with the same HMAC construction — so the verification the
  * server runs afterwards is the production path either way.
  */
-export function PaymentPanel({ payload, onCancel, onResult }: Props) {
+export function PaymentPanel({ payload, customer, onCancel, onResult }: Props) {
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
   const live = !payload.payment.is_mock && Boolean(payload.payment.public_key)
@@ -49,6 +68,18 @@ export function PaymentPanel({ payload, onCancel, onResult }: Props) {
         setFailed('The payment window could not be opened. Try again in a moment.')
         return
       }
+      /*
+       * A payment that failed is not a payment that was cancelled.
+       *
+       * Razorpay's widget reports a decline through `payment.failed` and
+       * nothing else — the modal then closes, which fires `ondismiss`. Without
+       * a listener the two are indistinguishable, so every declined card was
+       * being recorded as "the customer closed the payment panel" and the
+       * customer was told nothing about why. `dismissed` below keeps the
+       * dismissal from overwriting a reason we already have.
+       */
+      let dismissed = false
+
       const checkout = new window.Razorpay({
         key: payload.payment.public_key,
         order_id: payload.payment.provider_order_id,
@@ -58,9 +89,37 @@ export function PaymentPanel({ payload, onCancel, onResult }: Props) {
         // that made the thing, and the panel should say so.
         name: payload.brand_name,
         description: `Order ${payload.order_id}`,
+        /*
+         * Razorpay filters the methods it offers by what it knows about the
+         * payer — a UPI flow with no contact number is one of the ways a
+         * checkout ends up saying "use another payment method". Convo already
+         * asked for both of these on the order card, so there is no reason to
+         * make the customer type them again.
+         */
+        ...(customer
+          ? { prefill: { name: customer.name, contact: `+91${customer.phone}` } }
+          : {}),
+        theme: { color: '#1b6b54' },
         handler: (response: Record<string, unknown>) => onResult(response),
-        modal: { ondismiss: onCancel },
+        modal: {
+          ondismiss: () => {
+            if (dismissed) return
+            dismissed = true
+            onCancel()
+          },
+        },
       })
+
+      checkout.on('payment.failed', (event) => {
+        dismissed = true
+        const error = event?.error
+        setFailed(
+          error?.description ||
+            'The payment did not go through. Nothing has been charged; try another method.',
+        )
+        checkout.close()
+      })
+
       checkout.open()
     }
 
@@ -68,7 +127,7 @@ export function PaymentPanel({ payload, onCancel, onResult }: Props) {
     return () => {
       cancelled = true
     }
-  }, [live, payload, onResult, onCancel])
+  }, [live, payload, customer, onResult, onCancel])
 
   async function settle(outcome: 'success' | 'failure') {
     setBusy(true)
