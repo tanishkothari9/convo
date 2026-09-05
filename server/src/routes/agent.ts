@@ -8,7 +8,12 @@ import {
   tenants,
 } from "../db/repo.js";
 import { ensureSession } from "../agent/storefront.js";
-import { gatedAddToCart, gatedCheckout, cartPayload } from "../agent/gates.js";
+import {
+  cartPayload,
+  gatedAddToCart,
+  gatedCheckout,
+  gatedSetAddress,
+} from "../agent/gates.js";
 import { priceCart, ConvoStorefront } from "../agent/storefront.js";
 import { DEFAULT_AGENT_CONFIG } from "../agent/config.js";
 import {
@@ -323,6 +328,34 @@ agentRoutes.post(
     }
 
     res.status(201).json({ ok: true, checkout: checkout.payload });
+  }),
+);
+
+/**
+ * Where to send it.
+ *
+ * No model on this path at all — the agent posts structured fields and the
+ * server validates them, so the privacy question that shapes the conversational
+ * tool does not arise here. An address is also the one thing an autonomous
+ * buyer genuinely cannot do without: an order nobody can deliver is not a
+ * purchase.
+ */
+agentRoutes.post(
+  "/v1/agent/address",
+  route(async (req, res) => {
+    const session = ensureSession(agentSession(req), CURRENCY);
+    const outcome = gatedSetAddress({ session, address: req.body });
+
+    if (outcome.isError || outcome.heldBy) {
+      res.status(422).json({
+        ok: false,
+        reason: outcome.text,
+        gate: outcome.heldBy ?? null,
+      });
+      return;
+    }
+    // Confirmed, not echoed: an agent that posted it already has it.
+    res.json({ ok: true, saved: true });
   }),
 );
 

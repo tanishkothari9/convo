@@ -179,6 +179,59 @@ export function buildTools(config: AgentConfig): ToolDefinition[] {
       },
     },
     {
+      /*
+       * Deliberately last among the money tools, and deliberately narrow.
+       *
+       * The address stays out of the model wherever it can: the order card has
+       * a form that posts straight to the server, and that is the path a
+       * customer should use. But if they type it into the chat instead, it has
+       * already reached the model — refusing to act on it protects nothing and
+       * just strands the order. So the tool accepts it, the server validates
+       * it, and the arguments are redacted out of the stored transcript so it
+       * is written once, on the order, rather than living in the conversation.
+       *
+       * The tool result never repeats it back. A model that cannot re-read an
+       * address cannot put one in a sentence by accident.
+       */
+      name: "set_delivery_address",
+      description:
+        "Save the delivery address for the orders in the current checkout. Use it only when the customer has given a full address in the conversation; if anything is missing, ask for the missing part rather than guessing. Prefer the form on the order card — mention it if the customer has not typed one. Never repeat an address back to the customer.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            maxLength: 120,
+            description: "Who the parcel is for.",
+          },
+          phone: {
+            type: "string",
+            maxLength: 20,
+            description: "10-digit Indian mobile number.",
+          },
+          line1: {
+            type: "string",
+            maxLength: 200,
+            description: "House or building and street.",
+          },
+          line2: {
+            type: "string",
+            maxLength: 200,
+            description: "Area or landmark. Optional.",
+          },
+          city: { type: "string", maxLength: 80 },
+          state: { type: "string", maxLength: 80 },
+          postalCode: {
+            type: "string",
+            maxLength: 12,
+            description: "Six-digit PIN code.",
+          },
+        },
+        required: ["name", "phone", "line1", "city", "state", "postalCode"],
+        additionalProperties: false,
+      },
+    },
+    {
       name: "get_orders",
       description:
         "Orders placed in this conversation, newest first. The only source for an order's status, total, or contents.",

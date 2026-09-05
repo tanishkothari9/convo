@@ -252,6 +252,23 @@ export async function* runTurn(
   yield { type: "done", messageId: stored };
 }
 
+/**
+ * A delivery address is written to the order, not into the transcript.
+ *
+ * `set_delivery_address` is the one tool whose arguments are somebody's name,
+ * phone number and home. Stored as-is they would sit in `messages.tool_calls`
+ * for the life of the conversation, be replayed into the model's context on
+ * every later turn, and come back out of `/shop/history` on every reload. The
+ * order needs the address once; the transcript never does.
+ */
+function redactToolCalls(toolCalls: ToolCallRecord[]): ToolCallRecord[] {
+  return toolCalls.map((call) =>
+    call.name === "set_delivery_address"
+      ? { ...call, input: { redacted: "delivery address saved to the order" } }
+      : call,
+  );
+}
+
 function persist(
   conversationId: string,
   text: string,
@@ -263,7 +280,7 @@ function persist(
     conversationId,
     role: "assistant",
     content: text,
-    toolCalls: toolCalls.length > 0 ? toolCalls : null,
+    toolCalls: toolCalls.length > 0 ? redactToolCalls(toolCalls) : null,
     toolResults: toolResults.length > 0 ? toolResults : null,
     ui: components.length > 0 ? components : null,
   });

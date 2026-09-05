@@ -19,6 +19,7 @@ import {
   gatedAddToCart,
   gatedCheckout,
   gatedRemoveFromCart,
+  gatedSetAddress,
   gatedUpdateCartItem,
   viewCart,
 } from "./gates.js";
@@ -253,6 +254,9 @@ async function dispatch(
         reasoning: context.reasoning || null,
         note: typeof input.note === "string" ? input.note : null,
       });
+
+    case "set_delivery_address":
+      return gatedSetAddress({ session, address: input });
 
     case "get_orders": {
       const limit = clamp(Number(input.limit ?? 5), 1, 10);

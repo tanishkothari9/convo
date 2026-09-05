@@ -32,6 +32,7 @@ import {
 } from "../db/repo.js";
 import { transaction } from "../db/index.js";
 import { settleOrder } from "./settle.js";
+import { AddressError, readAddress } from "../domain/address.js";
 import { checkMandate, mandateId, type OpenMandate } from "./mandate.js";
 import { id } from "../lib/ids.js";
 import type {
@@ -367,6 +368,74 @@ export { cartComponent };
  * nothing is staged and the customer is told which brand and why. A checkout
  * that half-worked is worse than one that did not start.
  */
+/**
+ * The delivery address, from the conversation.
+ *
+ * Applied to every unpaid order in the shopper's latest checkout that actually
+ * needs shipping — a shopper has one doorstep however many brands they bought
+ * from, and asking again per brand would be absurd.
+ *
+ * What comes back to the model is a confirmation and nothing else. It never
+ * gets the address echoed, so it cannot re-read one into a sentence.
+ */
+export function gatedSetAddress(args: {
+  session: StorefrontSession;
+  address: unknown;
+}): ToolOutcome {
+  const { session } = args;
+
+  let address: ShippingAddress;
+  try {
+    address = readAddress(args.address);
+  } catch (error) {
+    return failed(
+      error instanceof AddressError
+        ? `That address is not complete: ${(error as Error).message} Ask the customer for the missing part.`
+        : "That address could not be read. Ask the customer to fill it in on the order card.",
+    );
+  }
+
+  const pending = orders.pendingForCustomer(session.customerSessionId);
+  if (pending.length === 0) {
+    return failed(
+      "There is no order waiting for an address. Check out first, then save it.",
+    );
+  }
+
+  let applied = 0;
+  transaction(() => {
+    for (const order of pending) {
+      if (!tenants.byId(order.tenantId)?.requiresShipping) continue;
+      orders.setShippingAddress(order.tenantId, order.id, address);
+      applied += 1;
+      audit.record({
+        tenantId: order.tenantId,
+        conversationId: session.conversationId,
+        cartId: order.cartId,
+        orderId: order.id,
+        actionType: "order.created",
+        amountMinor: order.totalAmountMinor,
+        currency: order.currency,
+        outcome: "ok",
+        reasoning: null,
+        // The address itself is on the order, not in here. A ledger a brand
+        // reads daily is the wrong place to copy someone's home to.
+        detail: { event: "delivery_address_set", source: "conversation" },
+      });
+    }
+  });
+
+  if (applied === 0) {
+    return ok(
+      "Nothing in this checkout needs delivering, so no address was needed. Say so briefly.",
+    );
+  }
+  return ok(
+    `Saved for ${applied === 1 ? "the order" : `all ${applied} orders`} in this checkout. ` +
+      "Confirm it is saved in one short sentence. Do not repeat the address back.",
+  );
+}
+
 export async function gatedCheckout(args: {
   session: StorefrontSession;
   config: AgentConfig;
@@ -929,8 +998,8 @@ export async function gatedConfirmPayment(args: {
     });
     return held(
       ADDRESS_GATE,
-      "This order has no delivery address, so it cannot be paid for. The customer fills that in " +
-        "on the order card; ask them to complete it there rather than typing it in the chat.",
+      "This order has no delivery address, so it cannot be paid for. Ask the customer to fill it " +
+        "in on the order card — or, if they would rather say it, take it with set_delivery_address.",
     );
   }
 
