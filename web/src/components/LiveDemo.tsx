@@ -121,7 +121,7 @@ export function LiveDemo() {
   const status = current.kind === 'status' ? current.text : null
 
   return (
-    <div className="demo glass-dark">
+    <div className="demo">
       <div className="demo-bar">
         <span className="demo-brand">
           <Mark size={22} />

@@ -212,13 +212,6 @@ a:hover {
   box-shadow: var(--shadow-lift);
 }
 
-.glass-dark {
-  background: var(--glass-dark);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-line);
-}
-
 /*
  * A one-pixel gradient border. Two backgrounds, one clipped to the padding box
  * and one to the border box, so the edge can carry a gradient without a
@@ -238,9 +231,4 @@ a:hover {
     -webkit-backdrop-filter: none;
   }
 
-  .glass-dark {
-    background: var(--green-900);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
   }
-}

@@ -276,7 +276,6 @@
      A translucent surface is a material, so it gets a bright top edge where
      the light would catch it, not just a border. */
   --glass-light: rgba(251, 251, 248, 0.78);
-  --glass-dark: rgba(9, 22, 18, 0.44);
   --glass-line: rgba(255, 255, 255, 0.16);
   --glass-blur: blur(22px) saturate(180%);
 

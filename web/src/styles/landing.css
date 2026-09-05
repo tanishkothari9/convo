@@ -761,16 +761,6 @@
 
 /* A wash that only appears under the pointer, so the grid is calm at rest and
    the card you are reading is the lit one. */
-.capability::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(90% 70% at 20% 0%, var(--accent-tint), transparent 66%);
-  opacity: 0;
-  transition: opacity var(--dur-enter) var(--ease-out);
-  pointer-events: none;
-}
-
 @media (hover: hover) and (pointer: fine) {
   .capability:hover {
     transform: translateY(-3px);
@@ -783,9 +773,6 @@
       0 24px 28px rgba(23, 23, 23, 0.04);
   }
 
-  .capability:hover::before {
-    opacity: 1;
-  }
 }
 
 .capability-icon {
@@ -805,9 +792,18 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  /*
+   * The icon does not invert on hover.
+   *
+   * It used to flood the tile with the accent and drop the glyph to
+   * near-black, which was written when the accent was a bright mint on a dark
+   * page — dark-on-mint read fine there. On bottle green it is a dark glyph on
+   * a dark fill: muddy, and a colour flip is a lot of event for a mouse
+   * passing over. The card lifting is the feedback; the tile just deepens.
+   */
   .capability:hover .capability-icon {
-    color: var(--green-950);
-    background: var(--accent);
+    background: var(--accent-tint-strong);
+    border-color: var(--accent-tint-strong);
   }
 }
 

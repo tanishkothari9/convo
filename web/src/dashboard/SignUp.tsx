@@ -42,7 +42,7 @@ export function SignUp() {
 
   return (
     <main className="auth">
-      <div className="auth-panel glass-dark">
+      <div className="auth-panel">
         <Link to="/" className="auth-mark" aria-label="Convo home">
           <Mark size={26} />
         </Link>
