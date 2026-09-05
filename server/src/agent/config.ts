@@ -19,7 +19,14 @@ export const DEFAULT_AGENT_CONFIG: AgentConfig = {
   maxSearchResults: 8,
   maxCartLines: 20,
   maxQuantityPerItem: 10,
-  maxToolIterations: 6,
+  /*
+   * One round per cart write, so "add five things" needs seven: a skill load, a
+   * search, and five adds. At six it ran out mid-basket and stopped with two or
+   * three in the cart, which read as the agent ignoring the request. Fourteen
+   * covers a five-item basket with room to re-search, and the loop still forces
+   * a tool-free round at the end so it cannot spin.
+   */
+  maxToolIterations: 14,
   maxFencedChars: 12_000,
   maxHistoryMessages: 40,
   maxOrderTotalMinor: 50_000_000, // ₹5,00,000

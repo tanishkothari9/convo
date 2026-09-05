@@ -549,6 +549,15 @@ export function ShopPage() {
             setCartOpen(false);
             send(text);
           }}
+          onRemove={async (productId) => {
+            // Straight to the server and straight back into the panel, so the
+            // line disappears on the click rather than after a model turn.
+            const next = await api.post<{ cart: CartPayload }>(
+              "/shop/cart/remove",
+              { productId },
+            );
+            setCart(next.cart);
+          }}
           busy={thinking}
         />
       )}

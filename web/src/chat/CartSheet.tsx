@@ -12,11 +12,14 @@ export function CartSheet({
   cart,
   onClose,
   onAsk,
+  onRemove,
   busy,
 }: {
   cart: CartPayload;
   onClose(): void;
   onAsk(text: string): void;
+  /** Remove a line where it sits, without spending a model turn on it. */
+  onRemove(productId: string): void;
   busy: boolean;
 }) {
   useEffect(() => {
@@ -96,9 +99,7 @@ export function CartSheet({
                       <button
                         className="cart-line-remove t-sm"
                         disabled={busy}
-                        onClick={() =>
-                          onAsk(`Remove "${line.name}" from my cart`)
-                        }
+                        onClick={() => onRemove(line.product_id)}
                       >
                         Remove
                       </button>

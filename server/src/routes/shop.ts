@@ -288,6 +288,36 @@ shopRoutes.get(
   }),
 );
 
+/**
+ * Change the cart from the cart, not by asking the agent to.
+ *
+ * Removing a line used to post "Remove X from my cart" into the chat, which
+ * spent a model turn, put a sentence in the transcript nobody wrote, and left
+ * the drawer showing the old contents until the reply came back. A button on a
+ * line should change that line.
+ *
+ * It goes through the same repository call the agent's own cart tool uses, so
+ * the caps and the cart lock still apply, and a locked cart is refused here
+ * exactly as it is there.
+ */
+shopRoutes.post(
+  "/shop/cart/remove",
+  route(async (req, res) => {
+    const session = ensureSession(customerSession(req, res), CURRENCY);
+    const productId = requireString(req.body, "productId", 120);
+    const cart = carts.ensureOpen(session.customerSessionId);
+
+    if (cart.status !== "open") {
+      throw badRequest(
+        "This cart is being paid for and cannot be changed.",
+        "cart_locked",
+      );
+    }
+    carts.removeItem(cart.id, productId);
+    res.json({ cart: cartPayload(priceCart(session, cart.id)) });
+  }),
+);
+
 // ── payment ─────────────────────────────────────────────────────────────────
 
 /**
