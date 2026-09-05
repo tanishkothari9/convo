@@ -41,7 +41,7 @@ export const SECTIONS: Section[] = [
     id: 'products',
     title: 'Products',
     blurb:
-      'Your catalogue. The agent searches these records and nothing else, so what is here is exactly what a customer can be sold.',
+      'Your catalogue. The agent searches these records and nothing else, so what is here is exactly what a customer can be sold — once your brand is listed. Pushing products does not put them on the marketplace by itself; turn on listing in Dashboard → Settings, and nothing of yours is searchable until you do.',
     endpoints: [
       {
         id: 'products-bulk',
