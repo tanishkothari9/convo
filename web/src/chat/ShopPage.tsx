@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { IconAgent, IconCart, IconMenu, IconPlus } from "../components/icons";
+import {
+  IconAgent,
+  IconCart,
+  IconMenu,
+  IconPlus,
+  IconReceipt,
+} from "../components/icons";
 import { Thinking } from "./Thinking";
 import { PixelStreet } from "../components/PixelStreet";
 import { Wordmark } from "../components/Wordmark";
 import { Composer } from "./Composer";
 import { CartSheet } from "./CartSheet";
+import { AccountSheet } from "./AccountSheet";
 import { AgentSheet } from "./AgentSheet";
 import { ChatSheet } from "./ChatSheet";
 import { ProductCards } from "./cards/ProductCards";
@@ -73,6 +80,7 @@ export function ShopPage() {
   const [cartOpen, setCartOpen] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
   const [agentOpen, setAgentOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -427,6 +435,17 @@ export function ShopPage() {
 
             {/* The shopper is the one who delegates a budget, so the way to
                 hand one to an agent belongs on the shopper's own screen. */}
+            {/* Orders live behind here rather than in the transcript, which
+                scrolls past them. */}
+            <button
+              className="chat-head-btn"
+              onClick={() => setAccountOpen(true)}
+              aria-label="Your orders"
+              title="Your orders"
+            >
+              <IconReceipt size={18} />
+            </button>
+
             <button
               className="chat-head-btn"
               onClick={() => setAgentOpen(true)}
@@ -527,6 +546,17 @@ export function ShopPage() {
         closed={shop.catalogSize === 0 && messages.length === 0}
         onSend={send}
       />
+
+      {accountOpen && (
+        <AccountSheet
+          onClose={() => setAccountOpen(false)}
+          onSignedIn={() => {
+            // The cookie now points at a different customer session, so the
+            // cart and chat list on screen belong to somebody else.
+            window.location.reload();
+          }}
+        />
+      )}
 
       {agentOpen && <AgentSheet onClose={() => setAgentOpen(false)} />}
 

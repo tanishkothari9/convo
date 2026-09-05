@@ -10,13 +10,25 @@
  * duplicating them.
  */
 import { db, transaction } from "./index.js";
-import { connections, products, tenants, users } from "./repo.js";
+import {
+  carts,
+  connections,
+  conversations,
+  orders,
+  products,
+  shoppers,
+  tenants,
+  users,
+} from "./repo.js";
 import { passwordFields } from "../auth/index.js";
 import { toMinor } from "../lib/money.js";
+import { id } from "../lib/ids.js";
 import { log } from "../lib/logger.js";
 import { env } from "../env.js";
 
 const DEMO_PASSWORD = "convo-demo-2026";
+/** The same password, so there is only one to remember. */
+const DEMO_SHOPPER = "shopper@convo.demo";
 
 interface SeedProduct {
   name: string;
@@ -539,7 +551,74 @@ function seed(): void {
   db();
   transaction(() => {
     for (const brand of BRANDS) seedBrand(brand);
+    seedShopper();
   });
+
+  /**
+   * A shopper with an account and something already bought.
+   *
+   * With one paid order and one still awaiting payment, so the orders page has
+   * both states in it the moment you sign in. An empty history demonstrates
+   * nothing, and staging the orders through a live checkout would need a payment
+   * provider to be reachable from a seed script.
+   */
+  function seedShopper(): void {
+    if (shoppers.credentialsByEmail(DEMO_SHOPPER)) return;
+
+    const { hash, salt } = passwordFields(DEMO_PASSWORD);
+    const shopper = shoppers.create({
+      email: DEMO_SHOPPER,
+      passwordHash: hash,
+      passwordSalt: salt,
+      displayName: "Anika Rao",
+    });
+
+    const conversation = conversations.ensure(shopper.customerSessionId);
+    const cart = carts.ensureOpen(shopper.customerSessionId);
+    const checkoutId = id("cko");
+
+    // One order per brand, exactly as a real split checkout would leave them.
+    const past: Array<{
+      tenantIndex: number;
+      status: "paid" | "awaiting_payment";
+    }> = [
+      { tenantIndex: 0, status: "paid" },
+      { tenantIndex: 1, status: "awaiting_payment" },
+    ];
+
+    for (const entry of past) {
+      const brand = BRANDS[entry.tenantIndex]!;
+      const tenant = tenants.bySlug(brand.slug);
+      if (!tenant) continue;
+      const catalogue = products.list(tenant.id);
+      const item = catalogue[0];
+      if (!item) continue;
+
+      orders.create({
+        tenantId: tenant.id,
+        cartId: cart.id,
+        conversationId: conversation.id,
+        checkoutId,
+        totalAmountMinor: item.priceMinor,
+        currency: "INR",
+        providerType: "manual",
+        providerOrderId: null,
+        lineItems: [
+          {
+            productId: item.id,
+            name: item.name,
+            quantity: 1,
+            unitPriceMinor: item.priceMinor,
+            lineTotalMinor: item.priceMinor,
+          },
+        ],
+        status: entry.status,
+      });
+    }
+
+    carts.setStatus(cart.id, "converted");
+    log.info("seeded demo shopper", { email: DEMO_SHOPPER });
+  }
 
   const lines = BRANDS.map(
     (brand) =>
@@ -553,6 +632,10 @@ ${lines}
 
     Password    ${DEMO_PASSWORD}
     Dashboard   ${env.publicBaseUrl}/login
+
+  And one shopper, with two past orders already on the account.
+
+    Shopper     ${DEMO_SHOPPER}
     Shop        ${env.publicBaseUrl}/shop
 `);
 }

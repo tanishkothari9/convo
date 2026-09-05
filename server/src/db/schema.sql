@@ -128,6 +128,24 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE INDEX IF NOT EXISTS idx_conversations_customer
   ON conversations(customer_session_id, last_active_at DESC);
 
+-- A shopper with an account.
+--
+-- Really just a named, password-protected customer session: everything a
+-- shopper owns — conversations, carts, orders — already keys off
+-- customer_session_id, so signing in sets that cookie to this row's own id and
+-- every existing screen keeps working. No second identity to reconcile.
+CREATE TABLE IF NOT EXISTS shoppers (
+  id                  TEXT PRIMARY KEY,
+  email               TEXT NOT NULL UNIQUE,
+  password_hash       TEXT NOT NULL,
+  password_salt       TEXT NOT NULL,
+  display_name        TEXT,
+  -- The session their cookie is set to. Stable for the life of the account, so
+  -- their history follows them between devices.
+  customer_session_id TEXT NOT NULL UNIQUE,
+  created_at          TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS messages (
   id                TEXT PRIMARY KEY,
   conversation_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,

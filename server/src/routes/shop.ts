@@ -12,15 +12,27 @@
  */
 import { Router, type Request, type Response } from "express";
 import {
+  burnPasswordWork,
+  passwordFields,
+  passwordMatches,
+} from "../auth/index.js";
+import {
   audit,
   carts,
   conversations,
   messages as messageStore,
   orders,
   products,
+  shoppers,
   tenants,
 } from "../db/repo.js";
-import { badRequest, notFound, requireString, route } from "../lib/http.js";
+import {
+  badRequest,
+  notFound,
+  optionalString,
+  requireString,
+  route,
+} from "../lib/http.js";
 import { limiters } from "../lib/ratelimit.js";
 import { RateLimitError } from "../lib/security.js";
 import { token } from "../lib/ids.js";
@@ -43,18 +55,23 @@ const CUSTOMER_COOKIE = "convo_customer";
 /** The shop's settlement currency. One marketplace, one currency, for now. */
 const CURRENCY = "INR";
 
-/** The customer's session id, minted on first contact. */
-function customerSession(req: Request, res: Response): string {
-  const existing = req.cookies?.[CUSTOMER_COOKIE];
-  if (typeof existing === "string" && existing.length >= 20) return existing;
-  const fresh = token();
-  res.cookie(CUSTOMER_COOKIE, fresh, {
+/** Point this browser at a customer session. Signing in and out both do this. */
+function setCustomerCookie(res: Response, customerSessionId: string): void {
+  res.cookie(CUSTOMER_COOKIE, customerSessionId, {
     httpOnly: true,
     sameSite: "lax",
     secure: env.isProduction,
     maxAge: 30 * 86_400_000,
     path: "/",
   });
+}
+
+/** The customer's session id, minted on first contact. */
+function customerSession(req: Request, res: Response): string {
+  const existing = req.cookies?.[CUSTOMER_COOKIE];
+  if (typeof existing === "string" && existing.length >= 20) return existing;
+  const fresh = token();
+  setCustomerCookie(res, fresh);
   return fresh;
 }
 
@@ -285,6 +302,112 @@ shopRoutes.get(
     const session = ensureSession(customerSession(req, res), CURRENCY);
     const cart = carts.ensureOpen(session.customerSessionId);
     res.json({ cart: cartPayload(priceCart(session, cart.id)) });
+  }),
+);
+
+/*
+ * Shopper accounts.
+ *
+ * A shopper is an anonymous customer session until they make one. Signing in
+ * points their cookie at the account's own session, so the cart, the chats and
+ * the orders that belong to that account come with them — and everything
+ * downstream keeps working, because it was all keyed on the session already.
+ *
+ * Signing in abandons whatever was in the anonymous cart rather than merging
+ * it. Merging two carts silently is how someone ends up paying for something
+ * they put in the basket on a shared laptop last week.
+ */
+shopRoutes.post(
+  "/shop/account/signup",
+  route(async (req, res) => {
+    const email = requireString(req.body, "email", 200).toLowerCase();
+    const password = requireString(req.body, "password", 200);
+    if (password.length < 8) {
+      throw badRequest("Use at least 8 characters.", "weak_password");
+    }
+    if (shoppers.credentialsByEmail(email)) {
+      throw badRequest("That email already has an account.", "email_taken");
+    }
+    const { hash, salt } = passwordFields(password);
+    const shopper = shoppers.create({
+      email,
+      passwordHash: hash,
+      passwordSalt: salt,
+      displayName: optionalString(req.body, "name", 120),
+    });
+    setCustomerCookie(res, shopper.customerSessionId);
+    res.status(201).json({ shopper: { email: shopper.email, name: null } });
+  }),
+);
+
+shopRoutes.post(
+  "/shop/account/login",
+  route(async (req, res) => {
+    const email = requireString(req.body, "email", 200).toLowerCase();
+    const password = requireString(req.body, "password", 200);
+
+    const credentials = shoppers.credentialsByEmail(email);
+    // Same message and the same amount of work either way, so neither the
+    // wording nor the timing says whether the account exists.
+    if (!credentials) {
+      burnPasswordWork(password);
+      throw badRequest("That email and password do not match.", "bad_login");
+    }
+    if (!passwordMatches(password, credentials.hash, credentials.salt)) {
+      throw badRequest("That email and password do not match.", "bad_login");
+    }
+
+    setCustomerCookie(res, credentials.customerSessionId);
+    const shopper = shoppers.bySession(credentials.customerSessionId);
+    res.json({
+      shopper: { email: shopper?.email, name: shopper?.displayName ?? null },
+    });
+  }),
+);
+
+/** Back to being anonymous. The account keeps everything it owns. */
+shopRoutes.post(
+  "/shop/account/logout",
+  route(async (_req, res) => {
+    setCustomerCookie(res, token());
+    res.json({ ok: true });
+  }),
+);
+
+/** Who is shopping, if anyone signed in. */
+shopRoutes.get(
+  "/shop/account",
+  route(async (req, res) => {
+    const shopper = shoppers.bySession(customerSession(req, res));
+    res.json({
+      shopper: shopper
+        ? { email: shopper.email, name: shopper.displayName }
+        : null,
+    });
+  }),
+);
+
+/** Everything this shopper has bought, newest first. */
+shopRoutes.get(
+  "/shop/orders",
+  route(async (req, res) => {
+    const customerSessionId = customerSession(req, res);
+    res.json({
+      orders: orders.listForCustomer(customerSessionId, 50).map((order) => ({
+        order_id: order.id,
+        brand_name: tenants.byId(order.tenantId)?.name ?? null,
+        checkout_id: order.checkoutId,
+        status: order.status,
+        total_display: formatMoney(order.totalAmountMinor, order.currency),
+        placed_at: order.createdAt,
+        line_items: order.lineItems.map((line) => ({
+          name: line.name,
+          quantity: line.quantity,
+        })),
+        failure_reason: order.failureReason,
+        by_agent: Boolean(order.mandateId),
+      })),
+    });
   }),
 );
 

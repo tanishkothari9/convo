@@ -4,7 +4,7 @@
  * conversation, cart, order, or audit data anywhere in the codebase.
  */
 import { all, get, run, transaction } from "./index.js";
-import { id, nowIso } from "../lib/ids.js";
+import { id, nowIso, token } from "../lib/ids.js";
 import { STOCK_UNTRACKED } from "../commerce/razorpay/adapter.js";
 import { addressKey } from "../domain/address.js";
 import type { ShippingAddress } from "../domain/address.js";
@@ -810,6 +810,70 @@ function toConversation(r: Record<string, unknown>): Conversation {
     archivedAt: r.archived_at == null ? null : String(r.archived_at),
   };
 }
+
+export const shoppers = {
+  create(input: {
+    email: string;
+    passwordHash: string;
+    passwordSalt: string;
+    displayName?: string | null;
+  }): { id: string; email: string; customerSessionId: string } {
+    const now = nowIso();
+    const shopperId = id("shp");
+    // The session id is minted here and never changes, so a shopper who signs
+    // in on a second device lands on the same cart and the same order history.
+    const customerSessionId = token();
+    run(
+      `INSERT INTO shoppers
+         (id, email, password_hash, password_salt, display_name, customer_session_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        shopperId,
+        input.email,
+        input.passwordHash,
+        input.passwordSalt,
+        input.displayName ?? null,
+        customerSessionId,
+        now,
+      ],
+    );
+    return { id: shopperId, email: input.email, customerSessionId };
+  },
+
+  credentialsByEmail(
+    email: string,
+  ):
+    | { id: string; hash: string; salt: string; customerSessionId: string }
+    | undefined {
+    const r = get(
+      "SELECT id, password_hash, password_salt, customer_session_id FROM shoppers WHERE email = ?",
+      [email],
+    );
+    if (!r) return undefined;
+    return {
+      id: String(r.id),
+      hash: String(r.password_hash),
+      salt: String(r.password_salt),
+      customerSessionId: String(r.customer_session_id),
+    };
+  },
+
+  /** Who, if anyone, this customer session belongs to. */
+  bySession(
+    customerSessionId: string,
+  ): { id: string; email: string; displayName: string | null } | undefined {
+    const r = get(
+      "SELECT id, email, display_name FROM shoppers WHERE customer_session_id = ?",
+      [customerSessionId],
+    );
+    if (!r) return undefined;
+    return {
+      id: String(r.id),
+      email: String(r.email),
+      displayName: r.display_name == null ? null : String(r.display_name),
+    };
+  },
+};
 
 export const conversations = {
   /** The shopper's most recent live thread, started if they have none. */
