@@ -1,5 +1,5 @@
-import { randomBytes } from 'node:crypto'
-import type { CommerceProviderAdapter } from './adapter.js'
+import { randomBytes } from "node:crypto";
+import type { CommerceProviderAdapter } from "./adapter.js";
 import {
   type CatalogItem,
   type PaymentCallbackPayload,
@@ -7,9 +7,9 @@ import {
   type PaymentOrderRequest,
   type PaymentResult,
   type ProviderCredentials,
-} from './types.js'
-import { hmacSha256Hex, safeEqualHex } from '../lib/crypto.js'
-import { env } from '../env.js'
+} from "./types.js";
+import { hmacSha256Hex, safeEqualHex } from "../lib/crypto.js";
+import { env } from "../env.js";
 
 /**
  * The provider for a brand that types its catalog into the dashboard.
@@ -25,23 +25,23 @@ import { env } from '../env.js'
  * payment provider.
  */
 export class ManualAdapter implements CommerceProviderAdapter {
-  readonly type = 'manual'
-  readonly displayName = 'Convo catalogue'
-  readonly capabilities = { catalog: true, payment: true }
+  readonly type = "manual";
+  readonly displayName = "Convo catalogue";
+  readonly capabilities = { catalog: true, payment: true };
 
   async verifyCredentials(): Promise<{ ok: true; detail: string }> {
-    return { ok: true, detail: 'Products are managed in the Convo dashboard.' }
+    return { ok: true, detail: "Products are managed in the Convo dashboard." };
   }
 
   async fetchCatalog(): Promise<CatalogItem[]> {
-    return []
+    return [];
   }
 
   async createPaymentOrder(
     _credentials: ProviderCredentials,
     request: PaymentOrderRequest,
   ): Promise<PaymentOrderHandle> {
-    const providerOrderId = `cvorder_${randomBytes(10).toString('hex')}`
+    const providerOrderId = `cvorder_${randomBytes(10).toString("hex")}`;
     return {
       provider: this.type,
       providerOrderId,
@@ -49,17 +49,26 @@ export class ManualAdapter implements CommerceProviderAdapter {
       currency: request.currency,
       publicKey: null,
       isMock: true,
-      checkout: { order_id: providerOrderId, amount: request.amountMinor, currency: request.currency },
-    }
+      checkout: {
+        order_id: providerOrderId,
+        amount: request.amountMinor,
+        currency: request.currency,
+      },
+    };
   }
 
   async verifyPayment(
     _credentials: ProviderCredentials,
     payload: PaymentCallbackPayload,
   ): Promise<PaymentResult> {
-    const paymentId = typeof payload.payment_id === 'string' ? payload.payment_id : null
-    const orderId = typeof payload.expectedOrderId === 'string' ? payload.expectedOrderId : null
-    const signature = typeof payload.signature === 'string' ? payload.signature : null
+    const paymentId =
+      typeof payload.payment_id === "string" ? payload.payment_id : null;
+    const orderId =
+      typeof payload.expectedOrderId === "string"
+        ? payload.expectedOrderId
+        : null;
+    const signature =
+      typeof payload.signature === "string" ? payload.signature : null;
 
     if (!paymentId || !orderId || !signature) {
       return {
@@ -67,19 +76,19 @@ export class ManualAdapter implements CommerceProviderAdapter {
         providerPaymentId: paymentId,
         providerOrderId: orderId,
         capturedAmountMinor: null,
-        failureReason: 'The payment confirmation was incomplete.',
-      }
+        failureReason: "The payment confirmation was incomplete.",
+      };
     }
 
-    const expected = signManualPayment(orderId, paymentId)
+    const expected = signManualPayment(orderId, paymentId);
     if (!safeEqualHex(expected, signature)) {
       return {
         verified: false,
         providerPaymentId: paymentId,
         providerOrderId: orderId,
         capturedAmountMinor: null,
-        failureReason: 'The payment signature did not verify.',
-      }
+        failureReason: "The payment signature did not verify.",
+      };
     }
 
     return {
@@ -88,11 +97,11 @@ export class ManualAdapter implements CommerceProviderAdapter {
       providerOrderId: orderId,
       capturedAmountMinor: null,
       failureReason: null,
-    }
+    };
   }
 }
 
 /** Signs a manual-provider confirmation. Used only by Convo's own test checkout route. */
 export function signManualPayment(orderId: string, paymentId: string): string {
-  return hmacSha256Hex(env.secret, `${orderId}|${paymentId}`)
+  return hmacSha256Hex(env.secret, `${orderId}|${paymentId}`);
 }

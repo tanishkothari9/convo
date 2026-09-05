@@ -5,7 +5,7 @@ import type {
   PaymentOrderRequest,
   PaymentResult,
   ProviderCredentials,
-} from './types.js'
+} from "./types.js";
 
 /**
  * The one integration surface a commerce provider implements.
@@ -20,20 +20,22 @@ import type {
  */
 export interface CommerceProviderAdapter {
   /** Stable identifier, matching `products.source` and `provider_connections.provider_type`. */
-  readonly type: string
+  readonly type: string;
   /** Name shown in the dashboard. */
-  readonly displayName: string
-  readonly capabilities: { catalog: boolean; payment: boolean }
+  readonly displayName: string;
+  readonly capabilities: { catalog: boolean; payment: boolean };
 
   /**
    * Validates credentials without writing anything — used by the dashboard's
    * "Connect" flow before the connection is saved. Throws ProviderConfigError
    * or ProviderApiError with a message the merchant can act on.
    */
-  verifyCredentials(credentials: ProviderCredentials): Promise<{ ok: true; detail: string }>
+  verifyCredentials(
+    credentials: ProviderCredentials,
+  ): Promise<{ ok: true; detail: string }>;
 
   /** The provider's catalog, already mapped to Convo's shapes. */
-  fetchCatalog(credentials: ProviderCredentials): Promise<CatalogItem[]>
+  fetchCatalog(credentials: ProviderCredentials): Promise<CatalogItem[]>;
 
   /**
    * Creates an order with the provider for `request.amountMinor` exactly.
@@ -43,7 +45,7 @@ export interface CommerceProviderAdapter {
   createPaymentOrder(
     credentials: ProviderCredentials,
     request: PaymentOrderRequest,
-  ): Promise<PaymentOrderHandle>
+  ): Promise<PaymentOrderHandle>;
 
   /**
    * Verifies a completed payment server-side. An adapter returns
@@ -54,5 +56,5 @@ export interface CommerceProviderAdapter {
   verifyPayment(
     credentials: ProviderCredentials,
     payload: PaymentCallbackPayload,
-  ): Promise<PaymentResult>
+  ): Promise<PaymentResult>;
 }
