@@ -139,8 +139,21 @@ providerRoutes.post(
           }
         : undefined;
 
+    /*
+     * Razorpay's is the mirror image: Convo hands back the URL, the merchant
+     * already knows the secret because they chose it. No secret goes out here.
+     */
+    const razorpayWebhook =
+      providerType === "razorpay"
+        ? {
+            url: `${env.publicBaseUrl}/api/webhooks/razorpay/${connections.byType(tenant.id, "razorpay")?.id}`,
+            configured: Boolean(credentials.webhookSecret),
+          }
+        : undefined;
+
     res.status(201).json({
       ...(frappeWebhook ? { webhook: frappeWebhook } : {}),
+      ...(razorpayWebhook ? { razorpayWebhook } : {}),
       connection: connections.byType(tenant.id, providerType),
       active: connections.active(tenant.id),
     });
@@ -247,7 +260,19 @@ function readCredentials(
       throw badRequest("A key id needs its key secret too.", "missing_secret");
     if (keySecret && !keyId)
       throw badRequest("A key secret needs its key id too.", "missing_key_id");
-    return { ...(keyId ? { keyId } : {}), ...(keySecret ? { keySecret } : {}) };
+    /*
+     * Optional, and the merchant's own. Unlike Frappe's — which Convo mints
+     * because Convo is the one being called — Razorpay's webhook secret is
+     * chosen in the merchant's Razorpay dashboard when they create the webhook,
+     * so it can only be pasted in. Without it Convo still works; it just never
+     * hears about a payment the customer completed after closing the tab.
+     */
+    const webhookSecret = optionalString(body, "webhookSecret", 200);
+    return {
+      ...(keyId ? { keyId } : {}),
+      ...(keySecret ? { keySecret } : {}),
+      ...(webhookSecret ? { webhookSecret } : {}),
+    };
   }
 
   if (providerType === "shopify") {

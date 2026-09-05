@@ -31,6 +31,7 @@ import {
   tenants,
 } from "../db/repo.js";
 import { transaction } from "../db/index.js";
+import { settleOrder } from "./settle.js";
 import { id } from "../lib/ids.js";
 import type {
   Order,
@@ -958,72 +959,34 @@ export async function gatedConfirmPayment(args: {
     );
   }
 
-  // Verified. Confirm the amount matches what Convo recorded before marking paid.
-  if (
-    result.capturedAmountMinor !== null &&
-    result.capturedAmountMinor !== order.totalAmountMinor
-  ) {
-    transaction(() => {
-      audit.record({
-        tenantId: order.tenantId,
-        conversationId: session.conversationId,
-        cartId: order.cartId,
-        orderId: order.id,
-        actionType: "payment.failed",
-        amountMinor: order.totalAmountMinor,
-        currency: order.currency,
-        outcome: "failed",
-        reasoning: args.reasoning ?? null,
-        detail: {
-          provider: providerType,
-          reason: "captured amount did not match the recorded order total",
-          captured_minor: result.capturedAmountMinor,
-        },
-      });
-    });
+  /*
+   * Verified. From here the browser and Razorpay's webhook agree on one path:
+   * the amount check, the stock reservation, the cart conversion and the ledger
+   * entry all live in settleOrder, so neither caller carries its own copy of
+   * the money rules.
+   */
+  const settled = settleOrder({
+    order,
+    providerType,
+    providerPaymentId: result.providerPaymentId,
+    capturedAmountMinor: result.capturedAmountMinor,
+    source: "browser",
+    conversationId: session.conversationId,
+    reasoning: args.reasoning ?? null,
+  });
+
+  if (settled.outcome === "amount_mismatch") {
     return failed(
       "The amount the provider captured does not match this order. It has been flagged for the " +
         "brand to review; tell the customer their order is on hold and the brand will be in touch.",
     );
   }
-
-  const paid = transaction(() => {
-    // Stock comes off the shelf only once payment is confirmed.
-    for (const line of order.lineItems) {
-      products.reserveStock(order.tenantId, line.productId, line.quantity);
-    }
-    const updated = orders.setStatus(order.tenantId, order.id, "paid", {
-      providerPaymentId: result.providerPaymentId,
-      failureReason: null,
-    });
-    // The cart is only spent once every brand in the checkout has been paid.
-    // With two brands, paying the first must not close the cart the second is
-    // still waiting on.
-    const siblings = orders.byCheckout(
-      session.customerSessionId,
-      order.checkoutId,
+  if (settled.outcome === "not_settleable") {
+    return failed(
+      "That order can no longer be paid. Tell the customer and offer to start a fresh checkout.",
     );
-    if (siblings.every((sibling) => sibling.status === "paid")) {
-      carts.setStatus(order.cartId, "converted");
-    }
-    audit.record({
-      tenantId: order.tenantId,
-      conversationId: session.conversationId,
-      cartId: order.cartId,
-      orderId: order.id,
-      actionType: "payment.confirmed",
-      amountMinor: order.totalAmountMinor,
-      currency: order.currency,
-      outcome: "ok",
-      reasoning: args.reasoning ?? null,
-      detail: {
-        provider: providerType,
-        provider_payment_id: result.providerPaymentId,
-        signature_verified: true,
-      },
-    });
-    return updated!;
-  });
+  }
+  const paid = settled.order;
 
   return ok(
     `Payment for ${order.id} is confirmed. Say so in one sentence; the confirmation card carries the figures.`,

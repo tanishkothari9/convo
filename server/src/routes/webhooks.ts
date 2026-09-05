@@ -1,7 +1,8 @@
 import { Router, type Request } from "express";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { audit, connections, products } from "../db/repo.js";
+import { audit, connections, orders, products } from "../db/repo.js";
 import { credentialsFor } from "../commerce/registry.js";
+import { recordPaymentFailure, settleOrder } from "../agent/settle.js";
 import { route } from "../lib/http.js";
 import { limiters } from "../lib/ratelimit.js";
 import { log } from "../lib/logger.js";
@@ -147,5 +148,150 @@ webhookRoutes.post(
     });
 
     res.json({ ok: true, applied: true, stock: updated.stock });
+  }),
+);
+
+/**
+ * Razorpay, telling Convo what happened to a payment.
+ *
+ * Until now the only thing that could settle an order was the customer's own
+ * browser handing back a signed result. That works right up to the moment the
+ * customer closes the tab — and then the money has moved, the brand has been
+ * paid, and Convo's ledger still says `awaiting_payment` forever. It is also
+ * the only way an AI buyer can ever learn a payment settled: an agent has no
+ * tab to hand anything back from.
+ *
+ * Per connection, because each brand is paid on its own Razorpay account and
+ * so configures its own webhook with its own secret. Razorpay signs the raw
+ * body with HMAC-SHA256 and sends it hex in `X-Razorpay-Signature`.
+ *
+ * The settlement itself is `settleOrder`, the same function the browser path
+ * calls — including the check that the captured amount matches what Convo
+ * priced. A webhook that took Razorpay's figure on trust would be a way to
+ * settle an order for the wrong amount.
+ */
+
+/** Razorpay signs the raw body with HMAC-SHA256, hex-encoded. Exported so the
+ *  suite exercises this comparison rather than re-implementing it. */
+export function razorpaySignatureMatches(
+  secret: string,
+  raw: Buffer,
+  provided: string,
+): boolean {
+  const expected = createHmac("sha256", secret).update(raw).digest("hex");
+  const a = Buffer.from(expected);
+  const b = Buffer.from(provided);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+const asNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+webhookRoutes.post(
+  "/webhooks/razorpay/:connectionId",
+  route(async (req, res) => {
+    const connectionId = req.params.connectionId!;
+    const budget = limiters.chat.take(`razorpay:${connectionId}`);
+    if (!budget.allowed) {
+      res.setHeader("Retry-After", String(budget.retryAfter));
+      res.status(429).json({ ok: false });
+      return;
+    }
+
+    const connection = connections.byConnectionId(connectionId);
+    const raw = (req as Request & { rawBody?: Buffer }).rawBody;
+    const provided = req.header("x-razorpay-signature");
+
+    const secret =
+      connection && connection.providerType === "razorpay"
+        ? credentialsFor(connection.tenantId, "razorpay").webhookSecret
+        : undefined;
+
+    if (
+      !connection ||
+      !secret ||
+      !raw ||
+      !provided ||
+      !razorpaySignatureMatches(secret, raw, provided)
+    ) {
+      log.warn("razorpay webhook rejected", {
+        connectionId,
+        signed: Boolean(provided),
+      });
+      res.status(401).json({ ok: false });
+      return;
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const event = asString(body.event);
+    const entity = (
+      (body.payload as Record<string, unknown> | undefined)?.payment as
+        Record<string, unknown> | undefined
+    )?.entity as Record<string, unknown> | undefined;
+
+    const providerOrderId = asString(entity?.order_id);
+    if (!event || !providerOrderId) {
+      res
+        .status(202)
+        .json({ ok: true, applied: false, reason: "not a payment event" });
+      return;
+    }
+
+    /*
+     * Matched on this brand's own account. The connection proved which tenant
+     * signed, so an order id from one brand's Razorpay account can never
+     * resolve to another brand's order.
+     */
+    const order = orders.byProviderOrderId(
+      connection.tenantId,
+      providerOrderId,
+    );
+    if (!order) {
+      // Not ours — an event for an order Convo did not create. Accepted so the
+      // merchant's Razorpay webhook log does not fill with failures.
+      res
+        .status(202)
+        .json({ ok: true, applied: false, reason: "unknown order" });
+      return;
+    }
+
+    if (event === "payment.captured" || event === "order.paid") {
+      const settled = settleOrder({
+        order,
+        providerType: "razorpay",
+        providerPaymentId: asString(entity?.id),
+        capturedAmountMinor: asNumber(entity?.amount),
+        source: "webhook",
+        conversationId: order.conversationId,
+      });
+      log.info("razorpay webhook settled", {
+        orderId: order.id,
+        outcome: settled.outcome,
+      });
+      res.json({
+        ok: true,
+        applied: settled.outcome === "paid",
+        outcome: settled.outcome,
+      });
+      return;
+    }
+
+    if (event === "payment.failed") {
+      const description =
+        asString((entity?.error_description as unknown) ?? null) ??
+        "The payment provider declined it.";
+      recordPaymentFailure({
+        order,
+        providerType: "razorpay",
+        reason: description,
+        conversationId: order.conversationId,
+      });
+      res.json({ ok: true, applied: true, outcome: "failed" });
+      return;
+    }
+
+    res
+      .status(202)
+      .json({ ok: true, applied: false, reason: "event not handled" });
   }),
 );
