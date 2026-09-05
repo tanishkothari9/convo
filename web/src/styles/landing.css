@@ -142,14 +142,7 @@
 @media (prefers-reduced-motion: reduce) {
   .hero-copy > *,
   .hero-demo,
-  .swap-chip,
-  .swap-layer,
-  .activity-row {
-    animation: none;
-    opacity: 1;
-    transform: none;
   }
-}
 
 /*
  * A chip in the product's own language, sitting on the illustration.
@@ -726,27 +719,44 @@
 
 /* ── Capability cards ───────────────────────────────────────────────────── */
 
+/*
+ * Four cards, so two by two — never three and an orphan.
+ *
+ * `auto-fit` was fitting three across at this width and dropping the fourth
+ * onto a row of its own, which reads as a layout that broke rather than one
+ * that wrapped. With a fixed count there is no width at which that happens.
+ */
 .capability-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
 }
 
+@media (max-width: 44rem) {
+  .capability-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*
+ * The same key the buttons are made of, at card scale.
+ *
+ * These were glass over an aurora, which made sense when there was an aurora
+ * behind them. On paper they were the only outlined rectangles left on the
+ * page — so they get the light on the top edge, the hairline ring, and the
+ * air underneath, like everything else you can touch.
+ */
 .capability {
   position: relative;
   padding: var(--space-5);
-  border-radius: var(--radius-card);
-  /* Glass over the floor rather than a filled tile: the aurora behind it
-     shows through, which is what ties the cards to the hero. */
+  border-radius: var(--radius-panel);
   background: var(--surface);
-  border: 1px solid var(--line);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  border: 0;
+  box-shadow: var(--shadow-key);
   overflow: hidden;
   transition:
     transform var(--dur-enter) var(--ease-out),
-    box-shadow var(--dur-enter) var(--ease-out),
-    border-color var(--dur-quick) ease;
+    box-shadow var(--dur-enter) var(--ease-out);
 }
 
 /* A wash that only appears under the pointer, so the grid is calm at rest and
@@ -764,8 +774,13 @@
 @media (hover: hover) and (pointer: fine) {
   .capability:hover {
     transform: translateY(-3px);
-    box-shadow: var(--shadow-lift);
-    border-color: var(--accent-tint);
+    background: var(--surface-solid);
+    box-shadow:
+      inset 0 2px 0 0 #ffffff,
+      inset 0 0 0.36px 1.5px rgba(255, 255, 255, 0.35),
+      0 0 0 1px rgba(23, 23, 23, 0.12),
+      0 8px 16px rgba(23, 23, 23, 0.08),
+      0 24px 28px rgba(23, 23, 23, 0.04);
   }
 
   .capability:hover::before {
@@ -844,37 +859,6 @@
   -webkit-backdrop-filter: blur(14px);
 }
 
-.swap-rail {
-  display: flex;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.swap-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0.3125rem var(--space-3);
-  border-radius: var(--radius-chip);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  font-size: var(--text-sm);
-  animation: hero-in 520ms var(--ease-out) both;
-}
-
-.swap-chip-dot {
-  width: 0.4375rem;
-  height: 0.4375rem;
-  border-radius: 50%;
-  background: var(--line-strong);
-}
-
-.swap-chip-dot[data-active='true'] {
-  background: var(--accent);
-  box-shadow: 0 0 0 3px rgba(55, 208, 196, 0.22);
-}
-
 .swap-caption {
   font-size: var(--text-xs);
   letter-spacing: var(--text-xs-ls);
@@ -929,6 +913,34 @@
      is why the four layer names were invisible. */
   color: var(--ink);
   animation: hero-in 520ms var(--ease-out) both;
+}
+
+.swap-layer-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+}
+
+.swap-layer-note {
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  font-weight: var(--weight-regular);
+  color: var(--ink-muted);
+}
+
+/* Built in and available-through-the-API are different promises, and the tag
+   is where a reader finds out which one they are being made. */
+.swap-layer-tag[data-state='api'] {
+  background: var(--surface-sunken);
+  color: var(--ink-secondary);
+}
+
+.swap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
 }
 
 /* Each layer gets its own mark. Four rows of the same icon is noise that
@@ -1031,16 +1043,122 @@
   justify-content: center;
 }
 
+/* ── Foot ───────────────────────────────────────────────────────────────── */
+
 .landing-foot {
+  position: relative;
+  margin-top: var(--space-7);
+  border-top: 1px solid var(--line);
+}
+
+.foot-inner {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-7);
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-7) var(--space-5) var(--space-6);
+}
+
+.foot-brand {
+  max-width: 24rem;
+}
+
+/*
+ * Set, not drawn.
+ *
+ * The mark has already appeared twice by the time anyone reaches the bottom of
+ * this page, and a third is a logo asking to be noticed on the way out. The
+ * name in the page's own face, a size up, does the job.
+ */
+.foot-wordmark {
+  display: block;
+  font-size: var(--text-title);
+  line-height: 1.1;
+  letter-spacing: -0.014em;
+  font-weight: var(--weight-regular);
+  color: var(--ink);
+}
+
+.foot-line {
+  margin-top: var(--space-3);
+}
+
+.foot-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-7);
+}
+
+.foot-group-title {
+  margin-bottom: var(--space-3);
+}
+
+.foot-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.foot-list a {
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+  text-decoration: none;
+  transition: color var(--dur-quick) ease;
+}
+
+.foot-list a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.foot-base {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
   gap: var(--space-3);
   max-width: 72rem;
   margin: 0 auto;
-  padding: var(--space-6) var(--space-5) var(--space-7);
+  padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--line);
+}
+
+/* ── The band ───────────────────────────────────────────────────────────── */
+
+/*
+ * The third view of the same street, from far enough away to be a horizon.
+ * It runs the full width under everything else, which is what makes the page
+ * end on the picture rather than on a rule.
+ */
+.pixel-band {
+  height: 4.5rem;
+  overflow: hidden;
+  background: #cdeefb;
+}
+
+.pixel-band-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+@media (max-width: 48rem) {
+  .foot-inner,
+  .foot-nav {
+    gap: var(--space-5);
+  }
+
+  .pixel-band {
+    height: 3.25rem;
+  }
 }
 
 @media (max-width: 34rem) {

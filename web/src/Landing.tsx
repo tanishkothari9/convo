@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Mark } from './components/Mark'
 import { LiveDemo } from './components/LiveDemo'
+import { PixelBand } from './components/PixelBand'
 import { PixelMarket } from './components/PixelMarket'
 import {
   IconAgent,
@@ -35,6 +36,72 @@ const CAPABILITIES = [
     icon: IconAudit,
     title: 'A ledger you can read',
     body: 'Every cart lock, order, payment attempt, confirmation, and refusal is appended with its amount, its outcome, and the reason the agent gave. Nothing in it is edited or removed.',
+  },
+]
+
+const FOOT_LINKS = [
+  {
+    title: 'Shop',
+    links: [
+      { label: 'Open the marketplace', to: '/shop' },
+      { label: 'Browse the brands', to: '/shop' },
+    ],
+  },
+  {
+    title: 'For brands',
+    links: [
+      { label: 'Add your brand', to: '/signup' },
+      { label: 'Sign in', to: '/login' },
+      { label: 'Dashboard', to: '/dashboard' },
+    ],
+  },
+  {
+    title: 'Developers',
+    links: [
+      { label: 'API reference', to: '/docs' },
+      { label: 'Bulk product upsert', to: '/docs' },
+      { label: 'API keys', to: '/dashboard/developers' },
+    ],
+  },
+]
+
+/*
+ * Where a catalogue can come from.
+ *
+ * One native sync and three routes through the API, and the tags say which is
+ * which. It is tempting to mark WooCommerce "built in" because it is the
+ * obvious next adapter — but there is no WooCommerce adapter in
+ * `server/src/commerce`, and a marketing page that implies one is a support
+ * ticket with a countdown on it.
+ */
+const SOURCES = [
+  {
+    label: 'Shopify',
+    note: 'Connect the store; Convo syncs the catalogue and re-syncs on demand',
+    icon: IconProvider,
+    tag: 'built in',
+    state: 'ready',
+  },
+  {
+    label: 'WooCommerce',
+    note: 'Push from the store on whatever schedule you choose',
+    icon: IconProvider,
+    tag: 'via API',
+    state: 'api',
+  },
+  {
+    label: 'Your ERP',
+    note: 'NetSuite, Zoho, Tally — whatever already holds the stock',
+    icon: IconCatalogue,
+    tag: 'via API',
+    state: 'api',
+  },
+  {
+    label: 'Anything you built',
+    note: 'A Next app, a script, a cron — one POST, up to 500 products',
+    icon: IconBolt,
+    tag: 'via API',
+    state: 'api',
   },
 ]
 
@@ -196,51 +263,50 @@ export function Landing() {
         <div className="section-inner swap">
           <div className="swap-copy">
             <span className="eyebrow">
-              <IconBolt size={14} />
-              Model-agnostic by construction
+              <IconProvider size={14} />
+              Bring the catalogue you already have
             </span>
-            <h2 className="section-title">Change the model. Keep the rules.</h2>
+            <h2 className="section-title">Connect what you already run.</h2>
             <p className="t-secondary">
-              The skills, the gates, the tool contracts, and the audit trail all sit above one
-              interface. Nothing in the agent imports a vendor SDK, so moving between Claude and GPT
-              is a line of configuration — and a brand can run on a different model from the brand
-              next to it.
+              Shopify connects natively. Everything else — WooCommerce, your ERP, the app you
+              wrote yourself — reaches Convo through one API call. Products are addressed by{' '}
+              <em>your</em> id, so the same nightly job can run forever without ever creating a
+              second copy of your catalogue.
             </p>
-            <Link className="btn btn-secondary" to="/signup">
-              Start with your catalogue
-              <IconArrow size={16} />
-            </Link>
+            <div className="swap-actions">
+              <Link className="btn btn-secondary" to="/docs">
+                Read the API reference
+                <IconArrow size={16} />
+              </Link>
+            </div>
           </div>
 
           <div className="swap-visual">
-            <p className="swap-caption swap-caption-top">Swap the model</p>
-            <div className="swap-rail">
-              {['Claude', 'GPT', 'Built-in'].map((name, i) => (
-                <div key={name} className="swap-chip" style={{ animationDelay: `${i * 90}ms` }}>
-                  <span className="swap-chip-dot" data-active={i === 0} />
-                  {name}
-                </div>
-              ))}
-            </div>
-            <p className="swap-caption">Everything under it stays put</p>
-
+            <p className="swap-caption swap-caption-top">Where your products come from</p>
             <div className="swap-stack">
               <span className="swap-bracket" aria-hidden="true" />
-              {[
-                { label: 'Skills', icon: IconAgent },
-                { label: 'Gates', icon: IconGate },
-                { label: 'Tool contracts', icon: IconProvider },
-                { label: 'Audit trail', icon: IconAudit },
-              ].map((layer, i) => (
-                <div key={layer.label} className="swap-layer" style={{ animationDelay: `${i * 70}ms` }}>
+              {SOURCES.map((source, i) => (
+                <div
+                  key={source.label}
+                  className="swap-layer"
+                  style={{ animationDelay: `${i * 70}ms` }}
+                >
                   <span className="swap-layer-icon">
-                    <layer.icon size={16} />
+                    <source.icon size={16} />
                   </span>
-                  {layer.label}
-                  <span className="swap-layer-tag">unchanged</span>
+                  <span className="swap-layer-name">
+                    {source.label}
+                    <span className="swap-layer-note">{source.note}</span>
+                  </span>
+                  <span className="swap-layer-tag" data-state={source.state}>
+                    {source.tag}
+                  </span>
                 </div>
               ))}
             </div>
+            <p className="swap-caption">
+              Whatever the source, the agent reads one catalogue and the ledger is yours.
+            </p>
           </div>
         </div>
       </section>
@@ -265,12 +331,45 @@ export function Landing() {
         </div>
       </section>
 
+      {/*
+        The foot of the page, and the third view of the same street — the hero
+        looks up at it, the closing panel stands in it, and this is it from far
+        enough away to be a horizon. The wordmark is set rather than drawn here:
+        at the bottom of a page the mark has already appeared twice, and a third
+        is a logo asking to be noticed on the way out.
+      */}
       <footer className="landing-foot">
-        <span className="wordmark wordmark-sm">
-          <Mark size={18} />
-          <span>Convo</span>
-        </span>
-        <span className="t-sm t-muted">A conversational commerce platform.</span>
+        <div className="foot-inner">
+          <div className="foot-brand">
+            <span className="foot-wordmark">Convo</span>
+            <p className="t-sm t-secondary foot-line">
+              One conversational storefront across every listed brand. Each brand is paid directly,
+              and every money action lands in its own audit trail.
+            </p>
+          </div>
+
+          <nav className="foot-nav" aria-label="Footer">
+            {FOOT_LINKS.map((group) => (
+              <div className="foot-group" key={group.title}>
+                <p className="t-eyebrow foot-group-title">{group.title}</p>
+                <ul className="foot-list">
+                  {group.links.map((link) => (
+                    <li key={link.label}>
+                      <Link to={link.to}>{link.label}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
+        </div>
+
+        <div className="foot-base">
+          <span className="t-xs t-muted">Convo — a conversational commerce platform.</span>
+          <span className="t-xs t-muted t-num">© {new Date().getFullYear()}</span>
+        </div>
+
+        <PixelBand />
       </footer>
     </main>
   )
