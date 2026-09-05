@@ -24,6 +24,28 @@ export function db(): DatabaseSync {
   handle.exec('PRAGMA journal_mode = WAL')
   handle.exec('PRAGMA foreign_keys = ON')
   handle.exec('PRAGMA busy_timeout = 5000')
+  /*
+   * One-way migration to the marketplace shape.
+   *
+   * The conversation used to belong to a brand and now belongs to the
+   * platform, which changes the shape of five tables rather than adding a
+   * column to them. SQLite cannot drop a NOT NULL, so those tables are rebuilt
+   * — and since the surface they served (a separate chat per brand) is being
+   * removed, there is nothing in them worth carrying across. Catalogues,
+   * brands, users, keys, provider connections and the ledger all survive.
+   */
+  const shaped = handle
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='conversations'")
+    .get() as { sql?: string } | undefined
+  if (shaped?.sql && !/customer_session_id\s+TEXT NOT NULL UNIQUE/i.test(shaped.sql)) {
+    log.warn('rebuilding conversation tables for the marketplace shape')
+    handle.exec('PRAGMA foreign_keys = OFF')
+    for (const table of ['seen_products', 'cart_items', 'carts', 'orders', 'messages', 'conversations']) {
+      handle.exec(`DROP TABLE IF EXISTS ${table}`)
+    }
+    handle.exec('PRAGMA foreign_keys = ON')
+  }
+
   // The schema is idempotent apart from ALTER TABLE, which SQLite has no
   // IF NOT EXISTS for. Those statements are split out and allowed to fail on
   // an already-migrated database; anything else failing is a real error.

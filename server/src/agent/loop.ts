@@ -11,7 +11,7 @@
  * LLM_PROVIDER changes which backend answers and nothing in this file.
  */
 import { conversations, carts, messages as messageStore, products } from '../db/repo.js'
-import type { Tenant, ToolCallRecord, ToolResultRecord, UiComponent } from '../domain/types.js'
+import type { ToolCallRecord, ToolResultRecord, UiComponent } from '../domain/types.js'
 import { log } from '../lib/logger.js'
 import { modelProvider } from '../models/index.js'
 import { ModelProviderError, type ModelMessage, type ModelToolResult } from '../models/types.js'
@@ -35,9 +35,10 @@ export type TurnEvent =
   | { type: 'error'; message: string }
 
 export interface TurnRequest {
-  tenant: Tenant
   customerSessionId: string
   message: string
+  /** The shop's settlement currency. One marketplace, one currency, for now. */
+  currency?: string
   config?: AgentConfig
   signal?: AbortSignal
 }
@@ -46,15 +47,14 @@ const backend = new ConvoStorefront()
 
 export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> {
   const config = request.config ?? DEFAULT_AGENT_CONFIG
-  const { tenant } = request
-  const session = ensureSession(tenant.id, request.customerSessionId, tenant.currency)
+  const currency = request.currency ?? 'INR'
+  const session = ensureSession(request.customerSessionId, currency)
 
   yield { type: 'conversation', conversationId: session.conversationId }
 
   // The customer's message is stored before the model sees it, so a turn that
   // fails halfway still leaves a faithful transcript.
   messageStore.append({
-    tenantId: tenant.id,
     conversationId: session.conversationId,
     role: 'user',
     content: request.message,
@@ -62,12 +62,14 @@ export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> 
 
   yield { type: 'thinking' }
 
-  const provider = modelProvider(tenant.llmProvider)
+  // One provider for the whole shop, from config. There is no per-brand model
+  // any more: the agent is Convo's, so the choice is Convo's.
+  const provider = modelProvider(null)
   const tools = buildTools(config)
   const allowedTools = new Set(tools.map((tool) => tool.name))
 
-  const staticSystem = buildStaticSystem(tenant)
-  const systemPrompt = staticSystem + dynamicContext(session, tenant)
+  const staticSystem = buildStaticSystem()
+  const systemPrompt = staticSystem + dynamicContext(session)
 
   const history = toModelMessages(session, config)
   const collected: UiComponent[] = []
@@ -121,7 +123,6 @@ export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> 
       // ── run the calls ─────────────────────────────────────────────────────
       const context: ExecutionContext = {
         session,
-        tenant,
         config,
         backend,
         allowedTools,
@@ -154,7 +155,7 @@ export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> 
 
         if (executed.outcome.heldBy) {
           log.info('tool call held', {
-            tenantId: tenant.id,
+            conversationId: session.conversationId,
             tool: call.name,
             gate: executed.outcome.heldBy,
           })
@@ -174,12 +175,12 @@ export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> 
         ? 'The assistant is having trouble responding right now. Try again in a moment.'
         : 'Something went wrong while answering. Try again in a moment.'
     log.error('agent turn failed', {
-      tenantId: tenant.id,
+      conversationId: session.conversationId,
       provider: provider.name,
       message: error instanceof Error ? error.message : 'unknown',
     })
     // The partial reply is still stored, so the transcript stays honest.
-    persist(tenant.id, session.conversationId, assistantText, turnToolCalls, turnToolResults, collected)
+    persist(session.conversationId, assistantText, turnToolCalls, turnToolResults, collected)
     yield { type: 'error', message }
     return
   }
@@ -189,7 +190,6 @@ export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> 
   }
 
   const stored = persist(
-    tenant.id,
     session.conversationId,
     assistantText,
     turnToolCalls,
@@ -200,7 +200,6 @@ export async function* runTurn(request: TurnRequest): AsyncGenerator<TurnEvent> 
 }
 
 function persist(
-  tenantId: string,
   conversationId: string,
   text: string,
   toolCalls: ToolCallRecord[],
@@ -208,7 +207,6 @@ function persist(
   components: UiComponent[],
 ): string {
   const message = messageStore.append({
-    tenantId,
     conversationId,
     role: 'assistant',
     content: text,
@@ -219,12 +217,19 @@ function persist(
   return message.id
 }
 
-function dynamicContext(session: StorefrontSession, tenant: Tenant): string {
-  const cart = carts.ensureOpen(session.tenantId, session.conversationId)
+function dynamicContext(session: StorefrontSession): string {
+  const cart = carts.ensureOpen(session.conversationId)
   const priced = priceCart(session, cart.id)
-  const catalog = products.list(session.tenantId)
+  const catalog = products.listedAcrossBrands()
   const categories = [...new Set(catalog.map((p) => p.category).filter((c): c is string => Boolean(c)))]
-  return buildDynamicContext({ tenant, cart: priced, catalogSize: catalog.length, categories })
+  const brands = [...new Set(catalog.map((p) => p.brandName))]
+  return buildDynamicContext({
+    cart: priced,
+    currency: session.currency,
+    catalogSize: catalog.length,
+    categories,
+    brands,
+  })
 }
 
 /**
@@ -234,7 +239,7 @@ function dynamicContext(session: StorefrontSession, tenant: Tenant): string {
  * of the context.
  */
 function toModelMessages(session: StorefrontSession, config: AgentConfig): ModelMessage[] {
-  const stored = messageStore.list(session.tenantId, session.conversationId)
+  const stored = messageStore.list(session.conversationId)
   const recent = stored.slice(-config.maxHistoryMessages)
   const out: ModelMessage[] = []
   for (const message of recent) {

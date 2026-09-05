@@ -1,9 +1,13 @@
 /**
- * Seeds a demo brand so there is always something working to look at.
+ * Seeds two demo brands so there is always something working to look at.
  *
- * Smart Choice is an ethnic wear brand and Convo's first tenant — one row in
- * the tenants table, not the product. Running this twice is safe: it updates
- * the existing tenant rather than duplicating it.
+ * Smart Choice sells ethnic wear and Kalaa Studio sells handcrafted jewellery
+ * — two rows in the tenants table, not the product. Two of them rather than
+ * one because the marketplace only shows what it is for when a cart can hold
+ * a saree from one shop and earrings from another, and settle as two orders.
+ *
+ * Running this twice is safe: it updates the existing brands rather than
+ * duplicating them.
  */
 import { db, transaction } from './index.js'
 import { connections, products, tenants, users } from './repo.js'
@@ -12,7 +16,6 @@ import { toMinor } from '../lib/money.js'
 import { log } from '../lib/logger.js'
 import { env } from '../env.js'
 
-const DEMO_EMAIL = 'owner@smartchoice.demo'
 const DEMO_PASSWORD = 'convo-demo-2026'
 
 interface SeedProduct {
@@ -192,85 +195,204 @@ const CATALOG: SeedProduct[] = [
   },
 ]
 
+/**
+ * Kalaa Studio's shelf. Deliberately a different lane from Smart Choice's, so
+ * a cart holding both is the ordinary case rather than a contrivance — which
+ * is the whole reason there are two brands in the seed.
+ */
+const KALAA_CATALOG: SeedProduct[] = [
+  {
+    name: 'Oxidised Silver Jhumkas — Temple Work',
+    description:
+      'Cast in 92.5 sterling silver and oxidised by hand, with a domed bell and a row of tiny ghungroos. Light enough to wear all evening.',
+    priceMajor: 3450,
+    stock: 14,
+    category: 'Earrings',
+    attributes: { Metal: '92.5 sterling silver', Finish: 'Oxidised', Weight: '18g the pair', Drop: '5.5 cm', Occasion: 'Festive, wedding', Care: 'Store dry, polish with a soft cloth' },
+    image: image('photo-1762686130435-897de4b26aac'),
+  },
+  {
+    name: 'Turquoise and Pearl Silver Necklace',
+    description:
+      'A Kutch-style collar in silver with turquoise cabochons and freshwater pearls. Adjustable at the back from 14 to 18 inches.',
+    priceMajor: 6900,
+    stock: 6,
+    category: 'Necklaces',
+    attributes: { Metal: '92.5 sterling silver', Stones: 'Turquoise, freshwater pearl', Length: '14-18 in adjustable', Occasion: 'Festive, evening', Care: 'Keep away from perfume' },
+    image: image('photo-1767971958465-16d986fad8df'),
+  },
+  {
+    name: 'Silver Bangles — Set of Six',
+    description:
+      'Slim hand-hammered bangles that stack without rattling. Sold as a set of six; tell us your wrist size and we will send the nearest fit.',
+    priceMajor: 4200,
+    stock: 9,
+    category: 'Bangles',
+    attributes: { Metal: '92.5 sterling silver', Finish: 'Hand-hammered', Sizes: '2.4, 2.6, 2.8', Quantity: 'Set of six', Occasion: 'Everyday, festive' },
+    image: image('photo-1762780700709-9695d1df32e8'),
+  },
+  {
+    name: 'Brass and Bead Jewellery Set',
+    description:
+      'A matched set from a Jaipur studio — necklace, earrings, and a ring in raw brass with glass beads. The brass warms in colour as it is worn.',
+    priceMajor: 2650,
+    stock: 11,
+    category: 'Sets',
+    attributes: { Metal: 'Raw brass', Includes: 'Necklace, earrings, ring', Finish: 'Unlacquered', Occasion: 'Everyday', Care: 'Polish with lemon and salt to brighten' },
+    image: image('photo-1766585903095-0ce7a25fee93'),
+  },
+  {
+    name: 'Silver Chain Bracelet — Fine Link',
+    description:
+      'A fine curb-link bracelet in sterling silver with a lobster clasp. Plain enough for every day, and it sits flat under a sleeve.',
+    priceMajor: 2900,
+    stock: 18,
+    category: 'Bracelets',
+    attributes: { Metal: '92.5 sterling silver', Length: '18 cm', Clasp: 'Lobster', Occasion: 'Everyday', Care: 'Remove before swimming' },
+    image: image('photo-1744722093742-aad22c7fa68b'),
+  },
+  {
+    name: 'Layered Silver Necklaces — Pair',
+    description:
+      'Two chains meant to be worn together, one short and one long, so the layering sits right without tangling. Also good apart.',
+    priceMajor: 3800,
+    stock: 7,
+    category: 'Necklaces',
+    attributes: { Metal: '92.5 sterling silver', Lengths: '16 in and 20 in', Quantity: 'Pair', Occasion: 'Everyday, evening' },
+    image: image('photo-1727333011028-ab6f7589f713'),
+  },
+  {
+    name: 'Two-Tone Drop Earrings — Silver and Gold',
+    description:
+      'Silver hoops with a gold-plated inner drop, so they read differently depending on the light. Posts are solid silver.',
+    priceMajor: 3100,
+    stock: 0,
+    category: 'Earrings',
+    attributes: { Metal: '92.5 sterling silver, gold plate', Drop: '3 cm', Fastening: 'Post and butterfly', Occasion: 'Everyday, evening' },
+    image: image('photo-1714733831162-0a6e849141be'),
+  },
+  {
+    name: 'Turquoise Charm Bracelet',
+    description:
+      'Silver links with turquoise drops and small stamped charms, made in Kutch. It moves and makes a little noise, which is the point.',
+    priceMajor: 3600,
+    stock: 10,
+    category: 'Bracelets',
+    attributes: { Metal: '92.5 sterling silver', Stones: 'Turquoise', Length: '19 cm', Occasion: 'Everyday, festive' },
+    image: image('photo-1676303679145-8679f5ceeb16'),
+  },
+]
+
+
+interface SeedBrand {
+  name: string
+  slug: string
+  description: string
+  email: string
+  catalog: SeedProduct[]
+}
+
+const BRANDS: SeedBrand[] = [
+  {
+    name: 'Smart Choice',
+    slug: 'smart-choice',
+    description:
+      'Handwoven sarees, chikankari kurta sets, and everyday ethnic wear, made by weavers and karigars across India.',
+    email: 'owner@smartchoice.demo',
+    catalog: CATALOG,
+  },
+  {
+    name: 'Kalaa Studio',
+    slug: 'kalaa-studio',
+    description:
+      'Handcrafted silver and brass jewellery from studios in Jaipur and Kutch — oxidised jhumkas, temple work, and everyday pieces.',
+    email: 'owner@kalaa.demo',
+    catalog: KALAA_CATALOG,
+  },
+]
+
+function seedBrand(brand: SeedBrand): void {
+  let tenant = tenants.bySlug(brand.slug)
+  if (!tenant) {
+    tenant = tenants.create({
+      name: brand.name,
+      slug: brand.slug,
+      description: brand.description,
+      currency: 'INR',
+    })
+    log.info('seeded tenant', { slug: tenant.slug })
+  }
+
+  if (!users.emailTaken(brand.email)) {
+    const { hash, salt } = passwordFields(DEMO_PASSWORD)
+    users.create({
+      tenantId: tenant.id,
+      email: brand.email,
+      passwordHash: hash,
+      passwordSalt: salt,
+      displayName: brand.name,
+    })
+    log.info('seeded dashboard user', { email: brand.email })
+  }
+
+  // Products live in Convo's own catalogue to start with. The dashboard's
+  // "Connect a provider" flow switches the brand over to Razorpay.
+  const existing = new Set(products.list(tenant.id, { includeInactive: true }).map((p) => p.name))
+  let created = 0
+  for (const item of brand.catalog) {
+    if (existing.has(item.name)) continue
+    products.create({
+      tenantId: tenant.id,
+      name: item.name,
+      description: item.description,
+      priceMinor: toMinor(item.priceMajor),
+      currency: 'INR',
+      images: [item.image],
+      stock: item.stock,
+      category: item.category,
+      attributes: item.attributes,
+      source: 'manual',
+    })
+    created += 1
+  }
+
+  if (!connections.byType(tenant.id, 'manual')) {
+    connections.upsert({
+      tenantId: tenant.id,
+      providerType: 'manual',
+      capabilities: 'catalog+payment',
+      credentialsEnc: null,
+      credentialsHint: null,
+    })
+    connections.activate(tenant.id, 'manual', ['catalog', 'payment'])
+  }
+
+  // Both demo brands are on the shelf: a marketplace with nothing listed is a
+  // blank page, and the first thing anyone opening this wants to see is that
+  // it works.
+  if (!tenant.isListed) tenants.update(tenant.id, { isListed: true })
+
+  log.info('seed complete', { tenant: tenant.slug, productsCreated: created })
+}
+
 function seed(): void {
   db()
-
   transaction(() => {
-    let tenant = tenants.bySlug('smart-choice')
-    if (!tenant) {
-      tenant = tenants.create({
-        name: 'Smart Choice',
-        slug: 'smart-choice',
-        description:
-          'Handwoven sarees, chikankari kurta sets, and everyday ethnic wear, made by weavers and karigars across India.',
-        assistantName: 'Meera',
-        brandVoice:
-          'warm and unhurried, the way a good shop assistant talks — plain about fabric, honest about what suits what, never pushy',
-        currency: 'INR',
-        accentColor: '#8C3A2B',
-      })
-      log.info('seeded tenant', { slug: tenant.slug })
-    }
-
-    if (!users.emailTaken(DEMO_EMAIL)) {
-      const { hash, salt } = passwordFields(DEMO_PASSWORD)
-      users.create({
-        tenantId: tenant.id,
-        email: DEMO_EMAIL,
-        passwordHash: hash,
-        passwordSalt: salt,
-        displayName: 'Smart Choice',
-      })
-      log.info('seeded dashboard user', { email: DEMO_EMAIL })
-    }
-
-    // Products live in Convo's own catalogue to start with. The dashboard's
-    // "Connect a provider" flow switches the brand over to Razorpay.
-    const existing = new Set(products.list(tenant.id, { includeInactive: true }).map((p) => p.name))
-    let created = 0
-    for (const item of CATALOG) {
-      if (existing.has(item.name)) continue
-      products.create({
-        tenantId: tenant.id,
-        name: item.name,
-        description: item.description,
-        priceMinor: toMinor(item.priceMajor),
-        currency: 'INR',
-        images: [item.image],
-        stock: item.stock,
-        category: item.category,
-        attributes: item.attributes,
-        source: 'manual',
-      })
-      created += 1
-    }
-
-    if (!connections.byType(tenant.id, 'manual')) {
-      connections.upsert({
-        tenantId: tenant.id,
-        providerType: 'manual',
-        capabilities: 'catalog+payment',
-        credentialsEnc: null,
-        credentialsHint: null,
-      })
-      connections.activate(tenant.id, 'manual', ['catalog', 'payment'])
-    }
-
-    log.info('seed complete', {
-      tenant: tenant.slug,
-      productsCreated: created,
-      chatUrl: `${env.publicBaseUrl}/chat/${tenant.slug}`,
-    })
+    for (const brand of BRANDS) seedBrand(brand)
   })
 
+  const lines = BRANDS.map(
+    (brand) => `    ${brand.name.padEnd(14)}${brand.email.padEnd(24)}${brand.catalog.length} products`,
+  ).join('\n')
+
   console.log(`
-  Smart Choice is seeded.
+  Two brands are seeded and listed.
 
-    Dashboard   ${env.publicBaseUrl}/login
-    Email       ${DEMO_EMAIL}
+${lines}
+
     Password    ${DEMO_PASSWORD}
-
-    Chat link   ${env.publicBaseUrl}/chat/smart-choice
+    Dashboard   ${env.publicBaseUrl}/login
+    Shop        ${env.publicBaseUrl}/shop
 `)
 }
 

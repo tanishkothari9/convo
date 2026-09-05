@@ -4,31 +4,37 @@
  * Adapted from `StorefrontBackend` in anthropics/commerce-agents (Apache-2.0):
  * one integration surface the agent talks to, so the agent never reaches into
  * a database or a provider directly. Convo's implementation is backed by its
- * own tenant-scoped tables — which is also where a provider-synced catalog
- * lands — plus the tenant's payment adapter for the money path.
+ * own tables — which is also where a provider-synced catalog lands — plus each
+ * brand's payment adapter for the money path.
  *
- * Every method takes the session and scopes its reads and writes to that
- * session's tenant. Everything a method returns reaches the model fenced.
+ * The shelf spans brands. Every read goes through `listedAcrossBrands`, which
+ * returns only brands that opted in, and every product the agent handles
+ * carries the name of the brand that sells it. Everything a method returns
+ * reaches the model fenced.
  */
 import { carts, conversations, orders, products, provenance } from '../db/repo.js'
 import type { Order, PricedCart, PricedLine, Product } from '../domain/types.js'
 import { transaction } from '../db/index.js'
 
 export interface StorefrontSession {
-  tenantId: string
   conversationId: string
   customerSessionId: string
   currency: string
 }
 
+/** A catalogue row with the name of the brand that sells it. */
+export type ListedProduct = Product & { brandName: string }
+
 export interface SearchFilters {
   category?: string
+  /** A brand name, when the shopper named one. Matched loosely. */
+  brand?: string
   minPriceMinor?: number
   maxPriceMinor?: number
   sort?: 'relevance' | 'price_asc' | 'price_desc'
 }
 
-/** Raised for something this brand does not offer, as opposed to a fault. */
+/** Raised for something no listed brand offers, as opposed to a fault. */
 export class NotOffered extends Error {}
 
 /** Raised for a product that exists but cannot be bought right now. */
@@ -43,8 +49,8 @@ export class Unavailable extends Error {
 }
 
 export interface StorefrontBackend {
-  searchProducts(session: StorefrontSession, query: string, filters: SearchFilters, limit: number): Promise<Product[]>
-  getProductDetails(session: StorefrontSession, productId: string): Promise<Product | null>
+  searchProducts(session: StorefrontSession, query: string, filters: SearchFilters, limit: number): Promise<ListedProduct[]>
+  getProductDetails(session: StorefrontSession, productId: string): Promise<ListedProduct | null>
   getCart(session: StorefrontSession): Promise<PricedCart>
   addToCart(session: StorefrontSession, productId: string, quantity: number): Promise<PricedCart>
   updateCartItem(session: StorefrontSession, productId: string, quantity: number): Promise<PricedCart>
@@ -58,14 +64,17 @@ export class ConvoStorefront implements StorefrontBackend {
     query: string,
     filters: SearchFilters,
     limit: number,
-  ): Promise<Product[]> {
-    const catalog = products.list(session.tenantId)
+  ): Promise<ListedProduct[]> {
+    const catalog = products.listedAcrossBrands()
     if (catalog.length === 0) {
-      throw new NotOffered('This brand has not published a catalogue yet.')
+      throw new NotOffered('No brand has published a catalogue yet.')
     }
 
     const withinFilters = catalog.filter((product) => {
       if (filters.category && (product.category ?? '').toLowerCase() !== filters.category.toLowerCase()) {
+        return false
+      }
+      if (filters.brand && !product.brandName.toLowerCase().includes(filters.brand.toLowerCase())) {
         return false
       }
       if (filters.minPriceMinor !== undefined && product.priceMinor < filters.minPriceMinor) return false
@@ -93,40 +102,43 @@ export class ConvoStorefront implements StorefrontBackend {
       )
     }
 
-    const ranked = scored.map(({ product }) => product)
-
-    // An open browse — no terms, no sort asked for — should show the range the
-    // brand carries, not the cheapest few. Taking one product per category in
-    // turn puts a saree, a kurta, and a dupatta in the first row rather than
-    // whatever happens to sit at the bottom of the price list. It starts from
-    // the filtered list rather than the ranked one, because with no terms the
-    // ranking is only the price tiebreak and the merchant's own catalogue
+    // An open browse — no terms, no sort asked for — should show the range on
+    // offer, not the cheapest few. Taking one product per brand-and-category
+    // in turn puts three labels and three garments in the first row rather
+    // than whatever sits at the bottom of the price list. It starts from the
+    // filtered list rather than the ranked one, because with no terms the
+    // ranking is only the price tiebreak and the merchants' own catalogue
     // order is the better signal.
     if (terms.length === 0 && !filters.sort) {
       const inStockFirst = [...withinFilters]
-        .reverse() // the repository returns newest first; the merchant added oldest first
+        .reverse() // the repository returns newest first; merchants added oldest first
         .sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0))
-      return spreadAcrossCategories(inStockFirst, limit)
+      return spread(inStockFirst, limit)
     }
 
-    return ranked.slice(0, limit)
+    // A search that matched several brands should not bury one of them under
+    // a run from another. Interleaving by brand keeps the top row honest
+    // about who carries what, without touching the ranking within a brand.
+    const ranked = scored.map(({ product }) => product)
+    if (filters.sort) return ranked.slice(0, limit)
+    return spread(ranked, limit)
   }
 
-  async getProductDetails(session: StorefrontSession, productId: string): Promise<Product | null> {
-    return products.byId(session.tenantId, productId) ?? null
+  async getProductDetails(session: StorefrontSession, productId: string): Promise<ListedProduct | null> {
+    return products.listedById(productId) ?? null
   }
 
   async getCart(session: StorefrontSession): Promise<PricedCart> {
-    const cart = carts.ensureOpen(session.tenantId, session.conversationId)
+    const cart = carts.ensureOpen(session.conversationId)
     return priceCart(session, cart.id)
   }
 
   async addToCart(session: StorefrontSession, productId: string, quantity: number): Promise<PricedCart> {
-    const product = products.byId(session.tenantId, productId)
+    const product = products.listedById(productId)
     if (!product || !product.isActive) {
       throw new Unavailable('That item is no longer in the catalogue.', productId, 0)
     }
-    const cart = carts.ensureOpen(session.tenantId, session.conversationId)
+    const cart = carts.ensureOpen(session.conversationId)
     const existing = cart.items.find((item) => item.productId === productId)
     const wanted = (existing?.quantity ?? 0) + quantity
     if (product.stock < wanted) {
@@ -138,7 +150,7 @@ export class ConvoStorefront implements StorefrontBackend {
         product.stock,
       )
     }
-    carts.addItem(session.tenantId, cart.id, productId, quantity, product.priceMinor)
+    carts.addItem(cart.id, product.tenantId, productId, quantity, product.priceMinor)
     return priceCart(session, cart.id)
   }
 
@@ -147,9 +159,9 @@ export class ConvoStorefront implements StorefrontBackend {
     productId: string,
     quantity: number,
   ): Promise<PricedCart> {
-    const cart = carts.ensureOpen(session.tenantId, session.conversationId)
+    const cart = carts.ensureOpen(session.conversationId)
     if (quantity > 0) {
-      const product = products.byId(session.tenantId, productId)
+      const product = products.listedById(productId)
       if (!product || !product.isActive) {
         throw new Unavailable('That item is no longer in the catalogue.', productId, 0)
       }
@@ -163,18 +175,18 @@ export class ConvoStorefront implements StorefrontBackend {
         )
       }
     }
-    carts.setQuantity(session.tenantId, cart.id, productId, quantity)
+    carts.setQuantity(cart.id, productId, quantity)
     return priceCart(session, cart.id)
   }
 
   async removeFromCart(session: StorefrontSession, productId: string): Promise<PricedCart> {
-    const cart = carts.ensureOpen(session.tenantId, session.conversationId)
-    carts.removeItem(session.tenantId, cart.id, productId)
+    const cart = carts.ensureOpen(session.conversationId)
+    carts.removeItem(cart.id, productId)
     return priceCart(session, cart.id)
   }
 
   async getOrders(session: StorefrontSession, limit: number): Promise<Order[]> {
-    return orders.listForConversation(session.tenantId, session.conversationId, limit)
+    return orders.listForConversation(session.conversationId, limit)
   }
 }
 
@@ -186,22 +198,22 @@ export class ConvoStorefront implements StorefrontBackend {
  * the model said. `checkout` charges what this returns.
  */
 export function priceCart(session: StorefrontSession, cartId: string): PricedCart {
-  const cart = carts.byId(session.tenantId, cartId)
+  const cart = carts.byId(cartId)
   if (!cart) {
     return { cartId, currency: session.currency, lines: [], itemCount: 0, subtotalMinor: 0 }
   }
-  const catalog = products.byIds(
-    session.tenantId,
-    cart.items.map((item) => item.productId),
-  )
-  const byId = new Map(catalog.map((product) => [product.id, product]))
 
   const lines: PricedLine[] = []
   for (const item of cart.items) {
-    const product = byId.get(item.productId)
-    if (!product) continue // deleted from the catalogue; it cannot be charged for
+    // Read one at a time rather than in a batch: each line may belong to a
+    // different brand, and a product whose brand has since delisted must drop
+    // out of the total exactly as a deleted one does.
+    const product = products.listedById(item.productId)
+    if (!product) continue // gone from the shelf; it cannot be charged for
     lines.push({
       productId: product.id,
+      tenantId: product.tenantId,
+      brandName: product.brandName,
       name: product.name,
       imageUrl: product.images[0] ?? null,
       quantity: item.quantity,
@@ -226,40 +238,36 @@ export function priceCart(session: StorefrontSession, cartId: string): PricedCar
 export function rememberSeen(session: StorefrontSession, seen: Product[]): void {
   transaction(() => {
     provenance.remember(
-      session.tenantId,
       session.conversationId,
-      seen.map((product) => product.id),
+      seen.map((product) => ({ productId: product.id, tenantId: product.tenantId })),
     )
   })
 }
 
-export function ensureSession(
-  tenantId: string,
-  customerSessionId: string,
-  currency: string,
-): StorefrontSession {
-  const conversation = conversations.ensure(tenantId, customerSessionId)
-  return { tenantId, conversationId: conversation.id, customerSessionId, currency }
+export function ensureSession(customerSessionId: string, currency: string): StorefrontSession {
+  const conversation = conversations.ensure(customerSessionId)
+  return { conversationId: conversation.id, customerSessionId, currency }
 }
 
 /**
- * One from each category in turn, until `limit` is reached.
+ * One from each brand-and-category in turn, until `limit` is reached.
  *
- * `products` arrives in the merchant's own catalogue order, which is kept
- * within each category: they decided what comes first, and an open "what do
- * you have" is exactly the moment to respect that rather than lead with
- * whatever happens to be cheapest.
+ * `products` arrives in the merchants' own order, which is kept within each
+ * bucket: they decided what comes first, and an open "what do you have" is
+ * exactly the moment to respect that rather than lead with whatever happens
+ * to be cheapest. Bucketing by brand as well as category is what stops one
+ * large catalogue from crowding a smaller one off the first row.
  */
-function spreadAcrossCategories(products: Product[], limit: number): Product[] {
-  const byCategory = new Map<string, Product[]>()
+function spread(products: ListedProduct[], limit: number): ListedProduct[] {
+  const byCategory = new Map<string, ListedProduct[]>()
   for (const product of products) {
-    const key = product.category ?? ''
+    const key = `${product.tenantId}\u0000${product.category ?? ''}`
     const bucket = byCategory.get(key)
     if (bucket) bucket.push(product)
     else byCategory.set(key, [product])
   }
   const buckets = [...byCategory.values()]
-  const out: Product[] = []
+  const out: ListedProduct[] = []
   for (let round = 0; out.length < limit; round += 1) {
     let added = false
     for (const bucket of buckets) {
@@ -288,8 +296,9 @@ function tokenize(query: string): string[] {
     .filter((word) => word.length > 1 && !STOPWORDS.has(word))
 }
 
-function relevance(product: Product, terms: string[]): number {
+function relevance(product: ListedProduct, terms: string[]): number {
   if (terms.length === 0) return 1
+  const brand = product.brandName.toLowerCase()
   const name = product.name.toLowerCase()
   const category = (product.category ?? '').toLowerCase()
   const description = (product.description ?? '').toLowerCase()
@@ -301,6 +310,10 @@ function relevance(product: Product, terms: string[]): number {
   let score = 0
   for (const term of terms) {
     if (name.includes(term)) score += 6
+    // Naming a brand is a strong signal, but weaker than naming the garment:
+    // "Smart Choice saree" should lead with sarees, not with everything they
+    // sell.
+    if (brand.includes(term)) score += 5
     if (category.includes(term)) score += 4
     if (attributes.includes(term)) score += 3
     if (description.includes(term)) score += 2

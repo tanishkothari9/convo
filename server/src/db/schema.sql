@@ -94,51 +94,50 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE INDEX IF NOT EXISTS idx_products_tenant ON products(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_products_tenant_active ON products(tenant_id, is_active);
 
--- ── Conversations ───────────────────────────────────────────────────────────
+-- ── Conversations ──────────────────────────────────────────────────────────
+--
+-- A shopper talks to Convo, not to a brand, so nothing below carries a
+-- tenant_id except where it names which brand a product or an order belongs
+-- to. Tenant isolation has not weakened — it has moved: a brand still cannot
+-- read another brand's catalogue, orders or ledger. What is shared is the
+-- shopper's conversation, which belongs to the platform.
 
 CREATE TABLE IF NOT EXISTS conversations (
   id                  TEXT PRIMARY KEY,
-  tenant_id           TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  customer_session_id TEXT NOT NULL,
+  customer_session_id TEXT NOT NULL UNIQUE,
   started_at          TEXT NOT NULL,
-  last_active_at      TEXT NOT NULL,
-  UNIQUE (tenant_id, customer_session_id)
+  last_active_at      TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_conversations_tenant ON conversations(tenant_id);
 
 CREATE TABLE IF NOT EXISTS messages (
   id                TEXT PRIMARY KEY,
   conversation_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  tenant_id         TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   -- 'user' | 'assistant'
   role              TEXT NOT NULL,
   content           TEXT NOT NULL DEFAULT '',
-  -- JSON array of {id,name,input} the model requested this turn
   tool_calls        TEXT,
-  -- JSON array of {tool_use_id,content,is_error} handed back to the model
   tool_results      TEXT,
-  -- JSON array of rendered UI components for replay on reload
   ui                TEXT,
   created_at        TEXT NOT NULL,
   seq               INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, seq);
 
--- Provenance: the product ids the agent has actually seen this session. Cart
--- writes and presentation payloads accept nothing else. (commerce-agents gates.)
+-- Provenance: the product ids the agent has actually seen this conversation.
+-- tenant_id records which brand the product belongs to, not who owns the row.
 CREATE TABLE IF NOT EXISTS seen_products (
   conversation_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  tenant_id         TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   product_id        TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  tenant_id         TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   seen_at           TEXT NOT NULL,
   PRIMARY KEY (conversation_id, product_id)
 );
 
 -- ── Cart and orders ─────────────────────────────────────────────────────────
 
+-- One cart per conversation, holding goods from any number of brands.
 CREATE TABLE IF NOT EXISTS carts (
   id                TEXT PRIMARY KEY,
-  tenant_id         TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   conversation_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   -- 'open' | 'locked' | 'converted' | 'abandoned'
   status            TEXT NOT NULL DEFAULT 'open',
@@ -150,23 +149,29 @@ CREATE INDEX IF NOT EXISTS idx_carts_conversation ON carts(conversation_id);
 CREATE TABLE IF NOT EXISTS cart_items (
   id                TEXT PRIMARY KEY,
   cart_id           TEXT NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+  -- Which brand sells this line. Used to split the cart at checkout.
   tenant_id         TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   product_id        TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   quantity          INTEGER NOT NULL,
-  -- Price snapshot at add time, in minor units. Never used to charge: checkout
-  -- re-reads the catalog. Kept so the agent can notice a price move.
+  -- Price snapshot at add time. Never used to charge: checkout re-reads the
+  -- catalogue. Kept so the agent can notice a price move.
   unit_price_minor  INTEGER NOT NULL,
   added_at          TEXT NOT NULL,
   UNIQUE (cart_id, product_id)
 );
 CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id);
 
+-- One order per brand per checkout. A cart spanning three brands is three
+-- orders sharing a checkout_id, because each brand has its own payment
+-- account and Convo is not the merchant of record.
 CREATE TABLE IF NOT EXISTS orders (
   id                TEXT PRIMARY KEY,
   tenant_id         TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   cart_id           TEXT NOT NULL REFERENCES carts(id) ON DELETE RESTRICT,
   conversation_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  -- Authoritative amount, recomputed server-side from catalog prices.
+  -- Groups the orders staged together by one checkout.
+  checkout_id       TEXT NOT NULL,
+  -- Authoritative amount for this brand's share, recomputed server-side.
   total_amount_minor INTEGER NOT NULL,
   currency          TEXT NOT NULL DEFAULT 'INR',
   -- 'created' | 'awaiting_payment' | 'paid' | 'failed' | 'cancelled' | 'refunded'
@@ -174,13 +179,14 @@ CREATE TABLE IF NOT EXISTS orders (
   provider_type     TEXT NOT NULL,
   provider_order_id TEXT,
   provider_payment_id TEXT,
-  -- Frozen line items as JSON, so an order stays readable if the catalog changes.
   line_items        TEXT NOT NULL DEFAULT '[]',
+  shipping_address  TEXT,
   failure_reason    TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_orders_tenant ON orders(tenant_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_checkout ON orders(checkout_id);
 CREATE INDEX IF NOT EXISTS idx_orders_provider_order ON orders(provider_order_id);
 
 -- ── Audit ───────────────────────────────────────────────────────────────────
@@ -242,11 +248,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_products_external
 ALTER TABLE provider_connections ADD COLUMN is_catalog_source INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE provider_connections ADD COLUMN is_payment_processor INTEGER NOT NULL DEFAULT 0;
 
--- Where the order goes. Frozen onto the order like its line items, so a
--- customer editing a saved address later cannot change where a past order was
--- sent. Null until the customer fills the form, and the payment gate refuses
--- to mark an order paid without it when the brand ships physical goods.
-ALTER TABLE orders ADD COLUMN shipping_address TEXT;
-
 -- A brand selling digital goods turns this off; everyone else ships.
 ALTER TABLE tenants ADD COLUMN requires_shipping INTEGER NOT NULL DEFAULT 1;
+
+-- A brand signed up for a dashboard, not for a shelf beside a competitor.
+-- Nothing appears in the marketplace until the brand turns this on.
+ALTER TABLE tenants ADD COLUMN is_listed INTEGER NOT NULL DEFAULT 0;

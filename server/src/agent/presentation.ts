@@ -27,7 +27,7 @@ export function presentProducts(
     return failed('present_products needs at least one pick.')
   }
 
-  const seen = provenance.seenIds(session.tenantId, session.conversationId)
+  const seen = provenance.seenIds(session.conversationId)
   const wanted: Array<{ productId: string; reason: string | null }> = []
   const dropped: string[] = []
 
@@ -46,8 +46,13 @@ export function presentProducts(
     })
   }
 
+  // Read one at a time: picks in one turn can span brands, and a product
+  // whose brand has delisted must drop out exactly as a deleted one does.
   const records = new Map(
-    products.byIds(session.tenantId, wanted.map((entry) => entry.productId)).map((p) => [p.id, p]),
+    wanted
+      .map((entry) => products.listedById(entry.productId))
+      .filter((product) => product !== undefined)
+      .map((product) => [product.id, product] as const),
   )
 
   const cards = wanted
@@ -60,6 +65,11 @@ export function presentProducts(
       const product = records.get(entry.productId)!
       return {
         product_id: product.id,
+        // Who sells it, on every card. In a marketplace this is not a detail:
+        // it is what the customer is choosing between when two sarees at the
+        // same price sit side by side.
+        tenant_id: product.tenantId,
+        brand_name: product.brandName,
         name: product.name,
         description: product.description,
         image_url: product.images[0] ?? null,

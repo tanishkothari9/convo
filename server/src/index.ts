@@ -7,7 +7,7 @@ import { errorHandler } from './lib/http.js'
 import { authRoutes } from './routes/auth.js'
 import { catalogRoutes } from './routes/catalog.js'
 import { providerRoutes } from './routes/providers.js'
-import { chatRoutes } from './routes/chat.js'
+import { shopRoutes } from './routes/shop.js'
 import { apiRoutes } from './routes/api.js'
 import { modelProvider } from './models/index.js'
 import { limiters } from './lib/ratelimit.js'
@@ -41,7 +41,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/v1', apiRoutes)
 
 app.use('/api/auth', authRoutes)
-app.use('/api', rateLimit(limiters.publicRead, clientIp), chatRoutes)
+app.use('/api', rateLimit(limiters.publicRead, clientIp), shopRoutes)
 const dashboardLimit = rateLimit(limiters.dashboard, clientIp)
 app.use('/api/dashboard', dashboardLimit, catalogRoutes)
 app.use('/api/dashboard', dashboardLimit, providerRoutes)

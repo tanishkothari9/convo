@@ -16,10 +16,16 @@
  *  3. Money. The chargeable amount is recomputed server-side from live
  *     catalogue prices immediately before the provider is called. No amount
  *     the model produced is ever sent to a payment provider.
+ *
+ * A fourth rule arrives with the marketplace: a cart spanning several brands
+ * is settled as one order per brand, each on that brand's own payment account.
+ * Convo never holds anyone else's money, so there is no merchant of record to
+ * become and no float to reconcile.
  */
 import { audit, carts, orders, products, provenance, tenants } from '../db/repo.js'
 import { transaction } from '../db/index.js'
-import type { OrderLineItem, PricedCart, Tenant } from '../domain/types.js'
+import { id } from '../lib/ids.js'
+import type { Order, OrderLineItem, PricedCart, PricedLine } from '../domain/types.js'
 import { formatMoney } from '../lib/money.js'
 import { log } from '../lib/logger.js'
 import { resolveProvider } from '../commerce/registry.js'
@@ -50,7 +56,7 @@ function provenanceError(productId: string): string {
 
 /** Held outcome when `productId` has no provenance in this conversation, else null. */
 export function checkProvenance(session: StorefrontSession, productId: string): ToolOutcome | null {
-  if (provenance.has(session.tenantId, session.conversationId, productId)) return null
+  if (provenance.has(session.conversationId, productId)) return null
   return held(PROVENANCE_GATE, provenanceError(productId))
 }
 
@@ -60,7 +66,7 @@ export function checkProvenance(session: StorefrontSession, productId: string): 
  */
 function provenanceOrCart(session: StorefrontSession, productId: string): ToolOutcome | null {
   if (checkProvenance(session, productId) === null) return null
-  const cart = carts.ensureOpen(session.tenantId, session.conversationId)
+  const cart = carts.ensureOpen(session.conversationId)
   if (cart.items.some((item) => item.productId === productId)) return null
   return held(PROVENANCE_GATE, provenanceError(productId))
 }
@@ -92,23 +98,30 @@ async function withCartLock<T>(conversationId: string, fn: () => Promise<T>): Pr
  * the order that locked it — they are telling us they are not done.
  */
 function reopenAfterCheckout(session: StorefrontSession, reasoning: string | null): void {
-  const open = carts.ensureOpen(session.tenantId, session.conversationId)
+  const open = carts.ensureOpen(session.conversationId)
   if (open.items.length > 0) return
 
-  const locked = carts.latestLocked(session.tenantId, session.conversationId)
+  const locked = carts.latestLocked(session.conversationId)
   if (!locked || locked.items.length === 0) return
 
-  const pending = orders
-    .pendingForConversation(session.tenantId, session.conversationId)
+  // Once any brand in a split checkout has been paid, the cart is history and
+  // reopening it would put goods already bought back on the shopping list.
+  const onThisCart = orders
+    .listForConversation(session.conversationId, 50)
     .filter((order) => order.cartId === locked.id)
+  if (onThisCart.some((order) => order.status === 'paid')) return
+
+  const pending = onThisCart.filter(
+    (order) => order.status === 'created' || order.status === 'awaiting_payment',
+  )
 
   transaction(() => {
     for (const order of pending) {
-      orders.setStatus(session.tenantId, order.id, 'cancelled', {
+      orders.setStatus(order.tenantId, order.id, 'cancelled', {
         failureReason: 'The customer went back to shopping before paying.',
       })
       audit.record({
-        tenantId: session.tenantId,
+        tenantId: order.tenantId,
         conversationId: session.conversationId,
         cartId: locked.id,
         orderId: order.id,
@@ -121,8 +134,8 @@ function reopenAfterCheckout(session: StorefrontSession, reasoning: string | nul
       })
     }
     // The empty cart opened above is discarded; the locked one becomes current.
-    if (open.id !== locked.id) carts.setStatus(session.tenantId, open.id, 'abandoned')
-    carts.setStatus(session.tenantId, locked.id, 'open')
+    if (open.id !== locked.id) carts.setStatus(open.id, 'abandoned')
+    carts.setStatus(locked.id, 'open')
   })
 }
 
@@ -149,8 +162,14 @@ function cartComponent(cart: PricedCart, kind: 'cart' | 'cart_state' = 'cart_sta
       item_count: cart.itemCount,
       subtotal_minor: cart.subtotalMinor,
       subtotal_display: formatMoney(cart.subtotalMinor, cart.currency),
+      // Grouped for the sheet, which shows a heading per brand: a cart with
+      // two labels in it is two deliveries and two charges, and the customer
+      // should see that before checkout rather than after.
+      brands: [...new Set(cart.lines.map((line) => line.brandName))],
       lines: cart.lines.map((line) => ({
         product_id: line.productId,
+        tenant_id: line.tenantId,
+        brand_name: line.brandName,
         name: line.name,
         image_url: line.imageUrl,
         quantity: line.quantity,
@@ -264,63 +283,65 @@ export { cartComponent }
 // ── the money gate ──────────────────────────────────────────────────────────
 
 /**
- * Locks the cart and creates a payment order.
+ * Locks the cart and stages one payment order per brand.
  *
  * The chargeable amount is computed here, from `priceCart`, which reads live
  * catalogue prices. Whatever the model said the total was is not consulted,
  * not passed in, and cannot be passed in — `checkout` takes no amount
  * argument. Stock is re-checked at this moment too, because an item can sell
  * out between the add and the checkout.
+ *
+ * The split is per brand because each brand takes payment on its own account.
+ * It is all-or-nothing: if any brand in the cart cannot take money right now,
+ * nothing is staged and the customer is told which brand and why. A checkout
+ * that half-worked is worse than one that did not start.
  */
 export async function gatedCheckout(args: {
   session: StorefrontSession
-  tenant: Tenant
   config: AgentConfig
   /** The model's own words for why it is checking out, recorded in the audit log. */
   reasoning?: string | null
   note?: string | null
 }): Promise<ToolOutcome> {
-  const { session, tenant, config } = args
+  const { session, config } = args
 
   return withCartLock(session.conversationId, async () => {
-    const cart = carts.ensureOpen(session.tenantId, session.conversationId)
+    const cart = carts.ensureOpen(session.conversationId)
     const priced = priceCart(session, cart.id)
 
     // ── empty cart ──────────────────────────────────────────────────────────
     if (priced.lines.length === 0) {
-      audit.record({
-        tenantId: session.tenantId,
-        conversationId: session.conversationId,
-        cartId: cart.id,
-        actionType: 'checkout.blocked',
-        outcome: 'blocked',
-        reasoning: args.reasoning ?? null,
-        detail: { gate: EMPTY_CART_GATE },
-      })
+      // Deliberately unaudited: no brand was involved, so this belongs in no
+      // brand's ledger. The audit log is each merchant's record of its own
+      // money, not a log of everything the agent tried.
       return held(EMPTY_CART_GATE, 'The cart is empty, so there is nothing to check out.')
     }
 
     // ── stock, re-checked at the moment of charge ───────────────────────────
     const shortfalls = priced.lines.filter((line) => !line.inStock)
     if (shortfalls.length > 0) {
-      audit.record({
-        tenantId: session.tenantId,
-        conversationId: session.conversationId,
-        cartId: cart.id,
-        actionType: 'checkout.blocked',
-        amountMinor: priced.subtotalMinor,
-        currency: priced.currency,
-        outcome: 'blocked',
-        reasoning: args.reasoning ?? null,
-        detail: {
-          gate: STOCK_GATE,
-          items: shortfalls.map((line) => ({
-            product_id: line.productId,
-            wanted: line.quantity,
-            available: line.availableStock,
-          })),
-        },
-      })
+      for (const brand of brandsOf(shortfalls)) {
+        audit.record({
+          tenantId: brand,
+          conversationId: session.conversationId,
+          cartId: cart.id,
+          actionType: 'checkout.blocked',
+          amountMinor: sumOf(shortfalls.filter((line) => line.tenantId === brand)),
+          currency: priced.currency,
+          outcome: 'blocked',
+          reasoning: args.reasoning ?? null,
+          detail: {
+            gate: STOCK_GATE,
+            items: shortfalls
+              .filter((line) => line.tenantId === brand)
+              .map((line) => ({
+                product_id: line.productId,
+                wanted: line.quantity,
+                available: line.availableStock,
+              })),
+          },
+        })
+      }
       const description = shortfalls
         .map((line) =>
           line.availableStock === 0
@@ -338,67 +359,118 @@ export async function gatedCheckout(args: {
     }
 
     // ── the authoritative amount ────────────────────────────────────────────
-    const amountMinor = priced.subtotalMinor
-    if (amountMinor <= 0 || amountMinor > config.maxOrderTotalMinor) {
-      audit.record({
-        tenantId: session.tenantId,
-        conversationId: session.conversationId,
-        cartId: cart.id,
-        actionType: 'checkout.blocked',
-        amountMinor,
-        currency: priced.currency,
-        outcome: 'blocked',
-        reasoning: args.reasoning ?? null,
-        detail: { gate: AMOUNT_GATE, limit_minor: config.maxOrderTotalMinor },
-      })
+    const totalMinor = sumOf(priced.lines)
+    if (totalMinor <= 0 || totalMinor > config.maxOrderTotalMinor) {
+      // Recorded against every brand in the cart: each of them lost a sale to
+      // this limit and each is entitled to see why.
+      for (const brand of brandsOf(priced.lines)) {
+        audit.record({
+          tenantId: brand,
+          conversationId: session.conversationId,
+          cartId: cart.id,
+          actionType: 'checkout.blocked',
+          amountMinor: sumOf(priced.lines.filter((line) => line.tenantId === brand)),
+          currency: priced.currency,
+          outcome: 'blocked',
+          reasoning: args.reasoning ?? null,
+          detail: { gate: AMOUNT_GATE, limit_minor: config.maxOrderTotalMinor },
+        })
+      }
       return held(
         AMOUNT_GATE,
-        'This order is outside the limits this brand accepts in chat. Ask the customer to get in touch with the brand directly.',
+        'This order is outside the limits Convo accepts in chat. Ask the customer to get in touch with the brand directly.',
       )
     }
 
-    const lineItems: OrderLineItem[] = priced.lines.map((line) => ({
-      productId: line.productId,
-      name: line.name,
-      quantity: line.quantity,
-      unitPriceMinor: line.unitPriceMinor,
-      lineTotalMinor: line.lineTotalMinor,
-    }))
+    /*
+     * One group per brand, resolved before anything is written.
+     *
+     * Every provider is checked up front so a cart with a misconfigured brand
+     * in it fails before a single order exists, rather than halfway through
+     * staging. The message names the brand, because "checkout failed" tells a
+     * customer nothing they can act on.
+     */
+    const groups: {
+      tenantId: string
+      brandName: string
+      requiresShipping: boolean
+      lines: PricedLine[]
+      amountMinor: number
+      lineItems: OrderLineItem[]
+      provider: ReturnType<typeof resolveProvider>
+    }[] = []
 
-    const { providerType, adapter, credentials } = resolveProvider(session.tenantId)
-    if (!adapter.capabilities.payment) {
-      return failed(`${adapter.displayName} is not set up to take payments for this brand.`)
+    for (const tenantId of brandsOf(priced.lines)) {
+      const lines = priced.lines.filter((line) => line.tenantId === tenantId)
+      const tenant = tenants.byId(tenantId)
+      if (!tenant || !tenant.isListed) {
+        return failed(
+          `${lines[0]!.brandName} is no longer available on Convo. Tell the customer, offer to ` +
+            'remove those items, and check out with the rest.',
+        )
+      }
+      let provider
+      try {
+        provider = resolveProvider(tenantId)
+      } catch {
+        return failed(
+          `${tenant.name} cannot take payments right now, so nothing was charged. Tell the ` +
+            'customer which brand it is and offer to check out the rest without it.',
+        )
+      }
+      if (!provider.adapter.capabilities.payment) {
+        return failed(
+          `${tenant.name} is not set up to take payments, so nothing was charged. Tell the ` +
+            'customer which brand it is and offer to check out the rest without it.',
+        )
+      }
+      groups.push({
+        tenantId,
+        brandName: tenant.name,
+        requiresShipping: tenant.requiresShipping,
+        lines,
+        amountMinor: sumOf(lines),
+        lineItems: lines.map((line) => ({
+          productId: line.productId,
+          name: line.name,
+          quantity: line.quantity,
+          unitPriceMinor: line.unitPriceMinor,
+          lineTotalMinor: line.lineTotalMinor,
+        })),
+        provider,
+      })
     }
 
-    // Staging a new order supersedes any earlier one for this conversation that
-    // could still be paid. Without this an order summary further up the
+    // Staging a new checkout supersedes any earlier order in this conversation
+    // that could still be paid. Without this an order card further up the
     // transcript keeps a live pay button against a cart that has since changed,
     // which is a second charge waiting to happen.
-    const superseded = orders.pendingForConversation(session.tenantId, session.conversationId)
+    const superseded = orders.pendingForConversation(session.conversationId)
 
-    // The cart is locked and the order recorded before the provider is called,
-    // so a provider that answers slowly cannot be charged for twice.
     /*
      * Carry the address forward.
      *
-     * A customer who has already told this shop where they live should not be
-     * asked again — so the last address used in this conversation is attached
-     * to the new order as it is staged, not merely offered to a form. That
-     * means the order is payable the moment it appears, and the gate below is
-     * satisfied without the browser having to do anything. Changing it is one
-     * tap on the card.
+     * A customer who has already said where they live should not be asked
+     * again — so the last address used in this conversation is attached to
+     * each new order as it is staged, not merely offered to a form. That means
+     * the orders are payable the moment they appear. Changing it is one tap on
+     * the card, and it changes every brand's order at once, because a shopper
+     * has one doorstep however many labels they bought from.
      */
-    const carriedAddress = tenant.requiresShipping
-      ? orders.lastShippingAddress(session.tenantId, session.conversationId)
-      : null
+    const needsShipping = groups.some((group) => group.requiresShipping)
+    const carriedAddress = needsShipping ? orders.lastShippingAddress(session.conversationId) : null
 
-    const order = transaction(() => {
+    const checkoutId = id('cko')
+
+    // The cart is locked and the orders recorded before any provider is called,
+    // so a provider that answers slowly cannot be charged for twice.
+    const staged = transaction(() => {
       for (const stale of superseded) {
-        orders.setStatus(session.tenantId, stale.id, 'cancelled', {
+        orders.setStatus(stale.tenantId, stale.id, 'cancelled', {
           failureReason: 'Replaced by a newer order in the same conversation.',
         })
         audit.record({
-          tenantId: session.tenantId,
+          tenantId: stale.tenantId,
           conversationId: session.conversationId,
           cartId: stale.cartId,
           orderId: stale.id,
@@ -410,103 +482,184 @@ export async function gatedCheckout(args: {
           detail: { reason: 'superseded' },
         })
       }
-      carts.setStatus(session.tenantId, cart.id, 'locked')
-      audit.record({
-        tenantId: session.tenantId,
-        conversationId: session.conversationId,
-        cartId: cart.id,
-        actionType: 'cart.locked',
-        amountMinor,
-        currency: priced.currency,
-        outcome: 'ok',
-        reasoning: args.reasoning ?? null,
-        detail: { line_count: lineItems.length, item_count: priced.itemCount },
-      })
-      const created = orders.create({
-        tenantId: session.tenantId,
-        cartId: cart.id,
-        conversationId: session.conversationId,
-        totalAmountMinor: amountMinor,
-        currency: priced.currency,
-        providerType,
-        providerOrderId: null,
-        lineItems,
-        status: 'created',
-      })
-      if (carriedAddress) {
-        orders.setShippingAddress(session.tenantId, created.id, carriedAddress)
-      }
-      return created
-    })
+      carts.setStatus(cart.id, 'locked')
 
-    try {
-      const handle = await adapter.createPaymentOrder(credentials, {
-        amountMinor,
-        currency: priced.currency,
-        receipt: order.id,
-        lines: lineItems.map((line) => ({
-          productId: line.productId,
-          name: line.name,
-          quantity: line.quantity,
-          unitPriceMinor: line.unitPriceMinor,
-          lineTotalMinor: line.lineTotalMinor,
-        })),
-        notes: { tenant: tenant.slug },
-      })
-
-      // A provider that acknowledges a different amount is refused outright.
-      if (handle.amountMinor !== amountMinor) {
-        throw new ProviderApiError('The payment provider acknowledged a different amount.')
-      }
-
-      transaction(() => {
-        orders.setStatus(session.tenantId, order.id, 'awaiting_payment')
-        orders.setProviderOrderId(session.tenantId, order.id, handle.providerOrderId)
+      const created: Order[] = []
+      for (const group of groups) {
         audit.record({
-          tenantId: session.tenantId,
+          tenantId: group.tenantId,
           conversationId: session.conversationId,
           cartId: cart.id,
-          orderId: order.id,
-          actionType: 'order.created',
-          amountMinor,
+          actionType: 'cart.locked',
+          amountMinor: group.amountMinor,
           currency: priced.currency,
           outcome: 'ok',
           reasoning: args.reasoning ?? null,
           detail: {
-            provider: providerType,
-            provider_order_id: handle.providerOrderId,
-            mock: handle.isMock,
+            line_count: group.lineItems.length,
+            item_count: group.lines.reduce((sum, line) => sum + line.quantity, 0),
+            checkout_id: checkoutId,
+            brands_in_checkout: groups.length,
           },
         })
-      })
+        const order = orders.create({
+          tenantId: group.tenantId,
+          cartId: cart.id,
+          conversationId: session.conversationId,
+          checkoutId,
+          totalAmountMinor: group.amountMinor,
+          currency: priced.currency,
+          providerType: group.provider.providerType,
+          providerOrderId: null,
+          lineItems: group.lineItems,
+          status: 'created',
+        })
+        if (carriedAddress && group.requiresShipping) {
+          orders.setShippingAddress(group.tenantId, order.id, carriedAddress)
+        }
+        created.push(order)
+      }
+      return created
+    })
 
-      const note = args.note ? sanitizeNote(args.note) : null
+    /*
+     * Now the providers, one per brand.
+     *
+     * If any call fails the whole checkout is unwound: every order staged
+     * above is cancelled and the cart handed back intact. Leaving one brand
+     * payable and another failed would present a customer with half a purchase
+     * and no way to reason about it.
+     */
+    type Handle = Awaited<
+      ReturnType<(typeof groups)[number]['provider']['adapter']['createPaymentOrder']>
+    >
+    const handles: { order: Order; group: (typeof groups)[number]; handle: Handle }[] = []
+    for (const [index, group] of groups.entries()) {
+      const order = staged[index]!
+      try {
+        const handle = await group.provider.adapter.createPaymentOrder(group.provider.credentials, {
+          amountMinor: group.amountMinor,
+          currency: priced.currency,
+          receipt: order.id,
+          lines: group.lineItems.map((line) => ({
+            productId: line.productId,
+            name: line.name,
+            quantity: line.quantity,
+            unitPriceMinor: line.unitPriceMinor,
+            lineTotalMinor: line.lineTotalMinor,
+          })),
+          notes: { checkout: checkoutId },
+        })
 
-      return ok(
-        `Order ${order.id} is staged for ${formatMoney(amountMinor, priced.currency)} and the ` +
-          'payment panel is open for the customer. The total was recomputed from catalogue prices ' +
-          'server-side; state no amount of your own. Nothing is paid until confirm_payment succeeds.',
-        [
-          {
-            component: 'order_summary',
-            payload: {
-              order_id: order.id,
-              status: 'awaiting_payment',
+        // A provider that acknowledges a different amount is refused outright.
+        if (handle.amountMinor !== group.amountMinor) {
+          throw new ProviderApiError('The payment provider acknowledged a different amount.')
+        }
+        handles.push({ order, group, handle })
+      } catch (error) {
+        const reason =
+          error instanceof ProviderConfigError
+            ? `${group.brandName}’s payment provider is not configured correctly.`
+            : error instanceof ProviderApiError
+              ? `${group.brandName}’s payment provider could not start this payment.`
+              : `The payment for ${group.brandName} could not be started.`
+        transaction(() => {
+          carts.setStatus(cart.id, 'open')
+          for (const stagedOrder of staged) {
+            orders.setStatus(stagedOrder.tenantId, stagedOrder.id, 'failed', {
+              failureReason: reason,
+            })
+            audit.record({
+              tenantId: stagedOrder.tenantId,
+              conversationId: session.conversationId,
+              cartId: cart.id,
+              orderId: stagedOrder.id,
+              actionType: 'payment.attempted',
+              amountMinor: stagedOrder.totalAmountMinor,
               currency: priced.currency,
-              total_minor: amountMinor,
-              total_display: formatMoney(amountMinor, priced.currency),
-              item_count: priced.itemCount,
-              note,
-              requires_address: tenant.requiresShipping,
-              // Already attached, not merely suggested: present means the
-              // order can be paid for as it stands.
-              shipping_address: carriedAddress,
-              // Everywhere this customer has had something sent, so a second
-              // purchase is a choice from a list rather than a form.
-              saved_addresses: tenant.requiresShipping
-                ? orders.savedShippingAddresses(session.tenantId, session.conversationId)
-                : [],
-              lines: lineItems.map((line) => ({
+              outcome: 'failed',
+              reasoning: args.reasoning ?? null,
+              detail: { provider: stagedOrder.providerType, reason, checkout_id: checkoutId },
+            })
+          }
+        })
+        log.warn('checkout failed at the provider', {
+          tenantId: group.tenantId,
+          checkoutId,
+          provider: group.provider.providerType,
+          message: error instanceof Error ? error.message : 'unknown',
+        })
+        return failed(
+          `${reason} Nothing has been charged and the cart is unchanged. Tell the customer ` +
+            'plainly and offer to try again.',
+        )
+      }
+    }
+
+    transaction(() => {
+      for (const { order, group, handle } of handles) {
+        orders.setStatus(group.tenantId, order.id, 'awaiting_payment')
+        orders.setProviderOrderId(group.tenantId, order.id, handle.providerOrderId)
+        audit.record({
+          tenantId: group.tenantId,
+          conversationId: session.conversationId,
+          cartId: cart.id,
+          orderId: order.id,
+          actionType: 'order.created',
+          amountMinor: group.amountMinor,
+          currency: priced.currency,
+          outcome: 'ok',
+          reasoning: args.reasoning ?? null,
+          detail: {
+            provider: group.provider.providerType,
+            provider_order_id: handle.providerOrderId,
+            mock: handle.isMock,
+            checkout_id: checkoutId,
+          },
+        })
+      }
+    })
+
+    const note = args.note ? sanitizeNote(args.note) : null
+    const split =
+      groups.length === 1
+        ? ''
+        : ` The cart spans ${groups.length} brands, so it is ${groups.length} separate orders, ` +
+          'each paid to that brand. Say so plainly in one sentence — a customer seeing two ' +
+          'charges should have been told to expect two.'
+
+    return ok(
+      `Checkout ${checkoutId} is staged for ${formatMoney(totalMinor, priced.currency)} across ` +
+        `${groups.length} order${groups.length === 1 ? '' : 's'} and the payment panel is open. ` +
+        'Totals were recomputed from catalogue prices server-side; state no amount of your own. ' +
+        `Nothing is paid until confirm_payment succeeds.${split}`,
+      [
+        {
+          component: 'checkout',
+          payload: {
+            checkout_id: checkoutId,
+            currency: priced.currency,
+            total_minor: totalMinor,
+            total_display: formatMoney(totalMinor, priced.currency),
+            item_count: priced.itemCount,
+            note,
+            requires_address: needsShipping,
+            // Already attached, not merely suggested: present means these
+            // orders can be paid for as they stand.
+            shipping_address: carriedAddress,
+            // Everywhere this customer has had something sent, so a second
+            // purchase is a choice from a list rather than a form.
+            saved_addresses: needsShipping
+              ? orders.savedShippingAddresses(session.conversationId)
+              : [],
+            orders: handles.map(({ order, group, handle }) => ({
+              order_id: order.id,
+              brand_name: group.brandName,
+              status: 'awaiting_payment',
+              requires_address: group.requiresShipping,
+              total_minor: group.amountMinor,
+              total_display: formatMoney(group.amountMinor, priced.currency),
+              lines: group.lineItems.map((line) => ({
                 product_id: line.productId,
                 name: line.name,
                 quantity: line.quantity,
@@ -515,54 +668,28 @@ export async function gatedCheckout(args: {
               })),
               payment: {
                 provider: handle.provider,
-                provider_label: adapter.displayName,
+                provider_label: group.provider.adapter.displayName,
                 provider_order_id: handle.providerOrderId,
                 public_key: handle.publicKey,
                 is_mock: handle.isMock,
                 amount_minor: handle.amountMinor,
                 currency: handle.currency,
               },
-            },
+            })),
           },
-        ],
-      )
-    } catch (error) {
-      // The provider refused or was unreachable. Nothing was charged; give the
-      // cart back so the customer can try again.
-      const reason =
-        error instanceof ProviderConfigError
-          ? 'This brand’s payment provider is not configured correctly.'
-          : error instanceof ProviderApiError
-            ? 'The payment provider could not start this payment.'
-            : 'The payment could not be started.'
-      transaction(() => {
-        carts.setStatus(session.tenantId, cart.id, 'open')
-        orders.setStatus(session.tenantId, order.id, 'failed', { failureReason: reason })
-        audit.record({
-          tenantId: session.tenantId,
-          conversationId: session.conversationId,
-          cartId: cart.id,
-          orderId: order.id,
-          actionType: 'payment.attempted',
-          amountMinor,
-          currency: priced.currency,
-          outcome: 'failed',
-          reasoning: args.reasoning ?? null,
-          detail: { provider: providerType, reason },
-        })
-      })
-      log.warn('checkout failed at the provider', {
-        tenantId: session.tenantId,
-        orderId: order.id,
-        provider: providerType,
-        message: error instanceof Error ? error.message : 'unknown',
-      })
-      return failed(
-        `${reason} Nothing has been charged and the cart is unchanged. Tell the customer plainly ` +
-          'and offer to try again.',
-      )
-    }
+        },
+      ],
+    )
   })
+}
+
+/** The distinct brands in a set of priced lines, in first-seen order. */
+function brandsOf(lines: PricedLine[]): string[] {
+  return [...new Set(lines.map((line) => line.tenantId))]
+}
+
+function sumOf(lines: PricedLine[]): number {
+  return lines.reduce((sum, line) => sum + line.lineTotalMinor, 0)
 }
 
 /**
@@ -579,11 +706,11 @@ export async function gatedConfirmPayment(args: {
   reasoning?: string | null
 }): Promise<ToolOutcome> {
   const { session, orderId } = args
-  const order = orders.byId(session.tenantId, orderId)
+  // The conversation is the authorisation. A shopper does not know which brand
+  // an order belongs to, and should not have to — but they cannot confirm one
+  // that did not come out of their own thread.
+  const order = orders.forCustomer(session.conversationId, orderId)
   if (!order) return failed('No such order for this conversation.')
-  if (order.conversationId !== session.conversationId) {
-    return failed('That order belongs to a different conversation.')
-  }
   if (order.status === 'paid') {
     return ok(`Order ${order.id} is already paid.`, [orderConfirmationComponent(order.id, order)])
   }
@@ -612,10 +739,10 @@ export async function gatedConfirmPayment(args: {
    * it runs in a browser the customer controls. An order that reaches "paid"
    * with no address is money taken for a parcel nobody can post.
    */
-  const tenant = tenants.byId(session.tenantId)
+  const tenant = tenants.byId(order.tenantId)
   if (tenant?.requiresShipping && !order.shippingAddress) {
     audit.record({
-      tenantId: session.tenantId,
+      tenantId: order.tenantId,
       conversationId: session.conversationId,
       cartId: order.cartId,
       orderId: order.id,
@@ -633,10 +760,10 @@ export async function gatedConfirmPayment(args: {
     )
   }
 
-  const { adapter, credentials, providerType } = resolveProvider(session.tenantId)
+  const { adapter, credentials, providerType } = resolveProvider(order.tenantId)
 
   audit.record({
-    tenantId: session.tenantId,
+    tenantId: order.tenantId,
     conversationId: session.conversationId,
     cartId: order.cartId,
     orderId: order.id,
@@ -657,7 +784,7 @@ export async function gatedConfirmPayment(args: {
     })
   } catch (error) {
     log.error('payment verification threw', {
-      tenantId: session.tenantId,
+      tenantId: order.tenantId,
       orderId: order.id,
       message: error instanceof Error ? error.message : 'unknown',
     })
@@ -673,13 +800,19 @@ export async function gatedConfirmPayment(args: {
   if (!result.verified) {
     const signatureProblem = /signature/i.test(result.failureReason ?? '')
     transaction(() => {
-      orders.setStatus(session.tenantId, order.id, 'failed', {
+      orders.setStatus(order.tenantId, order.id, 'failed', {
         failureReason: result.failureReason,
         providerPaymentId: result.providerPaymentId,
       })
-      carts.setStatus(session.tenantId, order.cartId, 'open')
+      // Only hand the cart back if no sibling brand in this checkout has been
+      // paid. Reopening a cart that is half bought would put goods the
+      // customer already owns back on their shopping list.
+      const siblings = orders.byCheckout(session.conversationId, order.checkoutId)
+      if (!siblings.some((sibling) => sibling.status === 'paid')) {
+        carts.setStatus(order.cartId, 'open')
+      }
       audit.record({
-        tenantId: session.tenantId,
+        tenantId: order.tenantId,
         conversationId: session.conversationId,
         cartId: order.cartId,
         orderId: order.id,
@@ -715,7 +848,7 @@ export async function gatedConfirmPayment(args: {
   ) {
     transaction(() => {
       audit.record({
-        tenantId: session.tenantId,
+        tenantId: order.tenantId,
         conversationId: session.conversationId,
         cartId: order.cartId,
         orderId: order.id,
@@ -740,15 +873,21 @@ export async function gatedConfirmPayment(args: {
   const paid = transaction(() => {
     // Stock comes off the shelf only once payment is confirmed.
     for (const line of order.lineItems) {
-      products.reserveStock(session.tenantId, line.productId, line.quantity)
+      products.reserveStock(order.tenantId, line.productId, line.quantity)
     }
-    carts.setStatus(session.tenantId, order.cartId, 'converted')
-    const updated = orders.setStatus(session.tenantId, order.id, 'paid', {
+    const updated = orders.setStatus(order.tenantId, order.id, 'paid', {
       providerPaymentId: result.providerPaymentId,
       failureReason: null,
     })
+    // The cart is only spent once every brand in the checkout has been paid.
+    // With two brands, paying the first must not close the cart the second is
+    // still waiting on.
+    const siblings = orders.byCheckout(session.conversationId, order.checkoutId)
+    if (siblings.every((sibling) => sibling.status === 'paid')) {
+      carts.setStatus(order.cartId, 'converted')
+    }
     audit.record({
-      tenantId: session.tenantId,
+      tenantId: order.tenantId,
       conversationId: session.conversationId,
       cartId: order.cartId,
       orderId: order.id,

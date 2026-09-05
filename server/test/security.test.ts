@@ -1,10 +1,17 @@
 /**
  * The security properties, asserted rather than assumed.
  *
- * Tenant isolation is enforced by convention — every query carries a tenant id
- * — and convention is exactly the kind of thing that rots. These tests fail if
- * one brand can reach another's rows, if an API key escapes its tenant, or if
- * an image URL that can carry script gets stored.
+ * Tenant isolation is enforced by convention — every query that should carry a
+ * tenant id does — and convention is exactly the kind of thing that rots. These
+ * tests fail if one brand can reach another's rows, if an API key escapes its
+ * tenant, or if an image URL that can carry script gets stored.
+ *
+ * The marketplace moved the boundary rather than removing it. A shopper's
+ * conversation, cart and provenance are now platform-level and deliberately
+ * span brands; what stays fenced is each brand's catalogue, orders and ledger,
+ * and each shopper's orders from every other shopper. Both halves are asserted
+ * below, because a shared cart is only safe if the sharing is exactly as wide
+ * as it was designed to be.
  */
 process.env.DATABASE_PATH = `./data/test-sec-${process.pid}.db`
 process.env.CONVO_SECRET = 'test-secret-for-the-security-suite-00000000'
@@ -14,9 +21,8 @@ import { after, before, test } from 'node:test'
 import { rmSync } from 'node:fs'
 
 const { db, closeDb } = await import('../src/db/index.js')
-const { apiKeys, audit, carts, conversations, orders, products, tenants, users } = await import(
-  '../src/db/repo.js'
-)
+const { apiKeys, audit, carts, conversations, orders, products, provenance, tenants, users } =
+  await import('../src/db/repo.js')
 const { mintApiKey, hashApiKey, digestsMatch, readBearer } = await import('../src/lib/apikeys.js')
 const { isSafeImageUrl } = await import('../src/routes/catalog.js')
 const { encryptJson, decryptJson, hashPassword, verifyPassword } = await import('../src/lib/crypto.js')
@@ -73,13 +79,14 @@ test('an external_id is unique per brand, not globally', () => {
   assert.equal(products.byExternalId(beta, 'SKU-SHARED')!.name, 'Beta item')
 })
 
-test('orders, carts and audit entries do not cross tenants', () => {
-  const conversation = conversations.ensure(beta, `cust-${process.pid}`)
-  const cart = carts.ensureOpen(beta, conversation.id)
+test('orders and audit entries do not cross tenants', () => {
+  const conversation = conversations.ensure(`cust-${process.pid}`)
+  const cart = carts.ensureOpen(conversation.id)
   const order = orders.create({
     tenantId: beta,
     cartId: cart.id,
     conversationId: conversation.id,
+    checkoutId: `cko-${process.pid}`,
     totalAmountMinor: 12_300,
     currency: 'INR',
     providerType: 'manual',
@@ -89,10 +96,84 @@ test('orders, carts and audit entries do not cross tenants', () => {
   audit.record({ tenantId: beta, orderId: order.id, actionType: 'order.created', outcome: 'ok' })
 
   assert.equal(orders.byId(alpha, order.id), undefined)
-  assert.equal(carts.byId(alpha, cart.id), undefined)
-  assert.equal(conversations.byId(alpha, conversation.id), undefined)
+  assert.ok(!orders.listForTenant(alpha, 100).some((o) => o.id === order.id))
   assert.ok(!audit.list(alpha, 100).some((e) => e.orderId === order.id))
   assert.equal(orders.revenueMinor(alpha), 0)
+})
+
+test('a shopper cannot read an order from someone else’s conversation', () => {
+  const mine = conversations.ensure(`shopper-a-${process.pid}`)
+  const theirs = conversations.ensure(`shopper-b-${process.pid}`)
+  const cart = carts.ensureOpen(mine.id)
+  const order = orders.create({
+    tenantId: beta,
+    cartId: cart.id,
+    conversationId: mine.id,
+    checkoutId: `cko-mine-${process.pid}`,
+    totalAmountMinor: 4_500,
+    currency: 'INR',
+    providerType: 'manual',
+    providerOrderId: 'y',
+    lineItems: [],
+  })
+
+  assert.ok(orders.forCustomer(mine.id, order.id), 'the owner cannot read their own order')
+  assert.equal(orders.forCustomer(theirs.id, order.id), undefined, 'an order leaked across shoppers')
+  assert.deepEqual(orders.byCheckout(theirs.id, order.checkoutId), [], 'a checkout leaked across shoppers')
+  assert.ok(!orders.listForConversation(theirs.id, 50).some((o) => o.id === order.id))
+  assert.equal(orders.lastShippingAddress(theirs.id), null)
+})
+
+test('a shopper’s cart spans brands but not other shoppers', () => {
+  const mine = conversations.ensure(`cart-a-${process.pid}`)
+  const theirs = conversations.ensure(`cart-b-${process.pid}`)
+  const alphaItem = products.create({ tenantId: alpha, name: 'Alpha good', priceMinor: 1000, stock: 5 })
+  const betaItem = products.create({ tenantId: beta, name: 'Beta good', priceMinor: 2000, stock: 5 })
+
+  const cart = carts.ensureOpen(mine.id)
+  carts.addItem(cart.id, alpha, alphaItem.id, 1, 1000)
+  carts.addItem(cart.id, beta, betaItem.id, 1, 2000)
+
+  // The point of the marketplace: one cart, two brands.
+  assert.equal(carts.byId(cart.id)!.items.length, 2)
+  assert.deepEqual(
+    [...new Set(carts.byId(cart.id)!.items.map((i) => i.tenantId))].sort(),
+    [alpha, beta].sort(),
+  )
+  // And still one cart per shopper.
+  assert.notEqual(carts.ensureOpen(theirs.id).id, cart.id)
+  assert.equal(carts.ensureOpen(theirs.id).items.length, 0)
+})
+
+test('a brand that has not opted in is not on the marketplace shelf', () => {
+  const hidden = products.create({ tenantId: alpha, name: 'Unlisted good', priceMinor: 500, stock: 3 })
+
+  // Neither brand has opted in yet.
+  assert.equal(products.listedById(hidden.id), undefined, 'an unlisted brand reached the shelf')
+  assert.ok(!products.listedAcrossBrands().some((p) => p.id === hidden.id))
+
+  tenants.update(alpha, { isListed: true })
+  assert.ok(products.listedById(hidden.id), 'an opted-in brand did not reach the shelf')
+  assert.ok(products.listedAcrossBrands().some((p) => p.id === hidden.id))
+
+  // Delisting takes it straight back off, which is what a brand pressing the
+  // toggle expects — not "it stops appearing in new searches".
+  tenants.update(alpha, { isListed: false })
+  assert.equal(products.listedById(hidden.id), undefined, 'delisting did not take effect')
+})
+
+test('a shopper’s conversation is not reachable from another session id', () => {
+  const mine = conversations.ensure(`sess-a-${process.pid}`)
+  const theirs = conversations.ensure(`sess-b-${process.pid}`)
+  assert.notEqual(mine.id, theirs.id)
+
+  // Provenance is per conversation: seeing a product in one thread does not
+  // authorise adding it in another.
+  const item = products.create({ tenantId: beta, name: 'Seen once', priceMinor: 700, stock: 2 })
+  provenance.remember(mine.id, [{ productId: item.id, tenantId: beta }])
+
+  assert.ok(provenance.has(mine.id, item.id))
+  assert.equal(provenance.has(theirs.id, item.id), false, 'provenance leaked across shoppers')
 })
 
 // ── API keys ────────────────────────────────────────────────────────────────

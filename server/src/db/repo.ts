@@ -53,6 +53,7 @@ function toTenant(r: Record<string, unknown>): Tenant {
     currency: String(r.currency),
     accentColor: String(r.accent_color),
     requiresShipping: r.requires_shipping === undefined ? true : bool(r.requires_shipping),
+    isListed: bool(r.is_listed),
     llmProvider: (r.llm_provider as string) ?? null,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
@@ -86,6 +87,7 @@ function toOrder(r: Record<string, unknown>): Order {
     tenantId: String(r.tenant_id),
     cartId: String(r.cart_id),
     conversationId: String(r.conversation_id),
+    checkoutId: String(r.checkout_id),
     totalAmountMinor: Number(r.total_amount_minor),
     currency: String(r.currency),
     status: String(r.status) as OrderStatus,
@@ -156,6 +158,7 @@ export const tenants = {
         | 'llmProvider'
         | 'slug'
         | 'requiresShipping'
+        | 'isListed'
       >
     >,
   ): Tenant | undefined {
@@ -168,6 +171,7 @@ export const tenants = {
       accentColor: 'accent_color',
       llmProvider: 'llm_provider',
       requiresShipping: 'requires_shipping',
+      isListed: 'is_listed',
     }
     const sets: string[] = []
     const params: unknown[] = []
@@ -448,6 +452,35 @@ export const products = {
     ).map(toProduct)
   },
 
+  /**
+   * Every in-stock product from every listed brand.
+   *
+   * The only accessor in this file that deliberately crosses tenants, and the
+   * only one the marketplace agent gets to call. It is not a hole in the
+   * isolation model — it is the marketplace, stated once, in a place a reader
+   * will find it. A brand that has not opted in does not appear here, and
+   * nothing in this file lets one brand read another's rows.
+   */
+  listedAcrossBrands(): (Product & { brandName: string })[] {
+    return all(
+      `SELECT p.*, t.name AS brand_name
+       FROM products p JOIN tenants t ON t.id = p.tenant_id
+       WHERE p.is_active = 1 AND t.is_listed = 1
+       ORDER BY p.created_at DESC, p.rowid DESC`,
+    ).map((r) => ({ ...toProduct(r), brandName: String(r.brand_name) }))
+  },
+
+  /** One listed product, by id, without knowing whose it is. */
+  listedById(productId: string): (Product & { brandName: string }) | undefined {
+    const r = get(
+      `SELECT p.*, t.name AS brand_name
+       FROM products p JOIN tenants t ON t.id = p.tenant_id
+       WHERE p.id = ? AND p.is_active = 1 AND t.is_listed = 1`,
+      [productId],
+    )
+    return r ? { ...toProduct(r), brandName: String(r.brand_name) } : undefined
+  },
+
   byId(tenantId: string, productId: string): Product | undefined {
     const r = get('SELECT * FROM products WHERE tenant_id = ? AND id = ?', [tenantId, productId])
     return r ? toProduct(r) : undefined
@@ -698,18 +731,20 @@ export const products = {
 }
 
 // ── conversations, messages, provenance ─────────────────────────────────────
+//
+// A shopper talks to Convo, not to a brand, so none of this is tenant-scoped.
+// Where a tenant id appears below it names which brand a product or an order
+// belongs to — never who is allowed to read the row.
 
 export const conversations = {
-  ensure(tenantId: string, customerSessionId: string): Conversation {
-    const existing = get('SELECT * FROM conversations WHERE tenant_id = ? AND customer_session_id = ?', [
-      tenantId,
+  ensure(customerSessionId: string): Conversation {
+    const existing = get('SELECT * FROM conversations WHERE customer_session_id = ?', [
       customerSessionId,
     ])
     if (existing) {
       run('UPDATE conversations SET last_active_at = ? WHERE id = ?', [nowIso(), existing.id])
       return {
         id: String(existing.id),
-        tenantId,
         customerSessionId,
         startedAt: String(existing.started_at),
         lastActiveAt: nowIso(),
@@ -718,45 +753,47 @@ export const conversations = {
     const now = nowIso()
     const conversationId = id('cnv')
     run(
-      `INSERT INTO conversations (id, tenant_id, customer_session_id, started_at, last_active_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [conversationId, tenantId, customerSessionId, now, now],
+      `INSERT INTO conversations (id, customer_session_id, started_at, last_active_at)
+       VALUES (?, ?, ?, ?)`,
+      [conversationId, customerSessionId, now, now],
     )
-    return { id: conversationId, tenantId, customerSessionId, startedAt: now, lastActiveAt: now }
+    return { id: conversationId, customerSessionId, startedAt: now, lastActiveAt: now }
   },
 
-  byId(tenantId: string, conversationId: string): Conversation | undefined {
-    const r = get('SELECT * FROM conversations WHERE tenant_id = ? AND id = ?', [
-      tenantId,
-      conversationId,
-    ])
+  byId(conversationId: string): Conversation | undefined {
+    const r = get('SELECT * FROM conversations WHERE id = ?', [conversationId])
     if (!r) return undefined
     return {
       id: String(r.id),
-      tenantId,
       customerSessionId: String(r.customer_session_id),
       startedAt: String(r.started_at),
       lastActiveAt: String(r.last_active_at),
     }
   },
 
+  /**
+   * Conversations that have actually seen this brand's goods.
+   *
+   * The dashboard used to count every conversation on the brand's own chat
+   * page. There is no such page now, so the honest equivalent is how many
+   * shoppers Convo has put this catalogue in front of.
+   */
   countForTenant(tenantId: string): number {
-    const r = get<{ n: number }>('SELECT COUNT(*) AS n FROM conversations WHERE tenant_id = ?', [
-      tenantId,
-    ])
+    const r = get<{ n: number }>(
+      'SELECT COUNT(DISTINCT conversation_id) AS n FROM seen_products WHERE tenant_id = ?',
+      [tenantId],
+    )
     return Number(r?.n ?? 0)
   },
 }
 
 export const messages = {
-  list(tenantId: string, conversationId: string): StoredMessage[] {
-    return all(
-      'SELECT * FROM messages WHERE tenant_id = ? AND conversation_id = ? ORDER BY seq',
-      [tenantId, conversationId],
-    ).map((r) => ({
+  list(conversationId: string): StoredMessage[] {
+    return all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY seq', [
+      conversationId,
+    ]).map((r) => ({
       id: String(r.id),
       conversationId: String(r.conversation_id),
-      tenantId: String(r.tenant_id),
       role: String(r.role) as StoredMessage['role'],
       content: String(r.content),
       toolCalls: json<StoredMessage['toolCalls']>(r.tool_calls, null),
@@ -768,7 +805,6 @@ export const messages = {
   },
 
   append(input: {
-    tenantId: string
     conversationId: string
     role: StoredMessage['role']
     content: string
@@ -783,12 +819,11 @@ export const messages = {
     const seq = Number(next?.n ?? 1)
     const messageId = id('msg')
     run(
-      `INSERT INTO messages (id, conversation_id, tenant_id, role, content, tool_calls, tool_results, ui, created_at, seq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO messages (id, conversation_id, role, content, tool_calls, tool_results, ui, created_at, seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         messageId,
         input.conversationId,
-        input.tenantId,
         input.role,
         input.content,
         input.toolCalls ? JSON.stringify(input.toolCalls) : null,
@@ -798,7 +833,7 @@ export const messages = {
         seq,
       ],
     )
-    return messages.list(input.tenantId, input.conversationId).find((m) => m.id === messageId)!
+    return messages.list(input.conversationId).find((m) => m.id === messageId)!
   },
 }
 
@@ -806,35 +841,41 @@ export const messages = {
  * Provenance. Cart writes and presentation payloads accept only product ids
  * recorded here for this conversation — adapted from the `seen_products`
  * session state and cart gates in anthropics/commerce-agents.
+ *
+ * Each row also records which brand the product belongs to, so a cart write
+ * knows whose stock to reserve and whose order the line will end up on.
  */
 export const provenance = {
-  remember(tenantId: string, conversationId: string, productIds: string[]): void {
-    if (productIds.length === 0) return
+  remember(conversationId: string, seen: { productId: string; tenantId: string }[]): void {
+    if (seen.length === 0) return
     const now = nowIso()
-    for (const productId of productIds) {
+    for (const item of seen) {
       run(
-        `INSERT INTO seen_products (conversation_id, tenant_id, product_id, seen_at)
+        `INSERT INTO seen_products (conversation_id, product_id, tenant_id, seen_at)
          VALUES (?, ?, ?, ?)
          ON CONFLICT(conversation_id, product_id) DO UPDATE SET seen_at = excluded.seen_at`,
-        [conversationId, tenantId, productId, now],
+        [conversationId, item.productId, item.tenantId, now],
       )
     }
   },
 
-  has(tenantId: string, conversationId: string, productId: string): boolean {
-    return (
-      get('SELECT 1 FROM seen_products WHERE tenant_id = ? AND conversation_id = ? AND product_id = ?', [
-        tenantId,
-        conversationId,
-        productId,
-      ]) !== undefined
+  /** The owning brand, or undefined if this conversation has not seen it. */
+  ownerOf(conversationId: string, productId: string): string | undefined {
+    const r = get<{ tenant_id: string }>(
+      'SELECT tenant_id FROM seen_products WHERE conversation_id = ? AND product_id = ?',
+      [conversationId, productId],
     )
+    return r ? String(r.tenant_id) : undefined
   },
 
-  seenIds(tenantId: string, conversationId: string): Set<string> {
+  has(conversationId: string, productId: string): boolean {
+    return provenance.ownerOf(conversationId, productId) !== undefined
+  },
+
+  seenIds(conversationId: string): Set<string> {
     const rows = all<{ product_id: string }>(
-      'SELECT product_id FROM seen_products WHERE tenant_id = ? AND conversation_id = ?',
-      [tenantId, conversationId],
+      'SELECT product_id FROM seen_products WHERE conversation_id = ?',
+      [conversationId],
     )
     return new Set(rows.map((r) => String(r.product_id)))
   },
@@ -855,34 +896,32 @@ function toCartItem(r: Record<string, unknown>): CartItem {
 }
 
 export const carts = {
-  /** The conversation's open cart, created on first use. */
-  ensureOpen(tenantId: string, conversationId: string): Cart {
+  /** The conversation's open cart, created on first use. Spans brands. */
+  ensureOpen(conversationId: string): Cart {
     const existing = get(
-      `SELECT * FROM carts WHERE tenant_id = ? AND conversation_id = ? AND status = 'open'
+      `SELECT id FROM carts WHERE conversation_id = ? AND status = 'open'
        ORDER BY created_at DESC LIMIT 1`,
-      [tenantId, conversationId],
+      [conversationId],
     )
-    if (existing) return carts.byId(tenantId, String(existing.id))!
+    if (existing) return carts.byId(String(existing.id))!
     const now = nowIso()
     const cartId = id('crt')
     run(
-      `INSERT INTO carts (id, tenant_id, conversation_id, status, created_at, updated_at)
-       VALUES (?, ?, ?, 'open', ?, ?)`,
-      [cartId, tenantId, conversationId, now, now],
+      `INSERT INTO carts (id, conversation_id, status, created_at, updated_at)
+       VALUES (?, ?, 'open', ?, ?)`,
+      [cartId, conversationId, now, now],
     )
-    return carts.byId(tenantId, cartId)!
+    return carts.byId(cartId)!
   },
 
-  byId(tenantId: string, cartId: string): Cart | undefined {
-    const r = get('SELECT * FROM carts WHERE tenant_id = ? AND id = ?', [tenantId, cartId])
+  byId(cartId: string): Cart | undefined {
+    const r = get('SELECT * FROM carts WHERE id = ?', [cartId])
     if (!r) return undefined
-    const items = all('SELECT * FROM cart_items WHERE tenant_id = ? AND cart_id = ? ORDER BY added_at', [
-      tenantId,
-      cartId,
-    ]).map(toCartItem)
+    const items = all('SELECT * FROM cart_items WHERE cart_id = ? ORDER BY added_at', [cartId]).map(
+      toCartItem,
+    )
     return {
       id: String(r.id),
-      tenantId,
       conversationId: String(r.conversation_id),
       status: String(r.status) as CartStatus,
       items,
@@ -892,8 +931,8 @@ export const carts = {
   },
 
   addItem(
-    tenantId: string,
     cartId: string,
+    tenantId: string,
     productId: string,
     quantity: number,
     unitPriceMinor: number,
@@ -905,63 +944,60 @@ export const carts = {
        ON CONFLICT(cart_id, product_id) DO UPDATE SET quantity = cart_items.quantity + excluded.quantity`,
       [id('cit'), cartId, tenantId, productId, quantity, unitPriceMinor, now],
     )
-    run('UPDATE carts SET updated_at = ? WHERE tenant_id = ? AND id = ?', [now, tenantId, cartId])
-    return carts.byId(tenantId, cartId)!
+    run('UPDATE carts SET updated_at = ? WHERE id = ?', [now, cartId])
+    return carts.byId(cartId)!
   },
 
-  setQuantity(tenantId: string, cartId: string, productId: string, quantity: number): Cart {
-    if (quantity <= 0) return carts.removeItem(tenantId, cartId, productId)
-    run(
-      'UPDATE cart_items SET quantity = ? WHERE tenant_id = ? AND cart_id = ? AND product_id = ?',
-      [quantity, tenantId, cartId, productId],
-    )
-    run('UPDATE carts SET updated_at = ? WHERE tenant_id = ? AND id = ?', [nowIso(), tenantId, cartId])
-    return carts.byId(tenantId, cartId)!
-  },
-
-  removeItem(tenantId: string, cartId: string, productId: string): Cart {
-    run('DELETE FROM cart_items WHERE tenant_id = ? AND cart_id = ? AND product_id = ?', [
-      tenantId,
+  setQuantity(cartId: string, productId: string, quantity: number): Cart {
+    if (quantity <= 0) return carts.removeItem(cartId, productId)
+    run('UPDATE cart_items SET quantity = ? WHERE cart_id = ? AND product_id = ?', [
+      quantity,
       cartId,
       productId,
     ])
-    run('UPDATE carts SET updated_at = ? WHERE tenant_id = ? AND id = ?', [nowIso(), tenantId, cartId])
-    return carts.byId(tenantId, cartId)!
+    run('UPDATE carts SET updated_at = ? WHERE id = ?', [nowIso(), cartId])
+    return carts.byId(cartId)!
   },
 
-  clear(tenantId: string, cartId: string): Cart {
-    run('DELETE FROM cart_items WHERE tenant_id = ? AND cart_id = ?', [tenantId, cartId])
-    run('UPDATE carts SET updated_at = ? WHERE tenant_id = ? AND id = ?', [nowIso(), tenantId, cartId])
-    return carts.byId(tenantId, cartId)!
+  removeItem(cartId: string, productId: string): Cart {
+    run('DELETE FROM cart_items WHERE cart_id = ? AND product_id = ?', [cartId, productId])
+    run('UPDATE carts SET updated_at = ? WHERE id = ?', [nowIso(), cartId])
+    return carts.byId(cartId)!
+  },
+
+  clear(cartId: string): Cart {
+    run('DELETE FROM cart_items WHERE cart_id = ?', [cartId])
+    run('UPDATE carts SET updated_at = ? WHERE id = ?', [nowIso(), cartId])
+    return carts.byId(cartId)!
   },
 
   /** The most recent cart locked by a checkout that was never paid. */
-  latestLocked(tenantId: string, conversationId: string): Cart | undefined {
+  latestLocked(conversationId: string): Cart | undefined {
     const row = get<{ id: string }>(
-      `SELECT id FROM carts WHERE tenant_id = ? AND conversation_id = ? AND status = 'locked'
+      `SELECT id FROM carts WHERE conversation_id = ? AND status = 'locked'
        ORDER BY updated_at DESC LIMIT 1`,
-      [tenantId, conversationId],
+      [conversationId],
     )
-    return row ? carts.byId(tenantId, String(row.id)) : undefined
+    return row ? carts.byId(String(row.id)) : undefined
   },
 
-  setStatus(tenantId: string, cartId: string, status: CartStatus): void {
-    run('UPDATE carts SET status = ?, updated_at = ? WHERE tenant_id = ? AND id = ?', [
-      status,
-      nowIso(),
-      tenantId,
-      cartId,
-    ])
+  setStatus(cartId: string, status: CartStatus): void {
+    run('UPDATE carts SET status = ?, updated_at = ? WHERE id = ?', [status, nowIso(), cartId])
   },
 }
 
 // ── orders ──────────────────────────────────────────────────────────────────
+//
+// Reads split two ways. A brand reads its own orders by tenant id, as before.
+// A customer reads theirs by conversation id, which spans brands — a cart of
+// two labels is two orders, and the shopper is entitled to both.
 
 export const orders = {
   create(input: {
     tenantId: string
     cartId: string
     conversationId: string
+    checkoutId: string
     totalAmountMinor: number
     currency: string
     providerType: ProviderType
@@ -973,14 +1009,15 @@ export const orders = {
     const orderId = id('ord')
     run(
       `INSERT INTO orders
-         (id, tenant_id, cart_id, conversation_id, total_amount_minor, currency, status,
-          provider_type, provider_order_id, line_items, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, tenant_id, cart_id, conversation_id, checkout_id, total_amount_minor, currency,
+          status, provider_type, provider_order_id, line_items, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         input.tenantId,
         input.cartId,
         input.conversationId,
+        input.checkoutId,
         input.totalAmountMinor,
         input.currency,
         input.status ?? 'awaiting_payment',
@@ -999,6 +1036,29 @@ export const orders = {
     return r ? toOrder(r) : undefined
   },
 
+  /**
+   * An order read by the customer who placed it.
+   *
+   * The conversation id is the authorisation: a shopper does not know which
+   * brand an order belongs to and should not have to, but they cannot read an
+   * order that did not come out of their own thread.
+   */
+  forCustomer(conversationId: string, orderId: string): Order | undefined {
+    const r = get('SELECT * FROM orders WHERE id = ? AND conversation_id = ?', [
+      orderId,
+      conversationId,
+    ])
+    return r ? toOrder(r) : undefined
+  },
+
+  /** Every order staged by one checkout, in a stable order. */
+  byCheckout(conversationId: string, checkoutId: string): Order[] {
+    return all(
+      'SELECT * FROM orders WHERE conversation_id = ? AND checkout_id = ? ORDER BY created_at, rowid',
+      [conversationId, checkoutId],
+    ).map(toOrder)
+  },
+
   byProviderOrderId(tenantId: string, providerOrderId: string): Order | undefined {
     const r = get('SELECT * FROM orders WHERE tenant_id = ? AND provider_order_id = ?', [
       tenantId,
@@ -1014,10 +1074,10 @@ export const orders = {
     ]).map(toOrder)
   },
 
-  listForConversation(tenantId: string, conversationId: string, limit = 10): Order[] {
+  listForConversation(conversationId: string, limit = 10): Order[] {
     return all(
-      'SELECT * FROM orders WHERE tenant_id = ? AND conversation_id = ? ORDER BY created_at DESC LIMIT ?',
-      [tenantId, conversationId, limit],
+      'SELECT * FROM orders WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ?',
+      [conversationId, limit],
     ).map(toOrder)
   },
 
@@ -1042,13 +1102,13 @@ export const orders = {
     return orders.byId(tenantId, orderId)
   },
 
-  /** Orders for this conversation that could still be paid. */
-  pendingForConversation(tenantId: string, conversationId: string): Order[] {
+  /** Orders for this conversation that could still be paid, across brands. */
+  pendingForConversation(conversationId: string): Order[] {
     return all(
       `SELECT * FROM orders
-       WHERE tenant_id = ? AND conversation_id = ? AND status IN ('created', 'awaiting_payment')
-       ORDER BY created_at`,
-      [tenantId, conversationId],
+       WHERE conversation_id = ? AND status IN ('created', 'awaiting_payment')
+       ORDER BY created_at, rowid`,
+      [conversationId],
     ).map(toOrder)
   },
 
@@ -1067,14 +1127,16 @@ export const orders = {
    *
    * Scoped to the conversation rather than to a customer account, because
    * there are no customer accounts — the session cookie is the identity, so
-   * this remembers within one person's thread and nowhere wider.
+   * this remembers within one person's thread and nowhere wider. It reads
+   * across brands, which is the point: an address is the shopper's, not a
+   * brand's, and re-typing it for every label in one cart would be absurd.
    */
-  lastShippingAddress(tenantId: string, conversationId: string): ShippingAddress | null {
+  lastShippingAddress(conversationId: string): ShippingAddress | null {
     const r = get<{ shipping_address: string | null }>(
       `SELECT shipping_address FROM orders
-       WHERE tenant_id = ? AND conversation_id = ? AND shipping_address IS NOT NULL
+       WHERE conversation_id = ? AND shipping_address IS NOT NULL
        ORDER BY created_at DESC LIMIT 1`,
-      [tenantId, conversationId],
+      [conversationId],
     )
     return r?.shipping_address ? json<ShippingAddress | null>(r.shipping_address, null) : null
   },
@@ -1087,16 +1149,12 @@ export const orders = {
    * identity. Capped, because this renders inside a chat card and a list of
    * fifteen addresses is a scrolling problem, not a convenience.
    */
-  savedShippingAddresses(
-    tenantId: string,
-    conversationId: string,
-    limit = 5,
-  ): ShippingAddress[] {
+  savedShippingAddresses(conversationId: string, limit = 5): ShippingAddress[] {
     const rows = all<{ shipping_address: string }>(
       `SELECT shipping_address FROM orders
-       WHERE tenant_id = ? AND conversation_id = ? AND shipping_address IS NOT NULL
+       WHERE conversation_id = ? AND shipping_address IS NOT NULL
        ORDER BY created_at DESC`,
-      [tenantId, conversationId],
+      [conversationId],
     )
 
     const seen = new Set<string>()

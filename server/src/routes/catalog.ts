@@ -14,14 +14,27 @@ import { slugify } from '../lib/ids.js'
 import { toMinor } from '../lib/money.js'
 import { env } from '../env.js'
 import { mintApiKey } from '../lib/apikeys.js'
+import type { Tenant } from '../domain/types.js'
 import { log } from '../lib/logger.js'
-import { AVAILABLE_PROVIDERS, providerStatus } from '../models/index.js'
+import { providerStatus } from '../models/index.js'
 import type { Product } from '../domain/types.js'
 
 export const catalogRoutes = Router()
 catalogRoutes.use(requireAuth)
 
 const tenantOf = (req: unknown) => (req as AuthedRequest).auth.tenant
+
+/** What still stands between this brand and the marketplace shelf. */
+function listingReadiness(tenant: Tenant) {
+  const blockers: string[] = []
+  if (products.list(tenant.id).length === 0) {
+    blockers.push('Add at least one product before listing on the marketplace.')
+  }
+  if (!connections.activePayment(tenant.id)) {
+    blockers.push('Connect a payment provider before listing on the marketplace.')
+  }
+  return { listed: tenant.isListed, blockers }
+}
 
 // ── the brand ───────────────────────────────────────────────────────────────
 
@@ -33,7 +46,8 @@ catalogRoutes.get(
     const paid = orders.listForTenant(tenant.id, 200).filter((o) => o.status === 'paid')
     res.json({
       tenant,
-      chatUrl: `${env.publicBaseUrl}/chat/${tenant.slug}`,
+      shopUrl: `${env.publicBaseUrl}/shop`,
+      listing: listingReadiness(tenant),
       stats: {
         products: catalog.filter((p) => p.isActive).length,
         outOfStock: catalog.filter((p) => p.isActive && p.stock === 0).length,
@@ -71,27 +85,22 @@ catalogRoutes.patch(
     const description = optionalString(req.body, 'description', 500)
     if (description !== undefined) patch.description = description
 
-    const assistantName = optionalString(req.body, 'assistantName', 60)
-    if (assistantName) patch.assistantName = assistantName
-
-    const brandVoice = optionalString(req.body, 'brandVoice', 200)
-    if (brandVoice) patch.brandVoice = brandVoice
-
-    const accentColor = optionalString(req.body, 'accentColor', 9)
-    if (accentColor) {
-      if (!/^#[0-9a-fA-F]{6}$/.test(accentColor)) throw badRequest('Use a hex colour like #6D4AFF.')
-      patch.accentColor = accentColor
+    if (typeof req.body?.requiresShipping === 'boolean') {
+      patch.requiresShipping = req.body.requiresShipping
     }
 
-    if ('llmProvider' in (req.body ?? {})) {
-      const requested = req.body.llmProvider
-      if (requested === null || requested === '') {
-        patch.llmProvider = null
-      } else if (typeof requested === 'string' && AVAILABLE_PROVIDERS.includes(requested)) {
-        patch.llmProvider = requested
-      } else {
-        throw badRequest('That is not a model provider Convo knows.', 'bad_provider')
+    /*
+     * Listing is the brand's decision and nobody else's, but it is refused
+     * while the shop would be a dead end: a shopper who finds goods they
+     * cannot buy has been failed by Convo, not by the merchant. Delisting is
+     * never refused — a brand can always take itself off the shelf.
+     */
+    if (typeof req.body?.isListed === 'boolean') {
+      if (req.body.isListed) {
+        const blockers = listingReadiness(tenant).blockers
+        if (blockers.length > 0) throw badRequest(blockers[0]!, 'not_ready_to_list')
       }
+      patch.isListed = req.body.isListed
     }
 
     res.json({ tenant: tenants.update(tenant.id, patch) })

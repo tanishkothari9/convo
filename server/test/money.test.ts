@@ -37,19 +37,27 @@ const backend = new ConvoStorefront()
 const config = DEFAULT_AGENT_CONFIG
 
 let tenantId = ''
+let otherTenantId = ''
 
-before(() => {
-  db()
-  const tenant = tenants.create({ name: 'Test Brand', slug: `test-${process.pid}` })
-  tenantId = tenant.id
+/** A brand that is on the marketplace shelf and can take money. */
+function listedBrand(name: string, slug: string): string {
+  const tenant = tenants.create({ name, slug })
   connections.upsert({
-    tenantId,
+    tenantId: tenant.id,
     providerType: 'manual',
     capabilities: 'catalog+payment',
     credentialsEnc: null,
     credentialsHint: null,
   })
-  connections.activate(tenantId, 'manual', ['catalog', 'payment'])
+  connections.activate(tenant.id, 'manual', ['catalog', 'payment'])
+  tenants.update(tenant.id, { isListed: true })
+  return tenant.id
+}
+
+before(() => {
+  db()
+  tenantId = listedBrand('Test Brand', `test-${process.pid}`)
+  otherTenantId = listedBrand('Other Brand', `other-${process.pid}`)
 })
 
 after(() => {
@@ -64,49 +72,63 @@ after(() => {
 })
 
 /** A fresh conversation with one product already seen. */
-function scenario(name: string, priceMajor: number, stock: number) {
+function scenario(name: string, priceMajor: number, stock: number, brand = tenantId) {
   const product = products.create({
-    tenantId,
+    tenantId: brand,
     name,
     priceMinor: priceMajor * 100,
     stock,
     currency: 'INR',
   })
-  const session = ensureSession(tenantId, `cust-${name}-${Math.random()}`, 'INR')
-  provenance.remember(tenantId, session.conversationId, [product.id])
-  return { product, session, tenant: tenants.byId(tenantId)! }
+  const session = ensureSession(`cust-${name}-${Math.random()}`, 'INR')
+  provenance.remember(session.conversationId, [{ productId: product.id, tenantId: brand }])
+  return { product, session, tenant: tenants.byId(brand)! }
+}
+
+/** Puts a second brand's product into the same conversation and cart. */
+async function alsoFrom(session: { conversationId: string; customerSessionId: string; currency: string }, name: string, priceMajor: number, stock = 5) {
+  const product = products.create({
+    tenantId: otherTenantId,
+    name,
+    priceMinor: priceMajor * 100,
+    stock,
+    currency: 'INR',
+  })
+  provenance.remember(session.conversationId, [{ productId: product.id, tenantId: otherTenantId }])
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+  return product
 }
 
 test('checkout is held on an empty cart and nothing is staged', async () => {
-  const { session, tenant } = scenario('empty-cart-item', 100, 5)
-  const outcome = await gatedCheckout({ session, tenant, config })
+  const { session } = scenario('empty-cart-item', 100, 5)
+  const outcome = await gatedCheckout({ session, config })
   assert.equal(outcome.heldBy, 'empty_cart')
-  assert.equal(orders.listForConversation(tenantId, session.conversationId).length, 0)
+  assert.equal(orders.listForConversation(session.conversationId).length, 0)
 })
 
 test('the charged total is recomputed from the catalogue, not from the cart snapshot', async () => {
-  const { product, session, tenant } = scenario('repriced-item', 1000, 5)
+  const { product, session } = scenario('repriced-item', 1000, 5)
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 2 })
 
   // The merchant changes the price while the item sits in the cart.
   products.update(tenantId, product.id, { priceMinor: 150_000 })
 
-  const outcome = await gatedCheckout({ session, tenant, config })
+  const outcome = await gatedCheckout({ session, config })
   assert.equal(outcome.isError, false)
-  const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+  const order = orders.listForConversation(session.conversationId)[0]!
   // 2 × the new price, not 2 × the price at add time.
   assert.equal(order.totalAmountMinor, 300_000)
 })
 
 test('an item that sells out between the cart and checkout stops the charge', async () => {
-  const { product, session, tenant } = scenario('sells-out-item', 500, 3)
+  const { product, session } = scenario('sells-out-item', 500, 3)
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 2 })
 
   products.update(tenantId, product.id, { stock: 0 })
 
-  const outcome = await gatedCheckout({ session, tenant, config })
+  const outcome = await gatedCheckout({ session, config })
   assert.equal(outcome.heldBy, 'stock')
-  assert.equal(orders.listForConversation(tenantId, session.conversationId).length, 0)
+  assert.equal(orders.listForConversation(session.conversationId).length, 0)
 
   const blocked = audit
     .list(tenantId, 50)
@@ -115,10 +137,10 @@ test('an item that sells out between the cart and checkout stops the charge', as
 })
 
 test('a payment cannot be confirmed without a valid signature', async () => {
-  const { product, session, tenant } = scenario('unsigned-item', 700, 5)
+  const { product, session } = scenario('unsigned-item', 700, 5)
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-  await gatedCheckout({ session, tenant, config })
-  const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+  await gatedCheckout({ session, config })
+  const order = orders.listForConversation(session.conversationId)[0]!
   // Otherwise valid, so the refusal below is the signature and nothing else.
   orders.setShippingAddress(tenantId, order.id, readAddress(GOOD_ADDRESS))
 
@@ -132,10 +154,10 @@ test('a payment cannot be confirmed without a valid signature', async () => {
 })
 
 test('a correctly signed payment marks the order paid and takes the stock', async () => {
-  const { product, session, tenant } = scenario('paid-item', 400, 5)
+  const { product, session } = scenario('paid-item', 400, 5)
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 2 })
-  await gatedCheckout({ session, tenant, config })
-  const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+  await gatedCheckout({ session, config })
+  const order = orders.listForConversation(session.conversationId)[0]!
   orders.setShippingAddress(tenantId, order.id, readAddress(GOOD_ADDRESS))
 
   const paymentId = 'cvpay_test_ok'
@@ -163,14 +185,14 @@ test('a correctly signed payment marks the order paid and takes the stock', asyn
 })
 
 test('an order superseded by a newer checkout cannot be paid', async () => {
-  const { product, session, tenant } = scenario('superseded-item', 300, 10)
+  const { product, session } = scenario('superseded-item', 300, 10)
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-  await gatedCheckout({ session, tenant, config })
-  const first = orders.listForConversation(tenantId, session.conversationId)[0]!
+  await gatedCheckout({ session, config })
+  const first = orders.listForConversation(session.conversationId)[0]!
 
   // The customer keeps shopping, then checks out again.
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-  await gatedCheckout({ session, tenant, config })
+  await gatedCheckout({ session, config })
 
   assert.equal(orders.byId(tenantId, first.id)!.status, 'cancelled')
 
@@ -189,21 +211,21 @@ test('an order superseded by a newer checkout cannot be paid', async () => {
 })
 
 test('shopping on after staging a checkout keeps the cart rather than starting a new one', async () => {
-  const { product, session, tenant } = scenario('kept-cart-item', 250, 10)
+  const { product, session } = scenario('kept-cart-item', 250, 10)
   const second = products.create({ tenantId, name: 'second-item', priceMinor: 75_000, stock: 4 })
-  provenance.remember(tenantId, session.conversationId, [second.id])
+  provenance.remember(session.conversationId, [{ productId: second.id, tenantId }])
 
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-  await gatedCheckout({ session, tenant, config })
+  await gatedCheckout({ session, config })
 
   // Instead of paying, the customer adds something else.
   await gatedAddToCart({ backend, config, session, productId: second.id, quantity: 1 })
 
-  const cart = carts.ensureOpen(tenantId, session.conversationId)
+  const cart = carts.ensureOpen(session.conversationId)
   assert.equal(cart.items.length, 2, 'the earlier item is still in the cart')
 
-  await gatedCheckout({ session, tenant, config })
-  const latest = orders.listForConversation(tenantId, session.conversationId)[0]!
+  await gatedCheckout({ session, config })
+  const latest = orders.listForConversation(session.conversationId)[0]!
   assert.equal(latest.totalAmountMinor, 25_000 + 75_000)
 })
 
@@ -217,7 +239,7 @@ test('the per-item cap is applied and reported, never silently exceeded', async 
     quantity: config.maxQuantityPerItem + 40,
   })
   assert.match(outcome.text, /capped at the per-item limit/i)
-  const cart = carts.ensureOpen(tenantId, session.conversationId)
+  const cart = carts.ensureOpen(session.conversationId)
   assert.equal(cart.items[0]!.quantity, config.maxQuantityPerItem)
 })
 
@@ -233,17 +255,17 @@ test('a cart write for a product this conversation has not seen is held', async 
     quantity: 1,
   })
   assert.equal(outcome.heldBy, 'provenance')
-  assert.equal(carts.ensureOpen(tenantId, session.conversationId).items.length, 0)
+  assert.equal(carts.ensureOpen(session.conversationId).items.length, 0)
 })
 
 
 // ── Delivery address ────────────────────────────────────────────────────────
 
 test('an order with nowhere to send it cannot be paid, even with a valid signature', async () => {
-  const { product, session, tenant } = scenario('no-address-item', 600, 5)
+  const { product, session } = scenario('no-address-item', 600, 5)
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-  await gatedCheckout({ session, tenant, config })
-  const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+  await gatedCheckout({ session, config })
+  const order = orders.listForConversation(session.conversationId)[0]!
 
   const paymentId = 'cvpay_no_address'
   const outcome = await gatedConfirmPayment({
@@ -261,10 +283,10 @@ test('an order with nowhere to send it cannot be paid, even with a valid signatu
 })
 
 test('the address is frozen onto the order it was given for', async () => {
-  const { product, session, tenant } = scenario('frozen-address-item', 300, 5)
+  const { product, session } = scenario('frozen-address-item', 300, 5)
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-  await gatedCheckout({ session, tenant, config })
-  const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+  await gatedCheckout({ session, config })
+  const order = orders.listForConversation(session.conversationId)[0]!
 
   orders.setShippingAddress(tenantId, order.id, readAddress(GOOD_ADDRESS))
   const stored = orders.byId(tenantId, order.id)!.shippingAddress!
@@ -281,18 +303,18 @@ test('the address is frozen onto the order it was given for', async () => {
 })
 
 test('an address is pre-filled from the last one used in the same conversation', async () => {
-  const { product, session, tenant } = scenario('prefill-item', 200, 9)
+  const { product, session } = scenario('prefill-item', 200, 9)
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-  await gatedCheckout({ session, tenant, config })
-  const first = orders.listForConversation(tenantId, session.conversationId)[0]!
+  await gatedCheckout({ session, config })
+  const first = orders.listForConversation(session.conversationId)[0]!
   orders.setShippingAddress(tenantId, first.id, readAddress(GOOD_ADDRESS))
 
-  const recalled = orders.lastShippingAddress(tenantId, session.conversationId)!
+  const recalled = orders.lastShippingAddress(session.conversationId)!
   assert.equal(recalled.name, 'Anika Rao')
 
   // And it does not leak into another conversation.
   const other = ensureSession(tenantId, `other-${Math.random()}`, 'INR')
-  assert.equal(orders.lastShippingAddress(tenantId, other.conversationId), null)
+  assert.equal(orders.lastShippingAddress(other.conversationId), null)
 })
 
 test('an address is validated and normalised however it was typed', () => {
@@ -331,12 +353,12 @@ test('an address that could not be delivered to is refused', () => {
 })
 
 test('a returning customer is not asked for the same address twice', async () => {
-  const { product, session, tenant } = scenario('repeat-buyer-item', 450, 20)
+  const { product, session } = scenario('repeat-buyer-item', 450, 20)
 
   // First purchase: the address is given once.
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-  await gatedCheckout({ session, tenant, config })
-  const first = orders.listForConversation(tenantId, session.conversationId)[0]!
+  await gatedCheckout({ session, config })
+  const first = orders.listForConversation(session.conversationId)[0]!
   orders.setShippingAddress(tenantId, first.id, readAddress(GOOD_ADDRESS))
 
   const firstPayment = 'cvpay_repeat_one'
@@ -353,13 +375,13 @@ test('a returning customer is not asked for the same address twice', async () =>
   // Second purchase: the address arrives already attached, so the order is
   // payable without the customer touching a form.
   await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-  const outcome = await gatedCheckout({ session, tenant, config })
-  const second = orders.listForConversation(tenantId, session.conversationId)[0]!
+  const outcome = await gatedCheckout({ session, config })
+  const second = orders.listForConversation(session.conversationId)[0]!
 
   assert.notEqual(second.id, first.id)
   assert.equal(second.shippingAddress?.postalCode, '570001', 'the address was not carried forward')
 
-  const card = outcome.components.find((c) => c.component === 'order_summary')!
+  const card = outcome.components.find((c) => c.component === 'checkout')!
   assert.ok(card.payload.shipping_address, 'the card should open showing where this is going')
 
   const secondPayment = 'cvpay_repeat_two'
@@ -375,41 +397,126 @@ test('a returning customer is not asked for the same address twice', async () =>
   assert.equal(orders.byId(tenantId, second.id)!.status, 'paid')
 })
 
-test('a carried address does not follow the customer to another brand', async () => {
-  const other = tenants.create({ name: 'Other Brand', slug: `other-${process.pid}` })
-  connections.upsert({
-    tenantId: other.id,
-    providerType: 'manual',
-    capabilities: 'catalog+payment',
-    credentialsEnc: null,
-    credentialsHint: null,
-  })
-  connections.activate(other.id, 'manual', ['catalog', 'payment'])
-
-  const shared = `shopper-${process.pid}`
-  const here = ensureSession(tenantId, shared, 'INR')
-  const there = ensureSession(other.id, shared, 'INR')
-
-  const mine = products.create({ tenantId, name: 'Mine', priceMinor: 10_000, stock: 3 })
-  provenance.remember(tenantId, here.conversationId, [mine.id])
-  await gatedAddToCart({ backend, config, session: here, productId: mine.id, quantity: 1 })
-  await gatedCheckout({ session: here, tenant: tenants.byId(tenantId)!, config })
-  const order = orders.listForConversation(tenantId, here.conversationId)[0]!
+test('an address follows the shopper across brands, but not to another shopper', async () => {
+  const { product, session } = scenario('cross-brand-address-item', 100, 3)
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+  await gatedCheckout({ session, config })
+  const order = orders.listForConversation(session.conversationId)[0]!
   orders.setShippingAddress(tenantId, order.id, readAddress(GOOD_ADDRESS))
 
+  // The address belongs to the shopper, not to a brand: buying from a second
+  // label in the same thread must not mean typing it again.
+  assert.deepEqual(orders.lastShippingAddress(session.conversationId), readAddress(GOOD_ADDRESS))
+
+  const stranger = ensureSession(`stranger-${process.pid}`, 'INR')
   assert.equal(
-    orders.lastShippingAddress(other.id, there.conversationId),
+    orders.lastShippingAddress(stranger.conversationId),
     null,
-    'an address leaked between brands',
+    'an address leaked to another shopper',
   )
 })
 
+// ── the split ───────────────────────────────────────────────────────────────
+
+test('a cart spanning two brands is charged as one order per brand', async () => {
+  const { product, session } = scenario('split-a-item', 400, 5)
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 2 })
+  await alsoFrom(session, 'split-b-item', 250)
+
+  const outcome = await gatedCheckout({ session, config })
+  assert.equal(outcome.isError, false)
+
+  const staged = orders.listForConversation(session.conversationId)
+  assert.equal(staged.length, 2, 'a two-brand cart did not split into two orders')
+  assert.deepEqual(
+    [...new Set(staged.map((order) => order.tenantId))].sort(),
+    [tenantId, otherTenantId].sort(),
+  )
+  // One checkout, so the card can present them together.
+  assert.equal(new Set(staged.map((order) => order.checkoutId)).size, 1)
+  // Each brand is charged for its own goods and nobody else's.
+  const byBrand = new Map(staged.map((order) => [order.tenantId, order.totalAmountMinor]))
+  assert.equal(byBrand.get(tenantId), 80_000)
+  assert.equal(byBrand.get(otherTenantId), 25_000)
+})
+
+test('paying one brand in a split checkout does not settle the other', async () => {
+  const { product, session } = scenario('split-pay-a', 300, 5)
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+  await alsoFrom(session, 'split-pay-b', 150)
+  await gatedCheckout({ session, config })
+
+  const staged = orders.listForConversation(session.conversationId)
+  const [first, second] = staged as [(typeof staged)[number], (typeof staged)[number]]
+  for (const order of staged) orders.setShippingAddress(order.tenantId, order.id, readAddress(GOOD_ADDRESS))
+
+  const paid = await gatedConfirmPayment({
+    session,
+    orderId: first.id,
+    payload: {
+      order_id: first.providerOrderId,
+      payment_id: 'pay_split_1',
+      signature: signManualPayment(first.providerOrderId!, 'pay_split_1'),
+    },
+  })
+  assert.equal(paid.isError, false)
+  assert.equal(orders.byId(first.tenantId, first.id)!.status, 'paid')
+
+  // The other brand is still owed, and the cart stays locked until it is not.
+  assert.equal(orders.byId(second.tenantId, second.id)!.status, 'awaiting_payment')
+  assert.equal(carts.byId(first.cartId)!.status, 'locked')
+
+  const rest = await gatedConfirmPayment({
+    session,
+    orderId: second.id,
+    payload: {
+      order_id: second.providerOrderId,
+      payment_id: 'pay_split_2',
+      signature: signManualPayment(second.providerOrderId!, 'pay_split_2'),
+    },
+  })
+  assert.equal(rest.isError, false)
+  assert.equal(carts.byId(first.cartId)!.status, 'converted', 'the cart did not close once both brands were paid')
+})
+
+test('a half-paid checkout does not hand the cart back', async () => {
+  const { product, session } = scenario('split-halfpaid-a', 200, 5)
+  await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+  await alsoFrom(session, 'split-halfpaid-b', 100)
+  await gatedCheckout({ session, config })
+
+  const staged = orders.listForConversation(session.conversationId)
+  const [first, second] = staged as [(typeof staged)[number], (typeof staged)[number]]
+  for (const order of staged) orders.setShippingAddress(order.tenantId, order.id, readAddress(GOOD_ADDRESS))
+
+  await gatedConfirmPayment({
+    session,
+    orderId: first.id,
+    payload: {
+      order_id: first.providerOrderId,
+      payment_id: 'pay_half_1',
+      signature: signManualPayment(first.providerOrderId!, 'pay_half_1'),
+    },
+  })
+
+  // The second brand declines. The cart must stay shut: reopening it would put
+  // goods the shopper has already paid for back on their shopping list.
+  const declined = await gatedConfirmPayment({
+    session,
+    orderId: second.id,
+    payload: { order_id: second.providerOrderId, payment_id: 'pay_half_2', signature: 'nonsense' },
+  })
+  assert.equal(declined.isError, false)
+  assert.equal(orders.byId(second.tenantId, second.id)!.status, 'failed')
+  assert.notEqual(carts.byId(first.cartId)!.status, 'open', 'a half-paid cart was handed back')
+})
+
 test('a customer who has sent to several places gets a list, deduplicated', async () => {
-  const { product, session, tenant } = scenario('multi-address-item', 500, 30)
+  const { product, session } = scenario('multi-address-item', 500, 30)
   const send = async (address: Record<string, unknown>) => {
     await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-    await gatedCheckout({ session, tenant, config })
-    const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+    await gatedCheckout({ session, config })
+    const order = orders.listForConversation(session.conversationId)[0]!
     orders.setShippingAddress(tenantId, order.id, readAddress(address))
     const payment = `cvpay_${Math.random().toString(36).slice(2, 10)}`
     await gatedConfirmPayment({
@@ -430,18 +537,18 @@ test('a customer who has sent to several places gets a list, deduplicated', asyn
   // The same place again: it must not appear twice.
   await send(GOOD_ADDRESS)
 
-  const saved = orders.savedShippingAddresses(tenantId, session.conversationId)
+  const saved = orders.savedShippingAddresses(session.conversationId)
   assert.equal(saved.length, 2, 'the list should hold two distinct places')
   assert.equal(saved[0]!.city, 'Mysuru', 'most recently used comes first')
   assert.ok(saved.some((a) => a.city === 'Bengaluru'))
 })
 
 test('the same street with a different recipient is a separate entry', async () => {
-  const { product, session, tenant } = scenario('gift-address-item', 500, 20)
+  const { product, session } = scenario('gift-address-item', 500, 20)
   const send = async (name: string) => {
     await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-    await gatedCheckout({ session, tenant, config })
-    const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+    await gatedCheckout({ session, config })
+    const order = orders.listForConversation(session.conversationId)[0]!
     orders.setShippingAddress(tenantId, order.id, readAddress({ ...GOOD_ADDRESS, name }))
     const payment = `cvpay_${Math.random().toString(36).slice(2, 10)}`
     await gatedConfirmPayment({
@@ -454,16 +561,16 @@ test('the same street with a different recipient is a separate entry', async () 
   await send('Anika Rao')
   await send('Lakshmi Rao')
 
-  const saved = orders.savedShippingAddresses(tenantId, session.conversationId)
+  const saved = orders.savedShippingAddresses(session.conversationId)
   assert.equal(saved.length, 2, 'a gift to someone else at the same flat is a different delivery')
 })
 
 test('the saved list is capped so a card cannot become a scrolling problem', async () => {
-  const { product, session, tenant } = scenario('many-address-item', 400, 40)
+  const { product, session } = scenario('many-address-item', 400, 40)
   for (let i = 0; i < 8; i += 1) {
     await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
-    await gatedCheckout({ session, tenant, config })
-    const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+    await gatedCheckout({ session, config })
+    const order = orders.listForConversation(session.conversationId)[0]!
     orders.setShippingAddress(
       tenantId,
       order.id,
@@ -477,5 +584,5 @@ test('the saved list is capped so a card cannot become a scrolling problem', asy
     })
   }
 
-  assert.equal(orders.savedShippingAddresses(tenantId, session.conversationId).length, 5)
+  assert.equal(orders.savedShippingAddresses(session.conversationId).length, 5)
 })

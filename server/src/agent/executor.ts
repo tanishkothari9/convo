@@ -27,11 +27,9 @@ import { presentCart, presentProducts, presentSuggestions } from './presentation
 import { skillByName } from './skills.js'
 import { LOAD_SKILL, STATUS_FIELD, STATUS_MAX_CHARS, isPresentationTool } from './tools.js'
 import { NotOffered, rememberSeen, type StorefrontBackend, type StorefrontSession } from './storefront.js'
-import type { Tenant } from '../domain/types.js'
 
 export interface ExecutionContext {
   session: StorefrontSession
-  tenant: Tenant
   config: AgentConfig
   backend: StorefrontBackend
   allowedTools: Set<string>
@@ -78,12 +76,12 @@ export async function execute(
     outcome = await dispatch(context, name, rest)
   } catch (error) {
     if (error instanceof NotOffered) {
-      outcome = ok(`This brand does not offer that: ${error.message}`)
+      outcome = ok(`No listed brand offers that: ${error.message}`)
     } else {
       // A tool exception never ends the turn.
       log.error('tool call failed', {
         tool: name,
-        tenantId: context.session.tenantId,
+        conversationId: context.session.conversationId,
         message: error instanceof Error ? error.message : 'unknown',
       })
       outcome = failed(`${name} is temporarily unavailable. Try a different approach or tell the customer.`)
@@ -210,7 +208,6 @@ async function dispatch(
     case 'checkout':
       return gatedCheckout({
         session,
-        tenant: context.tenant,
         config,
         reasoning: context.reasoning || null,
         note: typeof input.note === 'string' ? input.note : null,
@@ -222,9 +219,10 @@ async function dispatch(
       // Items on the customer's own orders count as provenance, so a reorder
       // needs no search.
       provenance.remember(
-        session.tenantId,
         session.conversationId,
-        history.flatMap((order) => order.lineItems.map((line) => line.productId)),
+        history.flatMap((order) =>
+          order.lineItems.map((line) => ({ productId: line.productId, tenantId: order.tenantId })),
+        ),
       )
       return ok(
         STOREFRONT_FENCE.fencePayload(
@@ -252,7 +250,7 @@ async function dispatch(
       return presentProducts(session, input)
 
     case 'present_cart': {
-      const cart = carts.ensureOpen(session.tenantId, session.conversationId)
+      const cart = carts.ensureOpen(session.conversationId)
       return presentCart(session, cart.id)
     }
 

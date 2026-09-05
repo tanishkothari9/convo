@@ -17,6 +17,8 @@ export interface Tenant {
   accentColor: string
   /** False for a brand selling something that does not need delivering. */
   requiresShipping: boolean
+  /** Opt-in. Nothing reaches the marketplace until the brand turns this on. */
+  isListed: boolean
   llmProvider: string | null
   createdAt: string
   updatedAt: string
@@ -73,9 +75,9 @@ export interface Product {
   updatedAt: string
 }
 
+/** A shopper's thread with Convo. Spans every brand they ask about. */
 export interface Conversation {
   id: string
-  tenantId: string
   customerSessionId: string
   startedAt: string
   lastActiveAt: string
@@ -86,7 +88,6 @@ export type MessageRole = 'user' | 'assistant'
 export interface StoredMessage {
   id: string
   conversationId: string
-  tenantId: string
   role: MessageRole
   content: string
   toolCalls: ToolCallRecord[] | null
@@ -126,9 +127,9 @@ export interface CartItem {
   addedAt: string
 }
 
+/** One cart per conversation, holding goods from any number of brands. */
 export interface Cart {
   id: string
-  tenantId: string
   conversationId: string
   status: CartStatus
   items: CartItem[]
@@ -139,6 +140,10 @@ export interface Cart {
 /** A cart line joined to its live catalog record, priced server-side. */
 export interface PricedLine {
   productId: string
+  /** Which brand sells this. Shown on every card — a marketplace that hides
+   *  who you are buying from is hiding the thing that matters most. */
+  tenantId: string
+  brandName: string
   name: string
   imageUrl: string | null
   quantity: number
@@ -178,6 +183,8 @@ export interface Order {
   tenantId: string
   cartId: string
   conversationId: string
+  /** Groups the orders staged together by one checkout across brands. */
+  checkoutId: string
   totalAmountMinor: number
   currency: string
   status: OrderStatus
