@@ -6,6 +6,11 @@ import { ShaderField } from '../components/ShaderField'
 import { useDarkSurface } from '../lib/useDarkSurface'
 import { useAuth } from './auth'
 
+const DEMO_BRANDS = [
+  { name: 'Smart Choice', email: 'owner@smartchoice.demo' },
+  { name: 'Kalaa Studio', email: 'owner@kalaa.demo' },
+]
+
 export function SignIn() {
   const { session, signIn, loading } = useAuth()
   useDarkSurface()
@@ -87,16 +92,24 @@ export function SignIn() {
           No account yet? <Link to="/signup">Add your brand</Link>
         </p>
 
-        <button
-          type="button"
-          className="auth-demo t-sm"
-          onClick={() => {
-            setEmail('owner@smartchoice.demo')
-            setPassword('convo-demo-2026')
-          }}
-        >
-          Fill in the Smart Choice demo brand
-        </button>
+        {/* Both, because the interesting thing about the demo data is seeing
+            one purchase land in two brands' dashboards and nowhere else. */}
+        <div className="auth-demos">
+          <span className="t-sm t-muted">Demo brands</span>
+          {DEMO_BRANDS.map((brand) => (
+            <button
+              key={brand.email}
+              type="button"
+              className="auth-demo t-sm"
+              onClick={() => {
+                setEmail(brand.email)
+                setPassword('convo-demo-2026')
+              }}
+            >
+              {brand.name}
+            </button>
+          ))}
+        </div>
       </div>
     </main>
   )

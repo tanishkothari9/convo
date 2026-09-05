@@ -413,6 +413,13 @@
   /* Bleed to the column edges so the last card reads as continuing. */
   margin-inline: calc(var(--space-4) * -1);
   padding-inline: var(--space-4);
+  /*
+   * Without this the rail snaps to the first card's own edge on layout, which
+   * scrolls it by exactly the padding above and lands the first card flush
+   * against the viewport while the reply beside it starts at the column
+   * margin. The snap port has to be inset by the same amount as the content.
+   */
+  scroll-padding-inline: var(--space-4);
   scrollbar-width: thin;
 }
 
