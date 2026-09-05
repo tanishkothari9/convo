@@ -373,6 +373,18 @@
   margin-top: var(--space-5);
 }
 
+/*
+ * Grid items default to `min-width: auto`, which means "never shrink below my
+ * content" — and the content here is an unwrapped line of JSON. So each pane
+ * sized to its longest line, the grid grew to match, and on a phone the whole
+ * reference was 1006px wide inside a 375px window with no way to scroll to the
+ * rest of it: the examples were not squeezed, they were cut off. `pre` already
+ * had `overflow-x: auto`; it never got the chance to use it.
+ */
+.docs-panes > * {
+  min-width: 0;
+}
+
 @media (min-width: 68rem) {
   .docs-panes {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

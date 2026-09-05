@@ -30,9 +30,37 @@
 }
 
 /*
- * The panel is the page's only raised object, so it gets the ring and the
- * ambient and nothing else — no gloss, no glow. On a ground this quiet, a
- * card one shade lighter than its surroundings is plenty of emphasis.
+ * The scene behind the door.
+ *
+ * Fixed rather than absolute so it is the whole window on any viewport, and
+ * behind everything at z-index 0 — the panel claims 1. It keeps its own four
+ * pixel grid and is simply cropped by the window, which is why there is no
+ * object-fit here: stretching it to cover would put the ridges on a different
+ * grid to every other pixel surface in the product.
+ */
+.pixel-summit {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+.pixel-summit-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+/*
+ * The panel now stands on a picture rather than on bone, which changes what it
+ * needs. --shadow-raised was tuned to lift a card a shade off its own
+ * background; over artwork it disappears. This is the key treatment from the
+ * landing page — a white bevel along the top edge, a hairline drawn in the
+ * shadow rather than a border, and a deeper drop — plus a little more white in
+ * the fill, so the form reads as an object resting on the view and the type
+ * inside it never has to compete with a cloud.
  */
 .auth-panel {
   position: relative;
@@ -40,14 +68,37 @@
   width: 100%;
   max-width: 24rem;
   padding: var(--space-6);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 94%, #fff);
   border-radius: var(--radius-sheet);
-  box-shadow: var(--shadow-raised);
+  box-shadow:
+    inset 0 2px 0 #fff,
+    0 0 0 1px rgba(23, 23, 23, 0.08),
+    0 2px 4px rgba(23, 23, 23, 0.06),
+    0 12px 24px rgba(23, 23, 23, 0.1),
+    0 32px 48px rgba(23, 23, 23, 0.08);
 }
 
+@supports (backdrop-filter: blur(2px)) {
+  /* A touch of the sky through the card, which is what stops it looking like
+     a screenshot pasted over a wallpaper. */
+  .auth-panel {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(14px) saturate(115%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .auth-panel {
+    background: var(--surface);
+    backdrop-filter: none;
+  }
+}
+
+/* Closer to the heading than it was: a smaller mark sitting a long way above
+   the title reads as a stray element rather than as the card's letterhead. */
 .auth-mark {
   display: inline-block;
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
 .auth-title {
@@ -64,7 +115,10 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-3);
-  color: var(--ink-muted);
+  /* --ink-secondary, not --ink-muted. Muted measured 2.78:1 against the
+     darkest artwork this card can sit over, and this row is the one that tells
+     a first-time visitor how to get in. */
+  color: var(--ink-secondary);
 }
 
 .auth-demo {
@@ -75,7 +129,7 @@
 
 /* A thin divider between the two, so they read as a pair of choices. */
 .auth-demo + .auth-demo::before {
-  content: '';
+  content: "";
   display: inline-block;
   width: 1px;
   height: 0.7em;
@@ -98,8 +152,13 @@
 
 /* ── Shell ──────────────────────────────────────────────────────────────── */
 
+/* A column, so the working surface can be told to fill it. `.shell-side` is
+   fixed and out of flow, so the children here are the mobile bar and the main
+   column. */
 .shell {
   min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 .shell-bar {
@@ -174,6 +233,8 @@
 }
 
 .shell-side-foot {
+  /* Takes the slack again, so the brand block and the yard under it both sit at
+     the bottom of the panel however short the nav is. */
   margin-top: auto;
   padding-top: var(--space-4);
   border-top: 1px solid var(--line);
@@ -195,23 +256,45 @@
 
 .shell-main {
   position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   margin-left: 14rem;
   padding: var(--space-7) var(--space-6) var(--space-8);
   max-width: calc(14rem + var(--page-column));
 }
 
+/* Absorbs the slack, which is what keeps the horizon on the floor. */
+.shell-page {
+  flex: 1;
+}
+
+/* Out through this column's padding only, so the field reaches the window edge
+   on the right and stops dead at the rail on the left. */
+.shell-main .pixel-horizon {
+  margin-inline: calc(var(--space-6) * -1);
+}
+
 /* A breath of the same light that lit the rail, so the working surface is a
    room the rail opens onto rather than a separate white page. */
 .shell-main::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0 0 auto 14rem;
   height: 22rem;
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60% 100% at 0% 0%, rgba(47, 176, 138, 0.1) 0%, transparent 70%),
-    radial-gradient(50% 90% at 70% 0%, rgba(43, 42, 114, 0.05) 0%, transparent 70%);
+    radial-gradient(
+      60% 100% at 0% 0%,
+      rgba(47, 176, 138, 0.1) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      50% 90% at 70% 0%,
+      rgba(43, 42, 114, 0.05) 0%,
+      transparent 70%
+    );
 }
 
 @media (max-width: 60rem) {
@@ -225,6 +308,47 @@
 }
 
 @media (max-width: 60rem) {
+  /* Control, then who you are, then where you are — left to right. */
+  .shell-bar-lead {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .shell-nav-toggle {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-left: calc(var(--space-2) * -1);
+    flex: none;
+    border: 0;
+    background: none;
+    border-radius: var(--radius-input);
+    color: var(--ink-secondary);
+    cursor: pointer;
+    transition:
+      background var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out);
+  }
+
+  .shell-nav-toggle:hover {
+    background: var(--surface-hover);
+    color: var(--ink);
+  }
+
+  /* The section you are on. Quiet and truncating: it is orientation, not a
+     heading — the page has its own title directly underneath. */
+  .shell-bar-where {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+    color: var(--ink-secondary);
+  }
+
   .shell-bar {
     display: flex;
     align-items: center;
@@ -248,7 +372,7 @@
     box-shadow: var(--shadow-deep);
   }
 
-  .shell-side[data-open='true'] {
+  .shell-side[data-open="true"] {
     transform: translateX(0);
   }
 
@@ -266,6 +390,10 @@
   .shell-main {
     margin-left: 0;
     padding: var(--space-6) var(--space-4) var(--space-8);
+  }
+
+  .shell-main .pixel-horizon {
+    margin-inline: calc(var(--space-4) * -1);
   }
 }
 
@@ -286,17 +414,61 @@
 
 /* Same eyebrow as the marketing pages: mono, tracked, upper. It names the
    state of the page rather than titling it, which is what the mono says. */
+/*
+ * Sentence case, in the body face.
+ *
+ * This was monospace, uppercase and tracked out — the label treatment that
+ * turns up above every heading on every generated page, and the giveaway is
+ * that it is applied regardless of what the words are doing. Here the words are
+ * "On the marketplace": a live status about whether anyone can reach this
+ * brand's catalogue, sitting next to a pulsing dot. Setting a status in
+ * small-caps monospace files it as decoration. It reads as a fact now.
+ */
+/* The yard, in the gap the drawer already had. `margin-top: auto` is what
+   pushes it — and the brand block under it — to the bottom of the panel. */
+/*
+ * The floor of the drawer.
+ *
+ * Out through the panel's padding on three sides — both walls and the bottom —
+ * so the ground runs into the corners instead of floating in a box with a
+ * margin around it. The canvas fades to nothing at its own top edge, so what
+ * meets the sign-out button above it is bare panel, not a horizon line.
+ */
+.pixel-yard {
+  /* Only where the rail is a drawer — see the breakpoint below. On a wide
+     screen it is permanent furniture standing beside a page that already ends
+     in a horizon, and two different scenes butted together at the rail's edge
+     is one scene too many. */
+  display: none;
+  width: calc(100% + var(--space-4) * 2);
+  height: auto;
+  margin: var(--space-4) calc(var(--space-4) * -1) calc(var(--space-5) * -1);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/*
+ * Shown only where the rail is a drawer.
+ *
+ * This has to sit *below* the base rule, not up with the other mobile
+ * overrides: same specificity, so a `display: block` written earlier in the
+ * file loses to the `display: none` written later and the yard never appears at
+ * any width. Which is exactly what happened.
+ */
+@media (max-width: 60rem) {
+  .pixel-yard {
+    display: block;
+  }
+}
+
 .page-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-eyebrow);
-  letter-spacing: var(--text-eyebrow-ls);
-  text-transform: uppercase;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
   font-weight: var(--weight-regular);
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
 }
 
 /* A pulse, because the storefront is genuinely live while you are reading. */
@@ -354,11 +526,12 @@
   max-width: 50rem;
   border-radius: var(--radius-card);
   overflow: hidden;
-  background:
-    linear-gradient(140deg,
-      color-mix(in srgb, var(--brand) 10%, var(--surface)) 0%,
-      color-mix(in srgb, var(--brand) 4%, var(--surface)) 60%,
-      var(--surface) 100%);
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--brand) 10%, var(--surface)) 0%,
+    color-mix(in srgb, var(--brand) 4%, var(--surface)) 60%,
+    var(--surface) 100%
+  );
   border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
   box-shadow: var(--shadow-lift);
 }
@@ -368,7 +541,11 @@
 .link-panel-glow {
   position: absolute;
   inset: -40% 40% 40% -20%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--brand) 26%, transparent) 0%, transparent 68%);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--brand) 26%, transparent) 0%,
+    transparent 68%
+  );
   pointer-events: none;
   z-index: -1;
 }
@@ -389,7 +566,11 @@
   flex: none;
   border-radius: 0.6875rem;
   color: var(--brand-contrast);
-  background: linear-gradient(140deg, var(--brand), color-mix(in srgb, var(--brand) 70%, #000));
+  background: linear-gradient(
+    140deg,
+    var(--brand),
+    color-mix(in srgb, var(--brand) 70%, #000)
+  );
   box-shadow: 0 4px 12px color-mix(in srgb, var(--brand) 34%, transparent);
 }
 
@@ -412,28 +593,28 @@
 }
 
 /* Unlisted: the same shape, none of the light. */
-.link-panel[data-live='false'] {
+.link-panel[data-live="false"] {
   background: var(--surface);
   border-color: var(--line);
   box-shadow: var(--shadow-sm);
 }
 
-.link-panel[data-live='false'] .link-panel-glow {
+.link-panel[data-live="false"] .link-panel-glow {
   display: none;
 }
 
-.link-panel[data-live='false'] .link-panel-icon {
+.link-panel[data-live="false"] .link-panel-icon {
   background: var(--surface-sunken);
   border: 1px solid var(--line);
   color: var(--text-muted);
   box-shadow: none;
 }
 
-.link-panel[data-live='false'] .link-panel-label {
+.link-panel[data-live="false"] .link-panel-label {
   color: var(--text-secondary);
 }
 
-.link-panel[data-live='false'] .link-panel-url {
+.link-panel[data-live="false"] .link-panel-url {
   color: var(--text-muted);
 }
 
@@ -446,8 +627,8 @@
   color: var(--text-secondary);
 }
 
-.link-panel[data-live='false'] .link-panel-foot,
-.link-panel[data-live='false'] .link-panel-blockers {
+.link-panel[data-live="false"] .link-panel-foot,
+.link-panel[data-live="false"] .link-panel-blockers {
   border-top-color: var(--line);
 }
 
@@ -464,7 +645,7 @@
 }
 
 .link-panel-blockers li::before {
-  content: '';
+  content: "";
   flex: none;
   width: 0.375rem;
   height: 0.375rem;
@@ -550,90 +731,97 @@
 
 /* ── Stats ─────────────────────────────────────────────────────────────── */
 
+/*
+ * The figures, as a statement rather than as four cards.
+ *
+ * They were four identical boxes — same radius, same gradient, same inset
+ * highlight, same soft drop, each with its icon in a rounded tinted tile. That
+ * is the stock dashboard kit, and it says nothing about what this page is: a
+ * shop's takings, its stock and who it reached. Four equal boxes also flatten
+ * the one figure that matters into a peer of the other three.
+ *
+ * So: no boxes and no icons, hairlines between the columns, and the money set
+ * larger than the counts. It reads like the top of a statement, which is what
+ * it is. Nothing here is decoration — the rules are the only structure and they
+ * are carrying the grouping.
+ */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-3);
   max-width: 50rem;
   margin-bottom: var(--space-7);
-}
-
-/* Two by two rather than three and a stray one: four figures should read as
-   a block whichever way they wrap. */
-@media (max-width: 62rem) {
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 26rem) {
-  .stat-grid {
-    grid-template-columns: 1fr;
-  }
+  border-block: 1px solid var(--line);
 }
 
 .stat {
-  position: relative;
-  padding: var(--space-4);
-  border-radius: var(--radius-card);
-  background: linear-gradient(170deg, #fff 0%, var(--surface-sunken) 130%);
-  border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 #fff, var(--shadow-lift);
-  overflow: hidden;
-  transition:
-    transform var(--dur-enter) var(--ease-out),
-    box-shadow var(--dur-enter) var(--ease-out);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
+  border-left: 1px solid var(--line);
+  min-width: 0;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .stat:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lift);
-  }
-}
-
-/* The figure that is money gets the wash; the counts stay plain, so the row
-   has one thing to look at rather than four. */
-.stat[data-accent='true'] {
-  background: linear-gradient(150deg, var(--accent-tint) 0%, var(--surface) 78%);
-  border-color: color-mix(in srgb, var(--green-500) 24%, transparent);
-}
-
-.stat-icon {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.5rem;
-  margin-bottom: var(--space-3);
-  color: var(--ink-muted);
-  background: var(--surface-sunken);
-}
-
-.stat[data-accent='true'] .stat-icon {
-  color: #fff;
-  background: var(--grad-brand);
+.stat:first-child {
+  padding-left: 0;
+  border-left: 0;
 }
 
 .stat-label {
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
 }
 
 .stat-value {
   font-size: 1.625rem;
   line-height: 1.15;
   letter-spacing: -0.012em;
-  font-weight: var(--weight-semibold);
-  margin-top: 0.0625rem;
+  font-weight: var(--weight-regular);
+  margin-top: 0.125rem;
 }
 
-.stat[data-accent='true'] .stat-value {
+/* The takings lead. Bigger and in the brand's green, because on a page about
+   selling things it is the figure the merchant came to read. */
+.stat[data-accent="true"] .stat-value {
+  font-size: 2.125rem;
+  letter-spacing: -0.018em;
   color: var(--green-700);
 }
 
 .stat-note {
-  margin-top: 0.125rem;
+  margin-top: 0.25rem;
   color: var(--ink-muted);
+}
+
+/* Two by two, with the rules re-drawn for the new grid: the left-hand column
+   starts each row, so it never carries a divider. */
+@media (max-width: 62rem) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .stat:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* One column below that: two figures side by side at 375px leaves the takings
+   with about eleven characters, and ₹1,24,500 does not fit in eleven. */
+@media (max-width: 30rem) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat {
+    padding: var(--space-3) 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .stat:first-child {
+    border-top: 0;
+  }
 }
 
 /* ── Panels ─────────────────────────────────────────────────────────────── */
@@ -727,7 +915,7 @@
   box-shadow: 0 2px 8px rgba(27, 107, 84, 0.26);
 }
 
-.setup-row[data-done='false'] .setup-tick {
+.setup-row[data-done="false"] .setup-tick {
   background: transparent;
 }
 
@@ -779,12 +967,12 @@
   background: var(--accent-tint);
 }
 
-.activity-row[data-outcome='blocked'] .activity-icon {
+.activity-row[data-outcome="blocked"] .activity-icon {
   color: var(--warning);
   background: var(--warning-tint);
 }
 
-.activity-row[data-outcome='failed'] .activity-icon {
+.activity-row[data-outcome="failed"] .activity-icon {
   color: var(--danger);
   background: var(--danger-tint);
 }
@@ -816,6 +1004,14 @@
 }
 
 /* ── Catalogue ──────────────────────────────────────────────────────────── */
+
+/* Left-aligned with the copy under it, not centred over it — the empty state
+   is a left-aligned block and a centred picture on top reads as unrelated. */
+.pixel-stall {
+  display: block;
+  margin: 0 0 var(--space-3) calc(var(--space-2) * -1);
+  image-rendering: pixelated;
+}
 
 .empty-mark {
   display: grid;
@@ -865,7 +1061,7 @@
   border-top: none;
 }
 
-.product-row[data-inactive='true'] {
+.product-row[data-inactive="true"] {
   opacity: 0.55;
 }
 
@@ -946,8 +1142,8 @@
   .product-row {
     grid-template-columns: 3rem 1fr auto;
     grid-template-areas:
-      'thumb main price'
-      'thumb stock actions';
+      "thumb main price"
+      "thumb stock actions";
     row-gap: var(--space-2);
   }
 
@@ -1116,12 +1312,12 @@
   background: var(--accent-tint);
 }
 
-.audit-action-icon[data-outcome='blocked'] {
+.audit-action-icon[data-outcome="blocked"] {
   color: var(--warning);
   background: var(--warning-tint);
 }
 
-.audit-action-icon[data-outcome='failed'] {
+.audit-action-icon[data-outcome="failed"] {
   color: var(--danger);
   background: var(--danger-tint);
 }
@@ -1171,7 +1367,7 @@
   transition: transform var(--dur-enter) var(--ease-out);
 }
 
-.audit-row[data-expanded='true'] .audit-toggle svg {
+.audit-row[data-expanded="true"] .audit-toggle svg {
   transform: rotate(180deg);
 }
 
@@ -1181,7 +1377,7 @@
   }
 }
 
-.audit-row[data-expanded='true'] td {
+.audit-row[data-expanded="true"] td {
   background: var(--surface-sunken);
   border-bottom-color: transparent;
 }
@@ -1297,7 +1493,7 @@
     transform var(--dur-enter) var(--ease-out);
 }
 
-.toast[data-mounted='true'] {
+.toast[data-mounted="true"] {
   opacity: 1;
   transform: translateY(0) scale(1);
 }
@@ -1425,7 +1621,7 @@
   border-top: none;
 }
 
-.key-row[data-revoked='true'] {
+.key-row[data-revoked="true"] {
   opacity: 0.55;
 }
 
@@ -1473,7 +1669,9 @@
   border-radius: var(--radius-card);
   background: linear-gradient(170deg, #fff 0%, var(--surface-sunken) 130%);
   border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 #fff, var(--shadow-lift);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    var(--shadow-lift);
 }
 
 .role-value {
@@ -1528,7 +1726,7 @@
   white-space: nowrap;
 }
 
-.order-item[data-expanded='true'] .order-summary-row {
+.order-item[data-expanded="true"] .order-summary-row {
   opacity: 1;
 }
 
@@ -1585,8 +1783,8 @@
   .order-summary-row {
     grid-template-columns: 1fr auto;
     grid-template-areas:
-      'status total'
-      'name when';
+      "status total"
+      "name when";
     row-gap: var(--space-1);
   }
 
