@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { IconCheck } from '../../components/icons'
+import { IconCheck, IconPlus } from '../../components/icons'
 
 export interface ShippingAddress {
   name: string
@@ -227,6 +227,128 @@ export function AddressForm({
         )}
       </div>
     </form>
+  )
+}
+
+/**
+ * A stable identity for an address, matching the server's.
+ *
+ * Used to mark which entry in the list is the one attached to this order — the
+ * name is included because the same flat with a different recipient is a
+ * different delivery.
+ */
+export function addressKey(address: ShippingAddress): string {
+  return [
+    address.name,
+    address.phone,
+    address.line1,
+    address.line2 ?? '',
+    address.city,
+    address.state,
+    address.postalCode,
+  ]
+    .map((part) => part.toLowerCase())
+    .join('|')
+}
+
+/**
+ * Pick where this one goes.
+ *
+ * Shown once a customer has sent something to more than one place. Choosing a
+ * row attaches it to the order immediately — there is no separate confirm,
+ * because the selection *is* the decision and the pay button below it is the
+ * confirm. The server re-validates whatever arrives, so nothing here is
+ * trusted for being on the list already.
+ */
+export function AddressPicker({
+  slug,
+  orderId,
+  addresses,
+  selected,
+  disabled,
+  onSelected,
+  onAddNew,
+}: {
+  slug: string
+  orderId: string
+  addresses: ShippingAddress[]
+  selected: ShippingAddress | null
+  disabled: boolean
+  onSelected(address: ShippingAddress): void
+  onAddNew(): void
+}) {
+  const [pending, setPending] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const selectedKey = selected ? addressKey(selected) : null
+
+  async function choose(address: ShippingAddress) {
+    const key = addressKey(address)
+    if (key === selectedKey || disabled) return
+    setPending(key)
+    setError(null)
+    try {
+      const result = await api.post<{ address: ShippingAddress }>(
+        `/chat/${slug}/orders/${orderId}/address`,
+        address,
+      )
+      onSelected(result.address)
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Could not use that address.')
+    } finally {
+      setPending(null)
+    }
+  }
+
+  return (
+    <div className="address-picker">
+      <p className="address-form-title">Where should this go?</p>
+
+      <ul className="address-options" role="radiogroup" aria-label="Delivery address">
+        {addresses.map((address) => {
+          const key = addressKey(address)
+          const isSelected = key === selectedKey
+          return (
+            <li key={key}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                className="address-option"
+                data-selected={isSelected}
+                disabled={disabled || pending !== null}
+                onClick={() => choose(address)}
+              >
+                <span className="address-option-mark" aria-hidden="true">
+                  {pending === key ? <span className="spinner" /> : isSelected ? <IconCheck size={12} /> : null}
+                </span>
+                <span className="address-option-body">
+                  <span className="address-option-name">
+                    {address.name} · <span className="t-num">+91 {address.phone}</span>
+                  </span>
+                  <span className="address-option-lines t-sm t-secondary">
+                    {[address.line1, address.line2, address.city, address.state]
+                      .filter(Boolean)
+                      .join(', ')}{' '}
+                    <span className="t-num">{address.postalCode}</span>
+                  </span>
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+
+      {error && (
+        <p className="notice notice-danger" role="alert">
+          {error}
+        </p>
+      )}
+
+      <button className="btn btn-secondary btn-block" type="button" onClick={onAddNew} disabled={disabled}>
+        <IconPlus size={15} />
+        Send somewhere else
+      </button>
+    </div>
   )
 }
 

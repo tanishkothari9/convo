@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import type { Component, OrderConfirmationPayload, OrderSummaryPayload } from '../types'
 import { PaymentPanel } from './PaymentPanel'
-import { AddressForm, AddressSummary, type ShippingAddress } from './AddressForm'
+import {
+  AddressForm,
+  AddressPicker,
+  AddressSummary,
+  addressKey,
+  type ShippingAddress,
+} from './AddressForm'
 
 /**
  * The order summary and its payment button.
@@ -34,11 +40,30 @@ export function OrderSummaryCard({
   )
   const [editingAddress, setEditingAddress] = useState(false)
 
+  // Grows as the customer sends things to new places, so a newly entered
+  // address joins the list without waiting for the next order.
+  const [saved, setSaved] = useState<ShippingAddress[]>(payload.saved_addresses ?? [])
+
   // A brand that ships needs somewhere to ship to before it can be paid. The
   // server enforces the same rule; this only means the customer meets it in
   // the right order rather than after a refusal.
   const needsAddress = payload.requires_address !== false
   const addressReady = !needsAddress || address !== null
+
+  /*
+   * Three shapes, in the order a customer meets them:
+   *   nothing on file  -> the form
+   *   one address      -> it, with a way to change it
+   *   several          -> a list to choose from, like any other checkout
+   */
+  const showForm = needsAddress && (editingAddress || (address === null && saved.length === 0))
+  const showPicker = needsAddress && !showForm && saved.length > 1
+
+  const remember = (next: ShippingAddress) => {
+    setAddress(next)
+    setSaved((current) => [next, ...current.filter((a) => addressKey(a) !== addressKey(next))])
+    setEditingAddress(false)
+  }
 
   /*
    * A card stays in the transcript, so scrolling back reaches an order that may
@@ -143,20 +168,29 @@ export function OrderSummaryCard({
 
       {payload.note && <p className="order-note t-sm t-secondary">{payload.note}</p>}
 
-      {state === 'open' && needsAddress && (address === null || editingAddress) && (
+      {state === 'open' && showForm && (
         <AddressForm
           slug={slug}
           orderId={payload.order_id}
-          initial={address}
-          onSaved={(saved) => {
-            setAddress(saved)
-            setEditingAddress(false)
-          }}
+          initial={editingAddress ? null : address}
+          onSaved={remember}
           {...(address ? { onCancel: () => setEditingAddress(false) } : {})}
         />
       )}
 
-      {state === 'open' && needsAddress && address !== null && !editingAddress && (
+      {state === 'open' && showPicker && (
+        <AddressPicker
+          slug={slug}
+          orderId={payload.order_id}
+          addresses={saved}
+          selected={address}
+          disabled={disabled}
+          onSelected={setAddress}
+          onAddNew={() => setEditingAddress(true)}
+        />
+      )}
+
+      {state === 'open' && needsAddress && !showForm && !showPicker && address !== null && (
         <AddressSummary
           address={address}
           onEdit={() => setEditingAddress(true)}

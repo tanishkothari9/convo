@@ -397,3 +397,79 @@ test('a carried address does not follow the customer to another brand', async ()
     'an address leaked between brands',
   )
 })
+
+test('a customer who has sent to several places gets a list, deduplicated', async () => {
+  const { product, session, tenant } = scenario('multi-address-item', 500, 30)
+  const send = async (address: Record<string, unknown>) => {
+    await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+    await gatedCheckout({ session, tenant, config })
+    const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+    orders.setShippingAddress(tenantId, order.id, readAddress(address))
+    const payment = `cvpay_${Math.random().toString(36).slice(2, 10)}`
+    await gatedConfirmPayment({
+      session,
+      orderId: order.id,
+      payload: { payment_id: payment, signature: signManualPayment(order.providerOrderId!, payment) },
+    })
+  }
+
+  await send(GOOD_ADDRESS)
+  await send({
+    ...GOOD_ADDRESS,
+    name: 'Ravi Rao',
+    line1: '44 Sampige Road',
+    city: 'Bengaluru',
+    postalCode: '560003',
+  })
+  // The same place again: it must not appear twice.
+  await send(GOOD_ADDRESS)
+
+  const saved = orders.savedShippingAddresses(tenantId, session.conversationId)
+  assert.equal(saved.length, 2, 'the list should hold two distinct places')
+  assert.equal(saved[0]!.city, 'Mysuru', 'most recently used comes first')
+  assert.ok(saved.some((a) => a.city === 'Bengaluru'))
+})
+
+test('the same street with a different recipient is a separate entry', async () => {
+  const { product, session, tenant } = scenario('gift-address-item', 500, 20)
+  const send = async (name: string) => {
+    await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+    await gatedCheckout({ session, tenant, config })
+    const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+    orders.setShippingAddress(tenantId, order.id, readAddress({ ...GOOD_ADDRESS, name }))
+    const payment = `cvpay_${Math.random().toString(36).slice(2, 10)}`
+    await gatedConfirmPayment({
+      session,
+      orderId: order.id,
+      payload: { payment_id: payment, signature: signManualPayment(order.providerOrderId!, payment) },
+    })
+  }
+
+  await send('Anika Rao')
+  await send('Lakshmi Rao')
+
+  const saved = orders.savedShippingAddresses(tenantId, session.conversationId)
+  assert.equal(saved.length, 2, 'a gift to someone else at the same flat is a different delivery')
+})
+
+test('the saved list is capped so a card cannot become a scrolling problem', async () => {
+  const { product, session, tenant } = scenario('many-address-item', 400, 40)
+  for (let i = 0; i < 8; i += 1) {
+    await gatedAddToCart({ backend, config, session, productId: product.id, quantity: 1 })
+    await gatedCheckout({ session, tenant, config })
+    const order = orders.listForConversation(tenantId, session.conversationId)[0]!
+    orders.setShippingAddress(
+      tenantId,
+      order.id,
+      readAddress({ ...GOOD_ADDRESS, line1: `${10 + i} MG Road` }),
+    )
+    const payment = `cvpay_${Math.random().toString(36).slice(2, 10)}`
+    await gatedConfirmPayment({
+      session,
+      orderId: order.id,
+      payload: { payment_id: payment, signature: signManualPayment(order.providerOrderId!, payment) },
+    })
+  }
+
+  assert.equal(orders.savedShippingAddresses(tenantId, session.conversationId).length, 5)
+})

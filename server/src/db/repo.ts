@@ -6,6 +6,7 @@
 import { all, get, run, transaction } from './index.js'
 import { id, nowIso } from '../lib/ids.js'
 import { STOCK_UNTRACKED } from '../commerce/razorpay/adapter.js'
+import { addressKey } from '../domain/address.js'
 import type { ShippingAddress } from '../domain/address.js'
 import type {
   AuditAction,
@@ -1076,6 +1077,40 @@ export const orders = {
       [tenantId, conversationId],
     )
     return r?.shipping_address ? json<ShippingAddress | null>(r.shipping_address, null) : null
+  },
+
+  /**
+   * Every distinct address this customer has used, most recent first.
+   *
+   * Derived from their own orders rather than kept in an address book, because
+   * there is no customer account to hang one off — the session cookie is the
+   * identity. Capped, because this renders inside a chat card and a list of
+   * fifteen addresses is a scrolling problem, not a convenience.
+   */
+  savedShippingAddresses(
+    tenantId: string,
+    conversationId: string,
+    limit = 5,
+  ): ShippingAddress[] {
+    const rows = all<{ shipping_address: string }>(
+      `SELECT shipping_address FROM orders
+       WHERE tenant_id = ? AND conversation_id = ? AND shipping_address IS NOT NULL
+       ORDER BY created_at DESC`,
+      [tenantId, conversationId],
+    )
+
+    const seen = new Set<string>()
+    const out: ShippingAddress[] = []
+    for (const row of rows) {
+      const address = json<ShippingAddress | null>(row.shipping_address, null)
+      if (!address) continue
+      const key = addressKey(address)
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(address)
+      if (out.length === limit) break
+    }
+    return out
   },
 
   setProviderOrderId(tenantId: string, orderId: string, providerOrderId: string): void {

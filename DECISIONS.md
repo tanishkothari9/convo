@@ -250,10 +250,27 @@ can post.
 
 The address is frozen onto the order like its line items, so editing a later
 one cannot rewrite where an earlier parcel went. A customer who has already told this shop where they live is not asked again.
-The last address used in that conversation is **attached to the next order as
-it is staged**, not merely offered to a form — so the card opens showing where
-the parcel is going, with Pay enabled and a Change link, and the second purchase
-is one tap. Attaching rather than suggesting matters: the order is genuinely
+The card takes one of three shapes, in the order a customer meets them:
+
+- **Nothing on file** — the form.
+- **One address** — it, shown, with Pay enabled and a way to change it.
+- **Several** — a list to choose from, like any other checkout, with the one
+  attached to this order selected and a "send somewhere else" below it.
+
+The last address used is **attached to the next order as it is staged**, not
+merely offered to a form, so the second purchase is one tap.
+
+The list is built from the customer's own past orders rather than an address
+book, and de-duplicated on every field including the name — the same flat with a
+different recipient is a different delivery, and someone posting a gift to their
+mother should see both entries rather than have one silently absorb the other.
+It is capped at five, because this renders inside a chat card and fifteen
+addresses is a scrolling problem rather than a convenience.
+
+Choosing a row attaches it immediately: there is no separate confirm, because
+the selection *is* the decision and the pay button below it is the confirm. What
+the row sends is re-validated server-side like any other address, so being on
+the list buys it no trust. Attaching rather than suggesting matters: the order is genuinely
 payable, so nothing depends on the browser re-submitting a form for the gate to
 pass.
 

@@ -103,6 +103,29 @@ export function readAddress(input: unknown, country = 'India'): ShippingAddress 
   }
 }
 
+/**
+ * A stable identity for an address, for de-duplicating a customer's list.
+ *
+ * The name is part of it on purpose: the same flat with a different recipient
+ * is a different delivery — someone sending a gift to their mother's house
+ * should see both entries, not have one silently absorb the other. Everything
+ * is already normalised by `readAddress` on the way in, so this only has to
+ * fold case and drop the optional line's null.
+ */
+export function addressKey(address: ShippingAddress): string {
+  return [
+    address.name,
+    address.phone,
+    address.line1,
+    address.line2 ?? '',
+    address.city,
+    address.state,
+    address.postalCode,
+  ]
+    .map((part) => part.toLowerCase())
+    .join('|')
+}
+
 /** One line, for a dashboard row or an order card. */
 export function formatAddress(address: ShippingAddress): string {
   return [address.line1, address.line2, address.city, address.state, address.postalCode]

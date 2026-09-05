@@ -500,6 +500,11 @@ export async function gatedCheckout(args: {
               // Already attached, not merely suggested: present means the
               // order can be paid for as it stands.
               shipping_address: carriedAddress,
+              // Everywhere this customer has had something sent, so a second
+              // purchase is a choice from a list rather than a form.
+              saved_addresses: tenant.requiresShipping
+                ? orders.savedShippingAddresses(session.tenantId, session.conversationId)
+                : [],
               lines: lineItems.map((line) => ({
                 product_id: line.productId,
                 name: line.name,

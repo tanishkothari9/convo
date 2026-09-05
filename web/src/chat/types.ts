@@ -74,6 +74,8 @@ export interface OrderSummaryPayload {
    * form has to be filled first.
    */
   shipping_address: ShippingAddress | null
+  /** Everywhere this customer has had something sent, most recent first. */
+  saved_addresses: ShippingAddress[]
   lines: Array<{
     product_id: string
     name: string

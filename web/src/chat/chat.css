@@ -1371,3 +1371,103 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+
+/* ── Address picker ─────────────────────────────────────────────────────── */
+
+.address-picker {
+  margin: var(--space-4) 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.address-picker > * + * {
+  margin-top: var(--space-3);
+}
+
+.address-options {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.address-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  text-align: left;
+  border-radius: var(--radius-input);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  transition:
+    border-color var(--dur-quick) ease,
+    background-color var(--dur-quick) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .address-option:hover:not(:disabled):not([data-selected='true']) {
+    border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+    background: var(--brand-tint);
+  }
+}
+
+.address-option:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.address-option[data-selected='true'] {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+}
+
+.address-option:disabled {
+  cursor: not-allowed;
+}
+
+/* The radio. Filled and ticked when chosen, an empty ring otherwise — so the
+   selected row reads at a glance without depending on the tint alone. */
+.address-option-mark {
+  display: grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.125rem;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  color: var(--brand-contrast);
+  transition:
+    background-color var(--dur-quick) ease,
+    border-color var(--dur-quick) ease;
+}
+
+.address-option[data-selected='true'] .address-option-mark {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.address-option-mark .spinner {
+  width: 0.625rem;
+  height: 0.625rem;
+  color: var(--brand);
+}
+
+.address-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+}
+
+.address-option-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.address-option-lines {
+  line-height: 1.45;
+}
