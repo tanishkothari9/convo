@@ -1512,7 +1512,7 @@
   margin-bottom: 0.1rem;
 }
 
-.marquee-meta {
+.marquee-line {
   display: flex;
   align-items: baseline;
   justify-content: space-between;

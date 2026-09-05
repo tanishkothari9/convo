@@ -1,23 +1,28 @@
 # Progress
 
-Status at hand-off. Nothing is half-finished across two milestones: the whole
-build order is done, and the last thing done was the polish pass.
+Status at hand-off. Nothing is half-finished: the whole build order is done,
+and the last thing done was the marketplace pivot — one shop across every
+brand, replacing the per-brand chat pages.
 
 ## Working, verified end to end
 
 | | How it was verified |
 |---|---|
-| Sign up, sign in, brand created with its own chat link | Driven in a browser |
+| Sign up, sign in, brand created and listed | Driven in a browser |
 | Catalogue: add, edit, delete, search, out-of-stock states | Driven in a browser |
-| Public storefront: browse → cart → checkout → pay → confirmation | Driven in a browser and over the API |
+| The shop: browse → cart → checkout → pay → confirmation | Driven in a browser and over the API |
+| Search across brands, with the brand named on every card | Driven in a browser and over the API |
+| A cross-brand cart splitting into one order per brand, paid in turn | Driven in a browser and over the API, plus 3 tests |
+| One address covering every brand in a checkout | Driven in a browser |
+| Each brand seeing only its own half of a shared purchase | Driven over the API against both dashboards |
+| Listing on, listing off, and the shelf changing immediately | Driven in a browser and over the API |
 | Server-computed totals, provenance gates, per-item caps | 9 database-backed tests |
 | Razorpay connect → sync → re-sync preserving merchant edits | Driven over the API |
 | Signature verification, including tampering and cross-order replay | 6 tests |
 | Audit trail with every money action, filterable, expandable | Driven in a browser |
-| Per-brand persona, accent colour, and model choice | Driven in a browser |
 | Layout at laptop, tablet, and 375px phone widths | Measured and screenshotted |
 
-`npm test` → 54 passing. `npm run typecheck` → clean, both workspaces. Production
+`npm test` → 66 passing. `npm run typecheck` → clean, both workspaces. Production
 build → clean. Every page loads with no failed requests and no console errors.
 
 ## The graceful failure cases
@@ -38,6 +43,18 @@ Two more that were found and closed during the build, both covered by tests:
 4. **A superseded order cannot be paid**, even with a valid signature.
 5. **A tampered or cross-order signature is refused**, and lands in the audit
    trail as `payment.signature_rejected`.
+
+Three that arrived with the split checkout, all covered by tests:
+
+6. **One brand in the cart cannot take payment.** Nothing is staged at all, and
+   the customer is told which brand and offered the rest without it. A checkout
+   that half-worked is worse than one that did not start.
+7. **One brand declines after another was paid.** The paid order stands, the
+   declined one can be retried, and the cart is *not* handed back — reopening
+   it would put goods already bought back on the shopping list.
+8. **A brand delists while its goods are in someone's cart.** The line drops
+   out of the priced cart exactly as a deleted product does, so it cannot be
+   charged for.
 
 ## Blocked on you — nothing is blocked, but two things are waiting
 
@@ -74,32 +91,41 @@ Not bugs — things deliberately out of scope, listed so you are not surprised:
 
 - No product variants (sizes, shades). The catalogue is flat.
 - No customer accounts; order history is per-conversation.
+- A cart spanning brands is paid one brand at a time. Razorpay Route would make
+  it one charge, at the cost of Convo holding other people's money.
+- Listing has no review step. Any brand with a catalogue and a payment provider
+  can put itself on the shelf.
 - No webhooks. Payment confirmation is synchronous from the browser, so a
   customer who closes the tab mid-payment leaves an order awaiting payment.
 - Rate limiting is per instance, not shared across a cluster.
 - The Shopify sync reads four pages of 250 products; beyond that, push by API.
-- Currency is INR for every tenant; there is no UI to change it.
+- Currency is INR for the whole marketplace; there is no UI to change it.
 - Dark mode is not built.
 
 ## Two brands are seeded, on purpose
 
-**Smart Choice** is the one to look at: sixteen products, each matched to its
-own photograph, a rust accent, and a full audit trail from the runs I did while
-building.
+**Smart Choice** (`owner@smartchoice.demo`) sells ethnic wear: sixteen
+products, each matched to its own photograph. **Kalaa Studio**
+(`owner@kalaa.demo`) sells handcrafted jewellery: eight. Both use the password
+`convo-demo-2026`, and both are listed.
 
-**Kalaa Studio** (`owner@kalaa.demo` / `kalaa-demo-2026`, `/chat/kalaa-studio`)
-is an empty brand created through the real sign-up form. It is there so the
-empty states are visible without you having to make one: an empty catalogue, an
-empty audit trail, and a storefront that says the shop is not open yet and
-closes its own composer rather than inviting a message nothing can answer. It
-also shows tenant isolation is real — different accent, different slug,
-separate catalogue, separate everything.
+Two rather than one because the marketplace only shows what it is for when a
+cart can hold a saree from one shop and earrings from another. Ask for both,
+check out, and you get two orders on one card, paid one at a time, each landing
+in that brand's own dashboard and nowhere else.
 
-Delete it if you would rather have one brand.
+They are also how tenant isolation is visible without reading a test: sign in
+as either and you see your own catalogue, your own orders, your own ledger, and
+no trace of the other's half of the same purchase.
 
 ## Where to look first
 
-1. `http://localhost:5173/chat/smart-choice` — the product.
+1. `http://localhost:5173/shop` — the product. Ask for a saree, then for
+   jhumkas, then check out.
 2. `server/src/agent/gates.ts` — the money gate, and the most important file.
-3. `server/src/models/types.ts` — the seam that makes the model swappable.
-4. `DECISIONS.md` — every call made without being able to ask you.
+   `gatedCheckout` is where a cart becomes one order per brand.
+3. `server/src/db/repo.ts` — `products.listedAcrossBrands()` is the one
+   accessor that crosses tenants on purpose; everything near it does not.
+4. `server/src/models/types.ts` — the seam that makes the model swappable.
+5. `DECISIONS.md` — every call made without being able to ask you, including
+   what I would have pushed back on.

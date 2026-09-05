@@ -1,14 +1,18 @@
 # Convo
 
-A conversational commerce platform. A brand signs up, brings a catalogue —
-typed in, or synced from a provider they already use — and gets a link. That
-link opens an AI storefront in the brand's own voice: it searches the
-catalogue, keeps a cart, and takes payment, with every chargeable amount
-computed on Convo's side and every money action written to an audit trail the
-brand can read.
+A conversational marketplace. A brand signs up, brings a catalogue — typed in,
+or synced from a provider they already use — and lists it. One storefront then
+sells for all of them: it searches every listed catalogue at once, keeps a
+single cart that can span brands, and settles that cart as one order per brand
+paid straight to that brand's own account. Every chargeable amount is computed
+on Convo's side, and every money action is written to an audit trail the
+selling brand can read.
 
-Convo is multi-tenant. **Smart Choice**, an ethnic wear brand, is the seeded
-demo tenant — one row in the `tenants` table, not the product.
+Convo is multi-tenant, and the tenancy boundary is the brand, not the shopper.
+A brand sees only its own catalogue, orders and ledger; the conversation and
+its cart belong to the platform, because a shopper is not talking to any one
+brand. **Smart Choice** (ethnic wear) and **Kalaa Studio** (jewellery) are the
+seeded demo tenants — rows in the `tenants` table, not the product.
 
 ## Run it
 
@@ -18,19 +22,21 @@ needed to run the whole thing.
 ```bash
 npm install
 cp .env.example .env
-npm run seed     # creates the Smart Choice demo brand and its catalogue
+npm run seed     # creates two demo brands, listed, with their catalogues
 npm run dev      # API on :8787, web on :5173
 ```
 
 | | |
 |---|---|
-| Storefront | <http://localhost:5173/chat/smart-choice> |
+| Shop | <http://localhost:5173/shop> |
 | Dashboard | <http://localhost:5173/login> |
-| Demo sign-in | `owner@smartchoice.demo` / `convo-demo-2026` |
+| Demo sign-in | `owner@smartchoice.demo` or `owner@kalaa.demo` / `convo-demo-2026` |
 
-Try: *"show me sarees for a wedding"* → *"add the first one"* → *"check out"* →
-pay in the panel. Then open **Audit trail** in the dashboard to see what the
-server recorded.
+Try: *"show me sarees for a wedding"* → *"add the first one"* → *"and some
+oxidised silver jhumkas"* → *"check out"*. The cart now spans both brands, so
+checkout stages two orders and the card pays them one at a time, naming the
+brand each time. Then open **Audit trail** in either dashboard: each brand sees
+its own half and nothing of the other's.
 
 Other scripts: `npm run typecheck`, `npm test`, `npm run build`.
 
@@ -41,12 +47,12 @@ server/                     Node + TypeScript, Express, node:sqlite
   src/agent/                the shopping agent — skills, gates, tools, prompt, loop
   src/models/               the ModelProvider abstraction: Claude, GPT, scripted
   src/commerce/             the CommerceProviderAdapter: Razorpay, manual
-  src/db/                   schema, tenant-scoped repositories, seed
-  src/routes/               public chat (SSE) and dashboard API
+  src/db/                   schema, repositories, seed
+  src/routes/               the public shop (SSE), dashboard API, public /v1 API
 web/                        React + Vite
   src/styles/tokens.css     the design tokens both surfaces share
   src/dashboard/            brand dashboard
-  src/chat/                 the public storefront
+  src/chat/                 the public shop
 ```
 
 ## The three ideas
@@ -73,10 +79,18 @@ One agent with modular skills, not a router over subagents: a shopping
 conversation is one continuous state, and splitting it loses that state and
 adds latency.
 
-**What Convo adds.** The blueprint deliberately handles no payment — its
-`checkout` renders the cart for the host to complete. Convo completes it, so
-the money gate in `gates.ts` is Convo's own, and it is the point at which a
+**What Convo adds.** Two things. The blueprint deliberately handles no payment
+— its `checkout` renders the cart for the host to complete. Convo completes it,
+so the money gate in `gates.ts` is Convo's own, and it is the point at which a
 conversational storefront becomes a real one.
+
+The second is the shelf. The blueprint's `StorefrontBackend` serves one
+merchant; Convo's serves all of the listed ones from a single conversation, and
+the gates grew a fourth rule to match: a cart spanning brands settles as one
+order per brand, on each brand's own payment account. The provenance, caps and
+money rules are unchanged by that — provenance is still per conversation, and
+the total is still recomputed per brand from live catalogue prices — but the
+unit of a checkout is now a group of orders rather than one.
 
 ### 2. The model is swappable; the rules are not
 
@@ -248,11 +262,16 @@ settings is the one deliberate exception, turned on its side because it sits
 directly under provider in the rail and two icons of horizontal lines and beads
 are not distinguishable at 17px.
 
-**The storefront** is the tenant's, so it defers: it takes the brand's colour
-for its ambient field, its bubbles, its buttons and its thinking indicator, and
-Convo's own green appears nowhere on it. The agent's replies are set as text in
-a reading column rather than in bubbles — only the customer's messages get one
-— so product cards read as part of what the shop is saying.
+**The shop** runs on Convo's own green rather than any one brand's palette.
+Under the old per-brand storefront it took the tenant's accent for its ambient
+field, its buttons and its thinking indicator; a shelf holding many brands
+cannot do that without quietly picking a favourite, and would lurch in colour
+every time the conversation moved between labels. Attribution moved from the
+chrome into the content instead: the brand's name sits above the product name
+on every card, in the cart, on the checkout card and on each receipt. The
+agent's replies are set as text in a reading column rather than in bubbles —
+only the customer's messages get one — so product cards read as part of what
+the shop is saying.
 
 The thinking state is the one place motion is the point, because it is the only
 thing a customer has to look at while they wait. A small sphere lit from within
@@ -269,23 +288,29 @@ have arrived.
 npm test
 ```
 
-49 tests over the rules that must hold whichever model is running: fencing
+66 tests over the rules that must hold whichever model is running: fencing
 against forged turn markers and fence escapes, signature verification against
 tampering and cross-order replay, the tool surface, and the money path against
 a real database — the total recomputed after a price move, an item selling out
 stopping the charge, stock leaving only on confirmation, and a superseded order
-staying unpayable even with a valid signature — plus a security suite covering
-tenant isolation, API-key handling, stored-XSS image URLs, credential
-encryption, and the Shopify host invariant.
+staying unpayable even with a valid signature.
+
+The marketplace adds its own: a two-brand cart splits into one order per brand
+with each charged only for its own goods, paying one brand leaves the other
+owed and the cart open, and a half-paid checkout is never handed back as a live
+cart. The security suite asserts both halves of the new boundary — brands still
+cannot read each other's orders or ledgers, an unlisted brand never reaches the
+shelf, and one shopper cannot read another's orders, addresses or provenance
+even though the cart is now a platform-level object.
 
 ## Security
 
 What is enforced, and where:
 
 - **Rate limiting** ([`ratelimit.ts`](server/src/lib/ratelimit.ts)) on auth, the
-  chat turn, the dashboard and the API. The chat route runs a model turn per
-  request, so an unthrottled endpoint is an unbounded bill; it is budgeted per
-  customer session rather than per IP, because a shop's customers share
+  chat turn, the dashboard and the API. The shop's message route runs a model
+  turn per request, so an unthrottled endpoint is an unbounded bill; it is
+  budgeted per customer session rather than per IP, because customers share
   addresses behind carrier NAT.
 - **No account enumeration.** Sign-in burns the same work whether or not the
   email exists, so neither the wording nor the timing answers the question.
@@ -300,12 +325,26 @@ What is enforced, and where:
   actually loads.
 - **Tenant isolation** is asserted, not assumed —
   [`security.test.ts`](server/test/security.test.ts) fails if one brand can
-  reach another's products, orders, carts, audit entries or keys.
+  reach another's products, orders, audit entries or keys, or if an unlisted
+  brand's goods reach the shelf.
+- **Shopper isolation** is the other half of that boundary, and the newer one.
+  The conversation and its cart deliberately span brands, so they can no longer
+  be fenced by tenant; they are fenced by the customer session cookie instead,
+  and every order route proves ownership with the conversation rather than with
+  a brand. The same suite fails if one shopper can read another's orders,
+  addresses or provenance.
 
 ## What a deployment would add
 
 Convo is complete as a working system, not as a production deployment. Before
 real money moves: a shared rate-limit store once there is more than one
 instance, a queue for provider calls, webhook handling for asynchronous payment
-updates, key rotation for `CONVO_SECRET`, and Postgres in place of SQLite. See
+updates, key rotation for `CONVO_SECRET`, and Postgres in place of SQLite.
+
+The marketplace adds two of its own. A customer paying three brands taps pay
+three times, which is honest but not pleasant; Razorpay Route would make it one
+charge, at the cost of Convo holding other people's money and becoming the
+merchant of record — a liability worth taking on only when the volume justifies
+it. And listing is currently a switch the brand flips, with no review; a real
+marketplace needs someone deciding what belongs on the shelf. See
 `DECISIONS.md`.

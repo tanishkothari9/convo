@@ -48,13 +48,9 @@ function toTenant(r: Record<string, unknown>): Tenant {
     name: String(r.name),
     slug: String(r.slug),
     description: (r.description as string) ?? null,
-    assistantName: String(r.assistant_name),
-    brandVoice: String(r.brand_voice),
     currency: String(r.currency),
-    accentColor: String(r.accent_color),
     requiresShipping: r.requires_shipping === undefined ? true : bool(r.requires_shipping),
     isListed: bool(r.is_listed),
-    llmProvider: (r.llm_provider as string) ?? null,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
   }
@@ -109,28 +105,14 @@ export const tenants = {
     name: string
     slug: string
     description?: string
-    assistantName?: string
-    brandVoice?: string
     currency?: string
-    accentColor?: string
   }): Tenant {
     const now = nowIso()
     const tenantId = id('ten')
     run(
-      `INSERT INTO tenants (id, name, slug, description, assistant_name, brand_voice, currency, accent_color, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        tenantId,
-        input.name,
-        input.slug,
-        input.description ?? null,
-        input.assistantName ?? `${input.name} Assistant`,
-        input.brandVoice ?? 'warm, precise, and unhurried',
-        input.currency ?? 'INR',
-        input.accentColor ?? '#1A1C22',
-        now,
-        now,
-      ],
+      `INSERT INTO tenants (id, name, slug, description, currency, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [tenantId, input.name, input.slug, input.description ?? null, input.currency ?? 'INR', now, now],
     )
     return tenants.byId(tenantId)!
   },
@@ -152,10 +134,6 @@ export const tenants = {
         Tenant,
         | 'name'
         | 'description'
-        | 'assistantName'
-        | 'brandVoice'
-        | 'accentColor'
-        | 'llmProvider'
         | 'slug'
         | 'requiresShipping'
         | 'isListed'
@@ -166,10 +144,6 @@ export const tenants = {
       name: 'name',
       slug: 'slug',
       description: 'description',
-      assistantName: 'assistant_name',
-      brandVoice: 'brand_voice',
-      accentColor: 'accent_color',
-      llmProvider: 'llm_provider',
       requiresShipping: 'requires_shipping',
       isListed: 'is_listed',
     }

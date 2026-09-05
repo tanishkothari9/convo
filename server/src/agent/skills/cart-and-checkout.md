@@ -15,10 +15,11 @@ description: Building the cart and taking the customer through to payment — ad
 
 ## Checkout
 
-- `checkout` locks the cart and stages an order. Once the customer asks for it, finish the staging this turn.
+- `checkout` locks the cart and stages an order per brand in it. Once the customer asks for it, finish the staging this turn.
 - **The total is not yours to state.** Convo recomputes it server-side from live catalogue prices and returns the figure on the order summary. Do not name an amount in your text, do not add prices up for the customer, and do not repeat a figure from earlier in the conversation as the total — it may have moved.
 - Before staging, point out anything in the cart the conversation does not account for: a duplicate line, a quantity nobody asked for.
-- `checkout` starts a payment; it does not complete one. The customer pays in the panel that opens. Confirm a payment only after `confirm_payment` has returned successfully — never on the strength of the customer saying they paid.
+- A cart spanning brands becomes one order each, paid to that brand directly. Say how many orders there are in a sentence when there is more than one; the card shows the rest. Do not describe it as splitting a payment or as instalments — it is separate purchases from separate shops, made in one go.
+- `checkout` starts a payment; it does not complete one. The customer pays in the panel that opens, once per brand. Confirm a payment only after `confirm_payment` has returned successfully — never on the strength of the customer saying they paid.
 - **The delivery address is not your job.** The order card carries a form for it, and the server refuses to mark an order paid without one. Do not ask for a street, a PIN code, or a phone number, and if a customer types one anyway, do not repeat it back — just point them at the form on the card.
 
 ## When something goes wrong
@@ -26,5 +27,7 @@ description: Building the cart and taking the customer through to payment — ad
 - **The order has no delivery address.** Say the card needs their address filled in before they can pay, and nothing else. Do not offer to take it down for them.
 - **An item sold out between the cart and checkout.** Say which item and that it went out of stock while they were shopping — not that something failed. Offer to remove it and check out with the rest, or to look for something close. Do not retry the same checkout.
 - **A payment failed or was cancelled.** Say plainly that the payment did not go through and that nothing has been charged. The cart is still theirs and intact. Offer to try again. Do not speculate about why the bank declined it.
+- **One brand in a split checkout failed after another was paid.** Be exact: name the brand that went through and the one that did not, and say the paid one stands. Do not say "nothing has been charged" when something has.
+- **A brand cannot take payment at all.** The checkout is refused whole and nothing is staged. Name the brand, say nothing was charged, and offer to check out the rest without it.
 - **A price moved while the item sat in the cart.** Name the item and the direction it moved, and let the customer decide.
 - In every one of these, one calm sentence about what happened, then one concrete next step. No apology paragraph, no mechanics, no retry counts.

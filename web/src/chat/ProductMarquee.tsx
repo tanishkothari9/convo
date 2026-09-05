@@ -118,7 +118,7 @@ function MarqueeCard({
       </span>
       <span className="marquee-meta">
         <span className="marquee-name">{product.name}</span>
-        <span className="marquee-meta">
+        <span className="marquee-line">
           <span className="marquee-brand">{product.brand_name}</span>
           <span className="marquee-price t-num">{product.price_display}</span>
         </span>

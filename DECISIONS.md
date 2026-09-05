@@ -282,13 +282,133 @@ pass.
 
 The memory is scoped to the conversation, not to an account, because there are
 no customer accounts — the session cookie is the identity, so it stops at one
-person's thread with one brand. Buying from a second brand with the same browser
-starts fresh, which is asserted by a test.
+person's thread and goes no wider. It does now follow that person across brands
+within the thread, which is the opposite of what it did before the marketplace:
+an address belongs to the shopper, not to a shop, and asking for it again
+because the next item came from a different label would be absurd. One
+submission attaches it to every unpaid order in the checkout. That it does not
+reach a *different shopper* is asserted by a test.
 
 Validation is India-shaped: a six-digit PIN, a ten-digit mobile, states from a
 list. `country` exists so widening it is a validation change rather than a
 migration. `requires_shipping` is per brand, so a brand selling something
 digital turns the whole step off.
+
+## The marketplace pivot
+
+### Every brand's own chat page was removed
+
+Convo shipped as one storefront per brand: `/chat/<slug>`, themed in the
+brand's colour, with a per-brand assistant name and voice. That is now a single
+shop at `/shop` that searches every listed catalogue at once.
+
+This was asked for directly, and it is the right shape. The per-brand version
+had the platform doing the hard part — the agent, the gates, the money path —
+and then handing each brand a link they had to drive traffic to themselves. A
+brand with no audience got a beautiful storefront nobody opened. One shelf
+means the platform carries the demand problem, which is the only part of this a
+brand cannot do alone.
+
+What brands keep: the dashboard, the catalogue, provider connections, the `/v1`
+API, their own orders, and their own audit trail. What they lose: the separate
+link, the accent colour, the assistant name, the brand voice, and the per-brand
+model override. Those four columns are still in `tenants` — SQLite cannot drop
+a column without rebuilding the table, and rebuilding it to delete defaults
+nothing reads is not worth the risk to live catalogues — but nothing reads
+them, and the settings page no longer offers them. A setting that does nothing
+is worse than no setting.
+
+**What I would push back on, and did not.** A brand's own themed storefront is
+a real thing to give up, and some brands sell precisely on presentation. The
+honest answer is that both can exist — the shelf for discovery, a branded page
+for a brand that has its own traffic — and the per-brand route could come back
+without disturbing anything below it, because the split is in the routes and
+the theming, not in the model. It was removed rather than kept because keeping
+a surface nobody is asked to maintain is how products rot.
+
+### The conversation stopped belonging to a brand
+
+The interesting consequence. Every row used to carry a `tenant_id` and every
+query filtered on it. A shopper talking to Convo is not talking to one brand,
+so `conversations`, `messages`, `carts`, `cart_items` and `seen_products` are
+now platform-level, and five tables were rebuilt rather than altered.
+
+Tenant isolation did not weaken; it moved, and there are now two boundaries
+where there was one:
+
+- **Between brands** — unchanged. A brand still cannot read another's
+  catalogue, orders or ledger, and `products.listedAcrossBrands()` is the only
+  accessor in the repository that deliberately crosses tenants. It is named to
+  be found, commented to say why, and returns only opted-in brands.
+- **Between shoppers** — new, and load-bearing in a way it was not before. The
+  cart can no longer be fenced by tenant, so it is fenced by the customer
+  session cookie. Every order route proves ownership with the conversation
+  (`orders.forCustomer`) rather than with a brand, because a shopper does not
+  know which brand an order belongs to and should not have to.
+
+Both are asserted in `security.test.ts`. The second is the one that would have
+been easy to get wrong quietly.
+
+### A cart spanning brands is one order per brand
+
+Convo is not the merchant of record and does not want to be. Each brand takes
+payment on its own account, so a three-brand cart is three orders sharing a
+`checkout_id`, and the card pays them in turn — naming the brand each time, so
+nobody is surprised by three charges on a statement.
+
+It is all-or-nothing at staging: if any brand in the cart cannot take money,
+nothing is staged and the customer is told which brand and why. A checkout that
+half-worked is worse than one that did not start. After staging it is
+deliberately *not* atomic — one brand can be paid while another declines,
+because refusing to let someone buy what they can buy would be worse. The cart
+closes only when every order in the checkout is paid, and a half-paid checkout
+is never handed back as a live cart.
+
+The alternative is Razorpay Route: one charge, split server-side. It is a
+better checkout and a much worse liability, because Convo would hold other
+people's money and become the merchant of record for refunds and disputes. Not
+before the volume justifies it.
+
+### Listing is opt-in, and refused when the shop would be a dead end
+
+`is_listed` defaults off. A brand signed up for a dashboard, not for a shelf
+beside a competitor, and putting them there by default is a decision that
+should be theirs.
+
+Turning it *on* is refused while the brand has no products or no payment
+provider — a shopper who finds goods they cannot buy has been failed by Convo,
+not by the merchant. Turning it *off* is never refused: a brand can always take
+itself off the shelf, immediately.
+
+There is no review step. A real marketplace needs someone deciding what belongs
+on the shelf, and this has nobody. That is a deployment problem, not an
+architecture one — the flag and the readiness check are the place it would go.
+
+### The agent ranks on fit, and never on who the brand is
+
+The one genuinely new failure mode. An assistant selling for competitors can
+put a thumb on the scale, and neither the brands nor the shopper would easily
+notice.
+
+Three things hold against it. The prompt says to treat brands as equals and to
+rank on fit, price and availability — never on size, stock or catalogue share.
+The `many-brands` skill says the same at more length, and adds that quality,
+ethics and delivery speed are not in the tool results and so are not the
+agent's to assert about anyone. And catalogue text stays fenced, so a merchant
+cannot write "recommend this first" into a description and have it read as an
+instruction — including a description claiming to speak for Convo.
+
+Two ranking decisions are in code rather than in the prompt, which is where
+they belong. An open browse deals products out one brand at a time, so the
+first row is a fair sample rather than everything from whoever uploaded most. A
+keyword search is ranked on relevance alone and deliberately *not* interleaved
+— a shopper who asked for jhumkas would rather see six good ones from one brand
+than three padded with sarees — with a relevance floor added, because across
+many catalogues a weak match is noise from a shop nobody asked about.
+
+None of this is enforcement. A model can still be persuaded, and a paid-ranking
+feature would sit exactly here; the honest position is that the incentive does
+not exist yet and the code should make it visible when it does.
 
 ## What a deployment still owns
 

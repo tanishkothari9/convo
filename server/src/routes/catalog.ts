@@ -57,7 +57,9 @@ catalogRoutes.get(
       },
       provider: connections.active(tenant.id) ?? null,
       model: {
-        active: tenant.llmProvider ?? env.llmProvider,
+        // One agent serves the whole marketplace, so the model is a platform
+        // choice. Reported here so a brand can see what is answering for it.
+        active: env.llmProvider,
         platformDefault: env.llmProvider,
         providers: providerStatus(),
       },

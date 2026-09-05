@@ -14,12 +14,21 @@ CREATE TABLE IF NOT EXISTS tenants (
   name              TEXT NOT NULL,
   slug              TEXT NOT NULL UNIQUE,
   description       TEXT,
-  -- Agent persona, per brand. Same agent architecture, different voice.
+  currency          TEXT NOT NULL DEFAULT 'INR',
+  /*
+   * Four columns kept for existing databases and read by nothing.
+   *
+   * They configured a per-brand assistant — its name, its register, its
+   * colour, its model — back when every brand had a chat page of its own.
+   * One agent serves the whole marketplace now, so a per-brand persona would
+   * mean the shop changing voice as the customer moved between shelves.
+   * SQLite cannot drop a column without rebuilding the table, and rebuilding
+   * it to delete four defaults nothing reads is not worth the risk to live
+   * catalogues; a Postgres migration drops them.
+   */
   assistant_name    TEXT NOT NULL DEFAULT 'Assistant',
   brand_voice       TEXT NOT NULL DEFAULT 'warm, precise, and unhurried',
-  currency          TEXT NOT NULL DEFAULT 'INR',
   accent_color      TEXT NOT NULL DEFAULT '#1A1C22',
-  -- Per-tenant model override; NULL falls back to the platform LLM_PROVIDER.
   llm_provider      TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL

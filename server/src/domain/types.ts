@@ -11,15 +11,11 @@ export interface Tenant {
   name: string
   slug: string
   description: string | null
-  assistantName: string
-  brandVoice: string
   currency: string
-  accentColor: string
   /** False for a brand selling something that does not need delivering. */
   requiresShipping: boolean
   /** Opt-in. Nothing reaches the marketplace until the brand turns this on. */
   isListed: boolean
-  llmProvider: string | null
   createdAt: string
   updatedAt: string
 }
