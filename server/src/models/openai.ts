@@ -41,11 +41,22 @@ export class OpenAIModelProvider implements ModelProvider {
     return Boolean(this.apiKey)
   }
 
+  /*
+   * Reasoning models take a `reasoning_effort`; everything before them rejects
+   * the argument outright, so it cannot simply always be sent. Matching on the
+   * model id is not elegant, but the alternative is a failed request per turn
+   * to discover the same thing.
+   */
+  private get reasoning(): boolean {
+    return /^(gpt-5|o[1-9])/.test(this.model)
+  }
+
   private body(request: AgentTurnRequest, stream: boolean) {
     return {
       model: this.model,
       max_completion_tokens: request.maxTokens ?? 2048,
       temperature: request.temperature ?? 1,
+      ...(this.reasoning ? { reasoning_effort: env.openaiReasoningEffort } : {}),
       messages: [
         { role: 'system', content: request.systemPrompt },
         ...toOpenAIMessages(request.messages),

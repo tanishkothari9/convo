@@ -294,6 +294,56 @@ list. `country` exists so widening it is a validation change rather than a
 migration. `requires_shipping` is per brand, so a brand selling something
 digital turns the whole step off.
 
+### The .env file was never being read
+
+Found while switching the model provider on, and it had been true the whole
+time: `env.ts` used `import 'dotenv/config'`, which reads from
+`process.cwd()`. The server starts through an npm workspace script, so the
+working directory is `server/` — and the `.env` is at the repo root. There is
+no `server/.env`, so the file was never loaded and every value silently fell
+back to its default.
+
+It looked like it worked because most of the defaults match what the file
+says: the same port, the same public base URL, a database path that resolves
+against the repo root anyway. What it actually meant was that `CONVO_SECRET`
+was the insecure development fallback, the Razorpay keys were never read, and
+`LLM_PROVIDER=openai` did nothing.
+
+Now resolved from the module's own location, which lands on the repo root from
+`src/` and from a built `dist/` alike. Real environment variables still win —
+dotenv does not overwrite what is already set — so a deployment that injects
+config properly is unaffected, and the test suite, which sets its own
+`DATABASE_PATH` and `CONVO_SECRET` before importing, is unaffected too.
+
+Nothing had to be migrated: no provider credentials had been encrypted yet, so
+there was nothing sealed with the old secret. Dashboard sessions signed with
+the old default stop resolving, which is the correct outcome for a session
+signed with a published default.
+
+### The gpt-5.6 family needs `reasoning_effort: 'none'` to use tools
+
+On `/v1/chat/completions` the 5.6 models refuse function tools outright:
+*"Function tools with reasoning_effort are not supported ... use /v1/responses
+or set reasoning_effort to 'none'."* Convo needs tools far more than it needs
+the model thinking to itself, so the Chat Completions adapter sends
+`reasoning_effort: 'none'` and keeps its existing wire format.
+
+The parameter is sent only for models that have it — `gpt-4.1` rejects
+`reasoning_effort` as an unrecognised argument, so it cannot simply always be
+included. Matching on the model id is not elegant; the alternative is a failed
+request per turn to discover the same thing.
+
+Moving to `/v1/responses` would keep reasoning and is the better long-term
+home, but it is a different request shape, a different response shape and
+different streaming events — a rewrite of the adapter to buy something this
+agent does not currently need.
+
+**Measured, not assumed.** With the OpenAI provider live, one message —
+*"find me blue kurtis under 2000, add one to my cart and check out"* — chains
+search → add to cart → checkout in a single turn, which the scripted provider
+cannot do. Three runs each on `gpt-5.6-luna` and `gpt-5.6-terra` completed the
+full chain, 7–9s a turn. Luna is configured; Terra is a one-line change.
+
 ## The marketplace pivot
 
 ### Every brand's own chat page was removed

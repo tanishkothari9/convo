@@ -60,12 +60,16 @@ Three that arrived with the split checkout, all covered by tests:
 
 Neither blocked the build; both were worked around rather than skipped.
 
-1. **An LLM API key.** No `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` was
-   available. Both backends are code-complete but have never been run against
-   their real API. Convo runs on the built-in deterministic provider instead,
-   which exercises every gate and audit path identically. To try a real model:
-   put a key in `.env`, set `LLM_PROVIDER=anthropic` (or `openai`), restart.
-   Nothing else changes.
+1. **~~An LLM API key~~ — supplied, and the OpenAI backend is now proven.**
+   Running on `openai` / `gpt-5.6-luna`. One message — *"find me blue kurtis
+   under 2000, add one to my cart and check out"* — chains search → add →
+   checkout in a single turn, then the customer fills the address and pays.
+   `gpt-5.6-terra` behaves equivalently and is a one-line change. The
+   Anthropic backend is still code-complete but unrun: no key for it.
+
+   Two things had to change to get there. The 5.6 models refuse function tools
+   on Chat Completions unless `reasoning_effort` is `'none'`, and `.env` was
+   never being read at all — see `DECISIONS.md`.
 
 2. **Razorpay test keys.** The adapter is written against the published API and
    runs against a built-in sandbox that speaks identical shapes. Add real test

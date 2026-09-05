@@ -103,16 +103,26 @@ Three backends ship:
 - **`anthropic`** — Claude on the Messages API, with a cache breakpoint between
   the static and dynamic halves of the system prompt.
 - **`openai`** — GPT on Chat Completions with function tool calling. The same
-  internal tool definitions are translated into each vendor's wire format.
+  internal tool definitions are translated into each vendor's wire format. The
+  gpt-5.6 family refuses function tools unless `reasoning_effort` is `'none'`,
+  so the adapter sends that for reasoning models and omits it for the ones that
+  reject the argument.
 - **`scripted`** — a deterministic, no-network provider. It is a real
   implementation of the interface, not a stub: it reads the same history, is
   handed the same tools, and answers with the same typed tool calls, so every
   gate and audit entry downstream runs identically. It is the default so that
   Convo is fully demonstrable with no API key.
 
-Set `LLM_PROVIDER` (and the matching key) to switch, or pick a model per brand
-in **Settings**. A provider configured without a key falls back to `scripted`
-and says so in the logs.
+Set `LLM_PROVIDER` (and the matching key) to switch. A provider configured
+without a key falls back to `scripted` and says so in the logs.
+
+What the model buys you is chaining. On `scripted`, one message is one intent —
+*"find me blue kurtis under 2000, add one to my cart and check out"* matches
+"check out", finds an empty cart and stops. On `openai` / `gpt-5.6-luna` the
+same sentence runs search → add → checkout in a single turn. What it does not
+buy you is payment: `checkout` takes no amount and there is no tool that moves
+money, so the last two steps — the delivery address and the signed payment —
+are the customer's on every provider.
 
 ### 3. The server decides what gets charged
 
