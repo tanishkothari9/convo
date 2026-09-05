@@ -58,6 +58,47 @@ web/                        React + Vite
   src/chat/                 the public shop
 ```
 
+## Buying, when the buyer is an agent
+
+A person shops here by talking. An agent shops here over JSON — the same shelf,
+the same cart, the same checkout — but it cannot buy on nobody's authority.
+
+The model is [AP2](https://github.com/google-agentic-commerce/AP2)'s. A human
+signs an **open mandate** once: a budget, the brands it may be spent at, a
+per-checkout ceiling, an expiry, as an ES256 JWS. The agent presents it at
+checkout and Convo tests the basket against it.
+
+```
+POST /v1/agent/mandates    a human authorises an agent; returns the signed mandate
+GET  /v1/agent/catalog     the shelf, across every listed brand
+POST /v1/agent/cart        add a product
+POST /v1/agent/checkout    check out, presenting the mandate
+GET  /v1/agent/orders      what settled — an agent has no browser to watch
+```
+
+Two rules make the allowlist mean something once more than one brand is
+involved. Each brand is tested **separately**, so a cart spanning an authorised
+brand and an unauthorised one fails on the second rather than passing because
+most of it was fine. The budget is tested against the **whole cart**, because
+checking it per brand would let an agent spend the same allowance once at every
+merchant it visits. Then the ordinary split runs: one order per brand, each paid
+to that brand's own account, under one mandate.
+
+**A mandate is not a price.** It says what an agent may spend; it never says
+what the basket costs. That figure is still recomputed from live catalogue rows
+by the same code a human's checkout uses — the mandate gate lives *inside*
+[`gatedCheckout`](server/src/agent/gates.ts), not beside it, because a parallel
+agent checkout would be a second money path and the second one always drifts.
+
+Spend is tallied by mandate id across every order it authorises, so a budget
+depletes rather than resetting. Orders still awaiting payment count: an agent
+that stages three checkouts and settles none has still spoken for that money.
+
+In the demo Convo holds both halves of the signing key, generated at boot. In
+production the private half belongs to the person delegating and would never
+reach the server — that is a shortcut in *who holds the key*, not in the
+verification, which is the real path either way.
+
 ## The three ideas
 
 ### 1. The agent is built on Claude Commerce Agents
@@ -323,7 +364,7 @@ have arrived.
 npm test
 ```
 
-76 tests over the rules that must hold whichever model is running: fencing
+91 tests over the rules that must hold whichever model is running: fencing
 against forged turn markers and fence escapes, signature verification against
 tampering and cross-order replay, the tool surface, and the money path against
 a real database — the total recomputed after a price move, an item selling out
