@@ -148,28 +148,85 @@
   --radius-sheet: 1rem;      /* 16px */
 
   /*
-   * Elevation as a ring plus air, not as a drop shadow.
+   * Elevation as a physical object, not as a drop shadow.
    *
-   * A card is defined by a hairline drawn in shadow rather than by a border —
-   * it sits inside the radius perfectly, needs no box-sizing arithmetic, and
-   * can be layered with a wide, almost invisible ambient that reads as the
-   * card being slightly off the page. The white inset is the top edge catching
-   * light, which is what stops a pale card dissolving into a pale ground.
+   * The important part is the white line along the top inside edge. A surface
+   * lit from above catches light on its top bevel, and one inset highlight is
+   * what separates a card that looks printed from a rectangle with a border on
+   * it. Under it sits a hairline ring — drawn in shadow rather than as a
+   * border, so it lands inside the radius and costs no layout — and then two
+   * or three very faint drops at increasing distance, which is what an object
+   * a few millimetres off the page actually casts.
+   *
+   * Every surface in the product is built from four of these and nothing else:
+   * a card, a raised key, a recessed well, and a framed device.
    */
   --ring: 0 0 0 1px rgba(23, 23, 23, 0.08);
   --ring-strong: 0 0 0 1px rgba(23, 23, 23, 0.14);
-  --edge-light: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  --edge-light: inset 0 0 0 1px #ffffff;
 
-  --shadow-card: var(--ring), 0 1px 2px rgba(23, 23, 23, 0.02), 0 0 20px rgba(23, 23, 23, 0.03);
-  --shadow-raised: var(--ring), 0 2px 4px rgba(23, 23, 23, 0.03), 0 8px 24px rgba(23, 23, 23, 0.04);
-  --shadow-float: var(--ring), 0 8px 20px rgba(23, 23, 23, 0.07), 0 24px 56px rgba(23, 23, 23, 0.09);
+  /* Paper: sitting on the page. */
+  --shadow-card:
+    inset 0 0 0 1px #ffffff,
+    0 0 0 1px rgba(23, 23, 23, 0.08),
+    0 0 20px rgba(23, 23, 23, 0.03),
+    0 15px 15px rgba(23, 23, 23, 0.02);
 
-  /* Kept as aliases: a hundred rules reference these by their old names, and
-     the point of a token layer is that they do not all have to change. */
+  --shadow-raised:
+    inset 0 0 0 1px #ffffff,
+    0 0 0 1px rgba(23, 23, 23, 0.08),
+    0 0 20px rgba(23, 23, 23, 0.03),
+    0 15px 15px rgba(23, 23, 23, 0.02),
+    0 36px 28px rgba(23, 23, 23, 0.02);
+
+  --shadow-float:
+    inset 0 0 0 1px #ffffff,
+    0 0 0 1px rgba(23, 23, 23, 0.08),
+    0 4px 10px rgba(23, 23, 23, 0.08),
+    0 25px 25px rgba(23, 23, 23, 0.04),
+    0 65px 45px rgba(23, 23, 23, 0.03);
+
+  /* A key: pressable, with the light on its top bevel. */
+  --shadow-key:
+    inset 0 2px 0 0 #ffffff,
+    inset 0 0 0.36px 1.5px rgba(255, 255, 255, 0.35),
+    0 0 0 1px rgba(23, 23, 23, 0.1),
+    0 2px 3px rgba(23, 23, 23, 0.06);
+
+  /* The same key in a saturated colour: the bevel becomes a lighter version of
+     the fill rather than white, which would read as a chip out of the paint. */
+  --shadow-key-accent:
+    inset 0 1.5px 0 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(9, 46, 34, 0.24),
+    0 2px 3px rgba(9, 46, 34, 0.18);
+
+  /* Pressed: the bevel goes, the drop collapses, the object sits down. */
+  --shadow-key-down:
+    inset 0 1px 2px rgba(23, 23, 23, 0.16),
+    0 0 0 1px rgba(23, 23, 23, 0.12);
+
+  /* A well: debossed into the page. Light from below-right, shadow above-left,
+     which is the inverse of everything raised. */
+  --shadow-well:
+    inset 0 0 0 1px #ffffff,
+    inset 1px 1px 4px rgba(23, 23, 23, 0.1),
+    inset -2px -2px 3px rgba(255, 255, 255, 0.7);
+
+  /* A device sitting on the page: a soft mat ring, like a print in a frame. */
+  --shadow-device:
+    inset 0 0 0.36px 1.5px rgba(255, 255, 255, 0.35),
+    inset 0 2px 0 0 #ffffff,
+    0 0 0 4px rgba(232, 231, 230, 0.4),
+    0 0 2px rgba(23, 23, 23, 0.22),
+    0 24px 40px rgba(23, 23, 23, 0.1);
+
+  /* Kept as aliases: rules across the product name these, and the point of a
+     token layer is that they do not all have to change. */
   --shadow-lift: var(--shadow-card);
   --shadow-deep: var(--shadow-float);
   --shadow-sm: var(--shadow-card);
-  --shadow-glow: 0 4px 14px rgba(27, 107, 84, 0.22);
+  --shadow-glow: var(--shadow-key-accent);
 
   /* ── Motion ──────────────────────────────────────────────────────────────
      The built-in easings are too weak to read as intentional. ease-in is

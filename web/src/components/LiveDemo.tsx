@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { IconCart, IconSend, IconSpark } from './icons'
+import { Mark } from './Mark'
 
 /**
  * The hero's product demo: a scripted conversation that plays itself.
@@ -106,7 +107,7 @@ export function LiveDemo() {
     <div className="demo glass-dark">
       <div className="demo-bar">
         <span className="demo-brand">
-          <span className="demo-badge">C</span>
+          <Mark size={22} />
           Convo
         </span>
         <span className="demo-cart">

@@ -5,7 +5,8 @@
       "name": "convo-web",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:web"],
-      "port": 5173
+      "port": 5173,
+      "autoPort": false
     }
   ]
 }

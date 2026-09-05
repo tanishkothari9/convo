@@ -280,13 +280,43 @@
   --line: #e7e7e3;
   --line-strong: #d9d9d6;
   --surface: #ffffff;
+  --surface-solid: #ffffff;
   --surface-sunken: #f1f1ee;
+  /*
+   * The accent has to come back too.
+   *
+   * The hero re-points --accent to a bright mint so it separates from a dark
+   * field. This panel is a light surface sitting on that field, so it needs
+   * the light-surface green — otherwise the bubble and the send key come out
+   * in a colour that appears nowhere in the actual product.
+   */
+  --accent: #1b6b54;
+  --accent-hover: #155943;
+  --accent-tint: #eaf1ee;
+  --brand: #1b6b54;
+  --brand-hover: #155943;
+  --brand-tint: #eaf1ee;
+  --brand-contrast: #fbfbf8;
+  --ring: 0 0 0 1px rgba(23, 23, 23, 0.08);
+  --ring-strong: 0 0 0 1px rgba(23, 23, 23, 0.14);
 
+  /*
+   * Set explicitly, not inherited.
+   *
+   * Re-pointing --ink does nothing for text that never asked for it: `color`
+   * was still coming down from the hero, which is white, so the total inside
+   * this panel rendered white on a pale mint tint. Tokens describe a palette;
+   * something still has to use them.
+   */
+  color: var(--ink);
   background: var(--canvas);
-  border: 1px solid rgba(23, 23, 23, 0.1);
+  border: 0;
   border-radius: var(--radius-sheet);
   overflow: hidden;
-  box-shadow: 0 12px 30px rgba(12, 30, 22, 0.22), 0 40px 80px rgba(12, 30, 22, 0.18);
+  /* A print in a mat: a soft ring of paper around the edge, a hairline inside
+     it, and enough shadow underneath that it is sitting on the grass rather
+     than pasted onto it. */
+  box-shadow: var(--shadow-device);
   /* Sat back very slightly, so it reads as a device held at an angle rather
      than a flat rectangle pasted onto the page. */
   transform: perspective(1400px) rotateY(-3deg) rotateX(1.5deg);
@@ -297,8 +327,8 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--line);
   background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--line);
 }
 
 .demo-brand {
@@ -308,18 +338,6 @@
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--ink);
-}
-
-.demo-badge {
-  display: grid;
-  place-items: center;
-  width: 1.375rem;
-  height: 1.375rem;
-  border-radius: 0.4375rem;
-  background: linear-gradient(140deg, #a8425f, #6d213a);
-  font-size: 0.6875rem;
-  font-weight: var(--weight-semibold);
-  color: #fff;
 }
 
 .demo-cart {
@@ -361,7 +379,9 @@
   max-width: 82%;
   padding: 0.4375rem var(--space-3);
   border-radius: 0.875rem 0.875rem 0.25rem 0.875rem;
-  background: linear-gradient(140deg, #a8425f, #7d2844);
+  /* The same bubble the shop uses, in the same green. A maroon one here was a
+     colour that appears nowhere else in the product. */
+  background: var(--accent);
   color: #fff;
   animation: pop-in 260ms var(--ease-out);
 }
@@ -389,9 +409,10 @@
 
 .demo-card {
   padding: var(--space-2);
-  border-radius: 0.625rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0;
+  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   gap: 0.1875rem;
@@ -432,15 +453,16 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The same shape the real checkout card uses: a rule, a label, and the figure
+   given the weight it has earned. Not a tinted panel of its own. */
 .demo-total {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3);
-  border-radius: 0.625rem;
-  background: rgba(47, 176, 138, 0.14);
-  border: 1px solid rgba(47, 176, 138, 0.3);
+  padding-top: var(--space-3);
+  margin-top: var(--space-1);
+  border-top: 1px solid var(--line);
   animation: card-rise 380ms var(--ease-out);
 }
 
@@ -449,13 +471,17 @@
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-xs);
+  line-height: 1.4;
   color: var(--ink-secondary);
 }
 
 .demo-total strong {
-  font-size: var(--text-heading);
+  flex: none;
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.014em;
+  color: var(--ink);
 }
 
 .demo-composer {
@@ -463,18 +489,20 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4) var(--space-4);
-  border-top: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--line);
 }
 
+/* A field is a well: pressed into the panel rather than drawn on it. */
 .demo-input {
   flex: 1;
-  min-height: 2rem;
+  min-height: 2.25rem;
   display: flex;
   align-items: center;
   padding: 0 var(--space-3);
   border-radius: var(--radius-chip);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  border: 0;
+  box-shadow: var(--shadow-well);
   font-size: var(--text-sm);
   color: var(--ink);
 }
@@ -495,10 +523,11 @@
 .demo-send {
   display: grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 50%;
-  background: var(--grad-brand);
+  background: var(--accent);
+  box-shadow: var(--shadow-key-accent);
   color: #fff;
   flex: none;
 }
